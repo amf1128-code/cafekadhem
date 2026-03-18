@@ -20,8 +20,18 @@ export function useAdmin() {
   }, [])
 
   async function login(email: string, password: string) {
-    const { error } = await supabase.auth.signInWithPassword({ email, password })
-    if (error) throw error
+    console.log('[auth] Attempting login for:', email)
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({ email, password })
+      if (error) {
+        console.error('[auth] Login error:', error.message, error.status, error)
+        throw error
+      }
+      console.log('[auth] Login successful, session:', !!data.session)
+    } catch (err) {
+      console.error('[auth] Login exception:', err)
+      throw err
+    }
   }
 
   async function logout() {
