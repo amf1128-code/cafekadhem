@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, Link } from 'react-router-dom'
 import { Button } from '../../components/ui/Button'
 import { Input } from '../../components/ui/Input'
 import { useAdmin } from '../../hooks/useAdmin'
@@ -55,6 +55,12 @@ export function AdminLogin() {
             Sign In
           </Button>
         </form>
+
+        <p className="text-center mt-4">
+          <Link to="/admin/forgot-password" className="text-forest hover:underline text-sm">
+            Forgot password?
+          </Link>
+        </p>
       </div>
     </div>
   )

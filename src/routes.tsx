@@ -8,6 +8,8 @@ import { EventDetail } from './pages/EventDetail'
 import { Order } from './pages/Order'
 import { InviteLanding } from './pages/InviteLanding'
 import { AdminLogin } from './pages/admin/Login'
+import { ForgotPassword } from './pages/admin/ForgotPassword'
+import { ResetPassword } from './pages/admin/ResetPassword'
 import { AdminDashboard } from './pages/admin/Dashboard'
 import { AdminEventForm } from './pages/admin/EventForm'
 import { AdminEventOrders } from './pages/admin/EventOrders'
@@ -31,6 +33,14 @@ export const router = createBrowserRouter([
   {
     path: '/admin/login',
     element: <AdminLogin />,
+  },
+  {
+    path: '/admin/forgot-password',
+    element: <ForgotPassword />,
+  },
+  {
+    path: '/admin/reset-password',
+    element: <ResetPassword />,
   },
   {
     path: '/admin',
