@@ -58,7 +58,7 @@ export function EventDetail() {
       .from('rsvps')
       .select('*, guest:public_guest_profiles(*)')
       .eq('event_id', id!)
-      .in('status', ['yes', 'maybe'])
+      .in('status', ['yes', 'maybe', 'waitlisted'])
 
     if (rsvpData) setRsvps(rsvpData as (RSVP & { guest: PublicGuestProfile })[])
 
@@ -88,6 +88,7 @@ export function EventDetail() {
   }
 
   const yesCount = rsvps.filter(r => r.status === 'yes').length
+  const waitlistCount = rsvps.filter(r => r.status === 'waitlisted').length
   const isFull = event.capacity ? yesCount >= event.capacity : false
 
   return (
@@ -136,7 +137,9 @@ export function EventDetail() {
               />
             </div>
             <span className="text-sm text-ink/60 whitespace-nowrap">
-              {isFull ? 'Full' : `${yesCount} / ${event.capacity} spots`}
+              {isFull
+                ? `Full${waitlistCount > 0 ? ` — ${waitlistCount} on waitlist` : ''}`
+                : `${yesCount} / ${event.capacity} spots`}
             </span>
           </div>
         </div>

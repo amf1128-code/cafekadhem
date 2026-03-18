@@ -72,7 +72,9 @@ export interface RSVP {
   id: string
   event_id: string
   guest_id: string
-  status: 'yes' | 'maybe' | 'no'
+  status: 'yes' | 'maybe' | 'no' | 'waitlisted'
+  waitlist_position: number | null
+  waitlisted_at: string | null
   created_at: string
   updated_at: string
   // Joined

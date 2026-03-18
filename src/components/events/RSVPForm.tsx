@@ -119,7 +119,7 @@ export function RSVPForm({ eventId, existingRsvp, isFull, onRsvpComplete }: RSVP
       setGuestToken(guestId)
 
       // Use safe_create_rsvp function for capacity enforcement
-      const { error: rsvpError } = await supabase.rpc('safe_create_rsvp', {
+      const { data: rsvpResult, error: rsvpError } = await supabase.rpc('safe_create_rsvp', {
         p_event_id: eventId,
         p_guest_id: guestId,
         p_status: status,
@@ -136,13 +136,19 @@ export function RSVPForm({ eventId, existingRsvp, isFull, onRsvpComplete }: RSVP
         })
       }
 
-      addToast(
-        status === 'yes'
-          ? "You're going!"
-          : status === 'maybe'
-          ? 'Marked as maybe.'
-          : 'RSVP updated.'
-      )
+      const returnedStatus = rsvpResult?.status
+      if (returnedStatus === 'waitlisted') {
+        const pos = rsvpResult?.waitlist_position
+        addToast(`You're on the waitlist${pos ? ` (position #${pos})` : ''}!`)
+      } else {
+        addToast(
+          status === 'yes'
+            ? "You're going!"
+            : status === 'maybe'
+            ? 'Marked as maybe.'
+            : 'RSVP updated.'
+        )
+      }
 
       setShowForm(false)
       onRsvpComplete()
@@ -154,12 +160,18 @@ export function RSVPForm({ eventId, existingRsvp, isFull, onRsvpComplete }: RSVP
   }
 
   if (existingRsvp && !showForm) {
-    const statusLabels = { yes: 'Going', maybe: 'Maybe', no: 'Not going' }
+    const statusLabels: Record<string, string> = { yes: 'Going', maybe: 'Maybe', no: 'Not going', waitlisted: 'Waitlisted' }
+    const isWaitlisted = existingRsvp.status === 'waitlisted'
     return (
       <div className="text-center">
         <p className="text-ink/70 mb-2">
-          Your RSVP: <span className="font-medium text-forest">{statusLabels[existingRsvp.status]}</span>
+          Your RSVP: <span className={`font-medium ${isWaitlisted ? 'text-amber-700' : 'text-forest'}`}>
+            {statusLabels[existingRsvp.status] || existingRsvp.status}
+          </span>
         </p>
+        {isWaitlisted && existingRsvp.waitlist_position && (
+          <p className="text-sm text-ink/50 mb-2">Position #{existingRsvp.waitlist_position} on the waitlist</p>
+        )}
         <Button variant="outline" size="sm" onClick={() => setShowForm(true)}>
           Change RSVP
         </Button>

@@ -8,8 +8,9 @@ interface RSVPListProps {
 export function RSVPList({ rsvps }: RSVPListProps) {
   const going = rsvps.filter(r => r.status === 'yes')
   const maybe = rsvps.filter(r => r.status === 'maybe')
+  const waitlisted = rsvps.filter(r => r.status === 'waitlisted')
 
-  if (going.length === 0 && maybe.length === 0) {
+  if (going.length === 0 && maybe.length === 0 && waitlisted.length === 0) {
     return null
   }
 
@@ -31,12 +32,25 @@ export function RSVPList({ rsvps }: RSVPListProps) {
       )}
 
       {maybe.length > 0 && (
-        <div>
+        <div className="mb-4">
           <h3 className="text-sm font-medium text-ink/60 mb-2">
             Maybe ({maybe.length})
           </h3>
           <div className="flex flex-wrap gap-2">
             {maybe.map(rsvp => (
+              <GuestChip key={rsvp.id} guest={rsvp.guest} />
+            ))}
+          </div>
+        </div>
+      )}
+
+      {waitlisted.length > 0 && (
+        <div>
+          <h3 className="text-sm font-medium text-ink/60 mb-2">
+            Waitlist ({waitlisted.length})
+          </h3>
+          <div className="flex flex-wrap gap-2">
+            {waitlisted.map(rsvp => (
               <GuestChip key={rsvp.id} guest={rsvp.guest} />
             ))}
           </div>
