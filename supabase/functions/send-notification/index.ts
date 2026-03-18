@@ -43,6 +43,10 @@ const messageTemplates: Record<string, (data: Record<string, string>) => { subje
     subject: `Reminder - ${data.event_title || 'Cafe Kadhem'} Tomorrow!`,
     body: `Reminder: ${data.event_title || 'Your event'} is tomorrow! See you there.`,
   }),
+  waitlist_promoted: (data) => ({
+    subject: `You're In! - ${data.event_title || 'Cafe Kadhem'}`,
+    body: `Great news! A spot opened up at ${data.event_title || 'our event'} and you've been promoted from the waitlist. You're confirmed! See you there.`,
+  }),
 }
 
 async function sendSMS(to: string, body: string): Promise<boolean> {

@@ -57,7 +57,12 @@ Deno.serve(async (req: Request) => {
       })
     }
 
-    return new Response(JSON.stringify({ success: true, rsvp }), {
+    const response: Record<string, unknown> = { success: true, rsvp }
+    if (rsvp?.status === 'waitlisted' && rsvp?.waitlist_position) {
+      response.waitlist_position = rsvp.waitlist_position
+    }
+
+    return new Response(JSON.stringify(response), {
       headers: { 'Content-Type': 'application/json' },
     })
   } catch (err) {
