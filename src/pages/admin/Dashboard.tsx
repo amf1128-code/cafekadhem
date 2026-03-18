@@ -8,7 +8,7 @@ import { Button } from '../../components/ui/Button'
 import { Badge } from '../../components/ui/Badge'
 
 export function AdminDashboard() {
-  const [events, setEvents] = useState<(Event & { rsvp_yes: number; rsvp_maybe: number; order_count: number })[]>([])
+  const [events, setEvents] = useState<(Event & { rsvp_yes: number; rsvp_maybe: number; rsvp_waitlisted: number; order_count: number })[]>([])
   const [recentRsvps, setRecentRsvps] = useState<(RSVP & { guest: PublicGuestProfile; event_title: string })[]>([])
   const [loading, setLoading] = useState(true)
 
@@ -26,15 +26,17 @@ export function AdminDashboard() {
     if (eventsData) {
       const withCounts = await Promise.all(
         eventsData.filter(e => isUpcoming(e.date)).map(async (event) => {
-          const [yesResult, maybeResult, orderResult] = await Promise.all([
+          const [yesResult, maybeResult, waitlistedResult, orderResult] = await Promise.all([
             supabase.from('rsvps').select('*', { count: 'exact', head: true }).eq('event_id', event.id).eq('status', 'yes'),
             supabase.from('rsvps').select('*', { count: 'exact', head: true }).eq('event_id', event.id).eq('status', 'maybe'),
+            supabase.from('rsvps').select('*', { count: 'exact', head: true }).eq('event_id', event.id).eq('status', 'waitlisted'),
             supabase.from('orders').select('*', { count: 'exact', head: true }).eq('event_id', event.id),
           ])
           return {
             ...event,
             rsvp_yes: yesResult.count || 0,
             rsvp_maybe: maybeResult.count || 0,
+            rsvp_waitlisted: waitlistedResult.count || 0,
             order_count: orderResult.count || 0,
           }
         })
@@ -101,6 +103,9 @@ export function AdminDashboard() {
               <div className="flex gap-4 text-sm text-ink/70 mb-3">
                 <span>{event.rsvp_yes} going</span>
                 <span>{event.rsvp_maybe} maybe</span>
+                {event.rsvp_waitlisted > 0 && (
+                  <span className="text-amber-700">{event.rsvp_waitlisted} waitlisted</span>
+                )}
                 <span>{event.order_count} orders</span>
               </div>
               <div className="flex gap-2">
@@ -110,6 +115,11 @@ export function AdminDashboard() {
                 <Link to={`/admin/events/${event.id}/orders`}>
                   <Button variant="ghost" size="sm">Orders</Button>
                 </Link>
+                {event.rsvp_waitlisted > 0 && (
+                  <Link to={`/admin/events/${event.id}/waitlist`}>
+                    <Button variant="ghost" size="sm">Waitlist</Button>
+                  </Link>
+                )}
                 <Link to={`/events/${event.id}`} target="_blank">
                   <Button variant="ghost" size="sm">View</Button>
                 </Link>
@@ -139,7 +149,7 @@ export function AdminDashboard() {
                   <td className="px-4 py-2">{rsvp.guest?.first_name || 'Unknown'}</td>
                   <td className="px-4 py-2 text-ink/70">{rsvp.event_title}</td>
                   <td className="px-4 py-2">
-                    <Badge variant={rsvp.status === 'yes' ? 'success' : rsvp.status === 'maybe' ? 'warning' : 'default'}>
+                    <Badge variant={rsvp.status === 'yes' ? 'success' : rsvp.status === 'maybe' ? 'warning' : rsvp.status === 'waitlisted' ? 'info' : 'default'}>
                       {rsvp.status}
                     </Badge>
                   </td>

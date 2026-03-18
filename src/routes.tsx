@@ -15,6 +15,7 @@ import { AdminMenuList } from './pages/admin/MenuList'
 import { AdminMenuForm } from './pages/admin/MenuForm'
 import { AdminGuestDirectory } from './pages/admin/GuestDirectory'
 import { AdminSettings } from './pages/admin/Settings'
+import { AdminEventWaitlist } from './pages/admin/EventWaitlist'
 
 export const router = createBrowserRouter([
   {
@@ -39,6 +40,7 @@ export const router = createBrowserRouter([
       { path: 'events/new', element: <AdminEventForm /> },
       { path: 'events/:id/edit', element: <AdminEventForm /> },
       { path: 'events/:id/orders', element: <AdminEventOrders /> },
+      { path: 'events/:id/waitlist', element: <AdminEventWaitlist /> },
       { path: 'menus', element: <AdminMenuList /> },
       { path: 'menus/new', element: <AdminMenuForm /> },
       { path: 'menus/:id/edit', element: <AdminMenuForm /> },

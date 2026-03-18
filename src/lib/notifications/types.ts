@@ -1,7 +1,7 @@
 export interface NotificationPayload {
   guestId: string
   eventId: string
-  type: 'rsvp_confirmation' | 'order_confirmation' | 'event_update' | 'event_reminder' | 'invite'
+  type: 'rsvp_confirmation' | 'order_confirmation' | 'event_update' | 'event_reminder' | 'invite' | 'waitlist_promoted'
   data?: Record<string, string>
 }
 
