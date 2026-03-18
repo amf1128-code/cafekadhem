@@ -1,0 +1,21 @@
+@import "tailwindcss";
+
+@theme {
+  --color-cream: #F2E6D0;
+  --color-forest: #2D5A27;
+  --color-forest-light: #3D7A34;
+  --color-forest-dark: #1E3D1A;
+  --color-warm: #D4C4A8;
+  --color-ink: #1A1A1A;
+
+  --font-serif: "Playfair Display", Georgia, serif;
+  --font-sans: "Inter", system-ui, sans-serif;
+  --font-script: "Cormorant Garamond", Georgia, serif;
+}
+
+body {
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
