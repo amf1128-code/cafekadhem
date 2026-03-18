@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { useParams, Link } from 'react-router-dom'
+import { useParams, Link, useSearchParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import type { Event, Menu, MenuItem, RSVP, PublicGuestProfile } from '../lib/types'
 import { formatEventDateTime } from '../lib/utils/date'
@@ -10,9 +10,12 @@ import { RSVPForm } from '../components/events/RSVPForm'
 import { RSVPList } from '../components/events/RSVPList'
 import { MenuDisplay } from '../components/menus/MenuDisplay'
 import { ShareButton } from '../components/events/ShareButton'
+import { InviteForm } from '../components/guests/InviteForm'
 
 export function EventDetail() {
   const { id } = useParams<{ id: string }>()
+  const [searchParams] = useSearchParams()
+  const invitedBy = searchParams.get('invited_by')
   const [event, setEvent] = useState<Event | null>(null)
   const [menu, setMenu] = useState<Menu | null>(null)
   const [menuItems, setMenuItems] = useState<MenuItem[]>([])
@@ -96,6 +99,15 @@ export function EventDetail() {
         </div>
       )}
 
+      {/* Invite Banner */}
+      {invitedBy && (
+        <div className="bg-forest/10 border border-forest/20 rounded-lg p-3 mb-4 text-center">
+          <p className="text-forest text-sm font-medium">
+            You've been invited by {invitedBy}!
+          </p>
+        </div>
+      )}
+
       {/* Event Info */}
       <h1 className="font-serif text-3xl text-forest-dark mb-2">{event.title}</h1>
       <p className="text-ink/70 mb-1">{formatEventDateTime(event.date, event.start_time, event.end_time)}</p>
@@ -144,9 +156,14 @@ export function EventDetail() {
       {/* RSVP List */}
       <RSVPList rsvps={rsvps} />
 
-      {/* Share */}
-      <div className="my-6">
+      {/* Share & Invite */}
+      <div className="bg-white border border-warm rounded-xl p-5 my-6 space-y-4">
+        <h2 className="font-serif text-xl text-forest-dark">Share</h2>
         <ShareButton eventId={event.id} eventTitle={event.title} />
+        <div className="border-t border-warm pt-4">
+          <p className="text-sm text-ink/60 mb-2">Invite a friend directly:</p>
+          <InviteForm eventId={event.id} />
+        </div>
       </div>
 
       {/* Menu */}
