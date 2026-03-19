@@ -45,7 +45,7 @@ export function Home() {
       <div className="text-center mb-16">
         {/* "Cafe Kadhem" with Arabic behind at half opacity */}
         <div className="relative inline-block mb-4">
-          <span className="absolute inset-0 flex items-center justify-center font-arabic text-6xl md:text-7xl text-forest/20 select-none pointer-events-none" aria-hidden="true">
+          <span className="absolute inset-0 flex items-center justify-center font-arabic text-6xl md:text-7xl text-forest/20 select-none pointer-events-none whitespace-nowrap" aria-hidden="true">
             &#1603;&#1575;&#1601;&#1610;&#1607; &#1603;&#1575;&#1592;&#1605;
           </span>
           <h1 className="relative font-serif text-2xl md:text-3xl text-forest px-8 py-4">
