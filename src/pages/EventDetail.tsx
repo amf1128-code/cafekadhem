@@ -93,22 +93,24 @@ export function EventDetail() {
   return (
     <div className="max-w-3xl mx-auto px-6 py-8">
       {/* Main archival card */}
-      <div className="relative border border-stone bg-parchment-light p-6 md:p-10 mb-8">
-        {/* Vertical reference text */}
-        <div className="absolute top-6 right-3 vertical-text text-[10px] tracking-[0.15em] uppercase text-stone-dark hidden md:block">
-          Ref: CK&mdash;{formatDate(event.date).replace(/\s/g, '').replace(',', '')} // {event.location.split(',')[0]?.toUpperCase()}
-        </div>
+      <div className="relative border border-warm bg-parchment-light p-6 md:p-10 mb-8">
+        {/* Vertical reference text — uses gathering_number from DB */}
+        {event.gathering_number && (
+          <div className="absolute top-6 right-3 vertical-text text-[10px] tracking-[0.15em] uppercase text-stone-dark hidden md:block">
+            Gathering {event.gathering_number} // {event.location.split(',')[0]?.toUpperCase()}
+          </div>
+        )}
 
         {/* Header */}
         <p className="text-xs tracking-[0.25em] uppercase text-ink-muted mb-2">
-          Cafe Kadhem Experiences
+          Cafe Kadhem
         </p>
-        <h1 className="font-serif text-3xl md:text-4xl text-ink italic mb-6 pr-8">
+        <h1 className="font-serif text-3xl md:text-4xl text-forest-dark italic mb-6 pr-8">
           {event.title}
         </h1>
 
         {/* Thin divider */}
-        <div className="border-t border-stone mb-6" />
+        <div className="border-t border-warm mb-6" />
 
         {/* Info grid */}
         <div className="grid grid-cols-3 gap-4 mb-6">
@@ -127,7 +129,7 @@ export function EventDetail() {
         </div>
 
         {/* Thin divider */}
-        <div className="border-t border-stone mb-6" />
+        <div className="border-t border-warm mb-6" />
 
         {/* Description */}
         {event.description && (
@@ -138,7 +140,7 @@ export function EventDetail() {
 
         {/* Invite Banner */}
         {invitedBy && (
-          <div className="border border-stone rounded px-4 py-3 mb-6 text-center">
+          <div className="border border-warm rounded px-4 py-3 mb-6 text-center">
             <p className="font-serif text-ink italic">
               You've been invited by <span className="text-ink font-medium not-italic">{invitedBy}</span>
             </p>
@@ -181,7 +183,7 @@ export function EventDetail() {
       </div>
 
       {/* RSVP Section */}
-      <div className="border border-stone bg-parchment-light p-6 md:p-10 mb-8">
+      <div className="border border-warm bg-parchment-light p-6 md:p-10 mb-8">
         <RSVPForm
           eventId={event.id}
           existingRsvp={myRsvp}
@@ -191,7 +193,7 @@ export function EventDetail() {
       </div>
 
       {/* Accordion sections */}
-      <div className="border border-stone bg-parchment-light divide-y divide-stone">
+      <div className="border border-warm bg-parchment-light divide-y divide-stone">
         {/* Location */}
         <details open className="group">
           <summary className="px-6 md:px-10 py-5 text-xs tracking-[0.2em] uppercase text-ink-light font-medium">
@@ -232,7 +234,7 @@ export function EventDetail() {
                 <div className="mt-6">
                   <Link
                     to={`/events/${event.id}/order`}
-                    className="inline-block border border-stone px-8 py-3 text-xs tracking-[0.2em] uppercase text-ink-light hover:border-ink hover:text-ink transition-colors"
+                    className="inline-block border border-warm px-8 py-3 text-xs tracking-[0.2em] uppercase text-ink-light hover:border-ink hover:text-ink transition-colors"
                   >
                     [ Pre-Order ]
                   </Link>
@@ -249,7 +251,7 @@ export function EventDetail() {
           </summary>
           <div className="px-6 md:px-10 pb-6 space-y-4">
             <ShareButton eventId={event.id} eventTitle={event.title} />
-            <div className="border-t border-stone pt-4">
+            <div className="border-t border-warm pt-4">
               <p className="text-xs tracking-[0.15em] uppercase text-ink-muted mb-3">Send a direct invite</p>
               <InviteForm eventId={event.id} />
             </div>

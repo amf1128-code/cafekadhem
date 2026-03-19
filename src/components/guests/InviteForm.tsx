@@ -83,13 +83,13 @@ export function InviteForm({ eventId }: InviteFormProps) {
           value={contact}
           onChange={e => setContact(e.target.value)}
           placeholder="Friend's email or phone"
-          className="flex-1 border-0 border-b border-stone bg-transparent py-2 font-script text-lg text-ink italic placeholder:text-stone-dark placeholder:italic outline-none focus:border-ink transition-colors"
+          className="flex-1 border-0 border-b border-warm bg-transparent py-2 font-script text-lg text-ink italic placeholder:text-stone-dark placeholder:italic outline-none focus:border-ink transition-colors"
         />
       </div>
       <button
         type="submit"
         disabled={sending}
-        className="border border-stone px-5 py-2 text-xs tracking-[0.2em] uppercase text-ink-muted hover:border-ink hover:text-ink transition-colors disabled:opacity-50 whitespace-nowrap"
+        className="border border-warm px-5 py-2 text-xs tracking-[0.2em] uppercase text-ink-muted hover:border-ink hover:text-ink transition-colors disabled:opacity-50 whitespace-nowrap"
       >
         {sending ? '...' : '[ Send ]'}
       </button>

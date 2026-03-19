@@ -16,7 +16,7 @@ export function MenuDisplay({ items }: MenuDisplayProps) {
             {items
               .filter(i => (i.category || 'Other') === cat)
               .map(item => (
-                <div key={item.id} className="flex justify-between items-baseline gap-4 border-b border-stone/50 pb-3">
+                <div key={item.id} className="flex justify-between items-baseline gap-4 border-b border-warm/50 pb-3">
                   <div className="flex-1 min-w-0">
                     <p className="font-serif text-lg text-ink">{item.name}</p>
                     {item.description && (

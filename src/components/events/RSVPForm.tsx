@@ -24,7 +24,7 @@ function UnderlineInput({
         {label}
       </label>
       <input
-        className="flex-1 border-0 border-b border-stone bg-transparent py-2 font-script text-lg text-ink italic placeholder:text-stone-dark placeholder:italic outline-none focus:border-ink transition-colors"
+        className="flex-1 border-0 border-b border-warm bg-transparent py-2 font-script text-lg text-ink italic placeholder:text-stone-dark placeholder:italic outline-none focus:border-ink transition-colors"
         {...props}
       />
     </div>
@@ -179,7 +179,7 @@ export function RSVPForm({ eventId, existingRsvp, isFull, onRsvpComplete }: RSVP
     return (
       <div className="text-center py-4">
         <p className="font-serif text-xl text-ink italic mb-1">
-          Your RSVP: <span className={isWaitlisted ? 'text-accent' : 'text-ink'}>
+          Your RSVP: <span className={isWaitlisted ? 'text-accent' : 'text-forest'}>
             {statusLabels[existingRsvp.status] || existingRsvp.status}
           </span>
         </p>
@@ -188,7 +188,7 @@ export function RSVPForm({ eventId, existingRsvp, isFull, onRsvpComplete }: RSVP
         )}
         <button
           onClick={() => setShowForm(true)}
-          className="border border-stone px-6 py-2 text-xs tracking-[0.2em] uppercase text-ink-muted hover:border-ink hover:text-ink transition-colors"
+          className="border border-warm px-6 py-2 text-xs tracking-[0.2em] uppercase text-ink-muted hover:border-ink hover:text-ink transition-colors"
         >
           [ Change RSVP ]
         </button>
@@ -240,7 +240,7 @@ export function RSVPForm({ eventId, existingRsvp, isFull, onRsvpComplete }: RSVP
         <select
           value={notifPref}
           onChange={e => setNotifPref(e.target.value)}
-          className="flex-1 border-0 border-b border-stone bg-transparent py-2 font-script text-lg text-ink italic outline-none focus:border-ink transition-colors appearance-none cursor-pointer"
+          className="flex-1 border-0 border-b border-warm bg-transparent py-2 font-script text-lg text-ink italic outline-none focus:border-ink transition-colors appearance-none cursor-pointer"
         >
           <option value="email">Email</option>
           <option value="sms">SMS</option>
@@ -255,7 +255,7 @@ export function RSVPForm({ eventId, existingRsvp, isFull, onRsvpComplete }: RSVP
             type="button"
             onClick={() => handleRSVP('yes')}
             disabled={loading}
-            className="border border-stone px-8 py-3 text-xs tracking-[0.2em] uppercase text-ink hover:border-ink hover:bg-ink hover:text-parchment transition-colors disabled:opacity-50"
+            className="border border-forest px-8 py-3 text-xs tracking-[0.2em] uppercase text-forest hover:bg-forest hover:text-cream transition-colors disabled:opacity-50"
           >
             [ {isFull ? 'Join Waitlist' : 'Reserve a Seat'} ]
           </button>
@@ -263,7 +263,7 @@ export function RSVPForm({ eventId, existingRsvp, isFull, onRsvpComplete }: RSVP
             type="button"
             onClick={() => handleRSVP('maybe')}
             disabled={loading}
-            className="border border-stone px-6 py-3 text-xs tracking-[0.2em] uppercase text-ink-muted hover:border-ink hover:text-ink transition-colors disabled:opacity-50"
+            className="border border-warm px-6 py-3 text-xs tracking-[0.2em] uppercase text-ink-muted hover:border-ink hover:text-ink transition-colors disabled:opacity-50"
           >
             [ Maybe ]
           </button>

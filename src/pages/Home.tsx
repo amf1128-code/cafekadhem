@@ -21,7 +21,6 @@ export function Home() {
       .order('date', { ascending: true })
 
     if (data) {
-      // Get RSVP counts for each event
       const eventsWithCounts = await Promise.all(
         data.filter(e => isUpcoming(e.date)).map(async (event) => {
           const { count } = await supabase
@@ -44,14 +43,17 @@ export function Home() {
     <div className="max-w-3xl mx-auto px-6 py-12">
       {/* Title area */}
       <div className="text-center mb-16">
-        <p className="text-xs tracking-[0.3em] uppercase text-ink-muted mb-4">
-          Cafe Kadhem Experiences
-        </p>
-        <h1 className="font-serif text-4xl md:text-5xl text-ink italic mb-4">
-          Upcoming Gatherings
-        </h1>
-        <p className="font-serif text-lg text-ink-muted italic">
-          An intimate dining experience. Join us at the table.
+        {/* "Cafe Kadhem" with Arabic behind at half opacity */}
+        <div className="relative inline-block mb-4">
+          <span className="absolute inset-0 flex items-center justify-center font-arabic text-5xl md:text-6xl text-ink/40 select-none pointer-events-none" aria-hidden="true">
+            &#1603;&#1575;&#1601;&#1610;&#1607; &#1603;&#1575;&#1592;&#1605;
+          </span>
+          <h1 className="relative text-lg md:text-xl tracking-[0.35em] uppercase text-ink font-medium px-8 py-4">
+            Cafe Kadhem
+          </h1>
+        </div>
+        <p className="font-serif text-lg text-ink-muted italic max-w-md mx-auto leading-relaxed">
+          Curating Arab-inspired treats in NYC. There's always room for one more at our table.
         </p>
       </div>
 
@@ -64,18 +66,20 @@ export function Home() {
         </div>
       ) : (
         <div className="space-y-8">
-          {events.map((event, index) => (
+          {events.map(event => (
             <Link
               key={event.id}
               to={`/events/${event.id}`}
               className="block group"
             >
               {/* Archival card */}
-              <div className="relative border border-stone bg-parchment-light p-6 md:p-8 transition-colors hover:border-ink-muted">
-                {/* Vertical ref text on right edge */}
-                <div className="absolute top-4 right-2 vertical-text text-[10px] tracking-[0.15em] uppercase text-stone-dark hidden md:block">
-                  Gathering No. {String(index + 1).padStart(2, '0')}
-                </div>
+              <div className="relative border border-warm bg-parchment-light p-6 md:p-8 transition-colors hover:border-forest/40">
+                {/* Vertical ref text on right edge — uses gathering_number from DB */}
+                {event.gathering_number && (
+                  <div className="absolute top-4 right-2 vertical-text text-[10px] tracking-[0.15em] uppercase text-stone-dark hidden md:block">
+                    Gathering {event.gathering_number}
+                  </div>
+                )}
 
                 {/* Top metadata row */}
                 <div className="flex items-start justify-between mb-6">
@@ -83,7 +87,7 @@ export function Home() {
                     <p className="text-xs tracking-[0.2em] uppercase text-ink-muted mb-1">
                       Cafe Kadhem
                     </p>
-                    <h2 className="font-serif text-2xl md:text-3xl text-ink italic">
+                    <h2 className="font-serif text-2xl md:text-3xl text-forest-dark italic">
                       {event.title}
                     </h2>
                   </div>
@@ -101,7 +105,7 @@ export function Home() {
                   </div>
                 </div>
 
-                {/* Flyer image — taped on */}
+                {/* Flyer image */}
                 {event.flyer_url && (
                   <div className="relative mb-6">
                     <div className="border-4 border-white shadow-sm">
@@ -115,25 +119,25 @@ export function Home() {
                 )}
 
                 {/* Info row with thin dividers */}
-                <div className="border-t border-b border-stone py-4 grid grid-cols-3 text-center">
-                  <div className="border-r border-stone">
-                    <p className="text-[10px] tracking-[0.2em] uppercase text-ink-muted mb-1 sm:hidden">Date</p>
+                <div className="border-t border-b border-warm py-4 grid grid-cols-3 text-center">
+                  <div className="border-r border-warm">
                     <p className="text-xs tracking-[0.15em] uppercase text-ink-muted hidden sm:block">
                       {event.location}
                     </p>
+                    <p className="text-[10px] tracking-[0.2em] uppercase text-ink-muted mb-1 sm:hidden">Date</p>
                     <p className="font-serif text-ink sm:hidden">{formatDate(event.date)}</p>
                   </div>
-                  <div className="border-r border-stone">
+                  <div className="border-r border-warm">
                     {event.capacity ? (
                       <>
-                        <p className="font-serif text-xl text-ink">{event.capacity - event.rsvp_count > 0 ? event.capacity - event.rsvp_count : 0}</p>
+                        <p className="font-serif text-xl text-forest-dark">{event.capacity - event.rsvp_count > 0 ? event.capacity - event.rsvp_count : 0}</p>
                         <p className="text-[10px] tracking-[0.15em] uppercase text-ink-muted">
                           {event.rsvp_count >= event.capacity ? 'Waitlist' : 'Seats Left'}
                         </p>
                       </>
                     ) : (
                       <>
-                        <p className="font-serif text-xl text-ink">{event.rsvp_count}</p>
+                        <p className="font-serif text-xl text-forest-dark">{event.rsvp_count}</p>
                         <p className="text-[10px] tracking-[0.15em] uppercase text-ink-muted">Guests</p>
                       </>
                     )}
@@ -145,7 +149,7 @@ export function Home() {
                   </div>
                 </div>
 
-                {/* Mobile date/location */}
+                {/* Mobile location */}
                 <div className="sm:hidden mt-4 text-sm text-ink-muted">
                   <p>{event.location}</p>
                 </div>

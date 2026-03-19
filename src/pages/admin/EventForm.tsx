@@ -19,6 +19,7 @@ export function AdminEventForm() {
   const isEdit = !!id
 
   const [title, setTitle] = useState('')
+  const [gatheringNumber, setGatheringNumber] = useState('')
   const [description, setDescription] = useState('')
   const [date, setDate] = useState('')
   const [startTime, setStartTime] = useState('')
@@ -47,6 +48,7 @@ export function AdminEventForm() {
       const { data: event } = await supabase.from('events').select('*').eq('id', id).single()
       if (event) {
         setTitle(event.title)
+        setGatheringNumber(event.gathering_number || '')
         setDescription(event.description || '')
         setDate(event.date)
         setStartTime(event.start_time)
@@ -98,6 +100,7 @@ export function AdminEventForm() {
 
       const eventData = {
         title: title.trim(),
+        gathering_number: gatheringNumber.trim() || null,
         description: description.trim() || null,
         date,
         start_time: startTime,
@@ -164,6 +167,7 @@ export function AdminEventForm() {
 
       <form onSubmit={handleSave} className="max-w-2xl space-y-4">
         <Input label="Title" value={title} onChange={e => setTitle(e.target.value)} required />
+        <Input label="Gathering Number" value={gatheringNumber} onChange={e => setGatheringNumber(e.target.value)} placeholder='e.g. "No. 01" (optional, shown on public page)' />
         <Textarea label="Description" value={description} onChange={e => setDescription(e.target.value)} />
 
         <div className="grid grid-cols-2 gap-3">

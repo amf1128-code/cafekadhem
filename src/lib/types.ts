@@ -18,6 +18,7 @@ export interface Event {
   menu_id: string | null
   capacity: number | null
   donation_info: string | null
+  gathering_number: string | null
   is_published: boolean
   created_at: string
   updated_at: string

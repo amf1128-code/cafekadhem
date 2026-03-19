@@ -49,7 +49,7 @@ export function ShareButton({ eventId, eventTitle }: ShareButtonProps) {
     <button
       onClick={handleShare}
       disabled={loading}
-      className="border border-stone px-6 py-2.5 text-xs tracking-[0.2em] uppercase text-ink-muted hover:border-ink hover:text-ink transition-colors disabled:opacity-50"
+      className="border border-warm px-6 py-2.5 text-xs tracking-[0.2em] uppercase text-ink-muted hover:border-ink hover:text-ink transition-colors disabled:opacity-50"
     >
       {loading ? 'Creating link...' : '[ Share Event ]'}
     </button>

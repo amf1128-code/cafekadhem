@@ -210,7 +210,7 @@ export function Order() {
         </p>
         <Link
           to={`/events/${event.id}`}
-          className="inline-block border border-stone px-8 py-3 text-xs tracking-[0.2em] uppercase text-ink-muted hover:border-ink hover:text-ink transition-colors"
+          className="inline-block border border-warm px-8 py-3 text-xs tracking-[0.2em] uppercase text-ink-muted hover:border-ink hover:text-ink transition-colors"
         >
           [ Back to Event ]
         </Link>
@@ -224,10 +224,10 @@ export function Order() {
   return (
     <div className="max-w-3xl mx-auto px-6 py-8">
       {/* Header card */}
-      <div className="border border-stone bg-parchment-light p-6 md:p-10 mb-8">
+      <div className="border border-warm bg-parchment-light p-6 md:p-10 mb-8">
         <p className="text-xs tracking-[0.25em] uppercase text-ink-muted mb-2">Pre-Order</p>
         <h1 className="font-serif text-3xl text-ink italic mb-1">{event.title}</h1>
-        <div className="border-t border-stone mt-6" />
+        <div className="border-t border-warm mt-6" />
 
         {/* Menu Items */}
         <div className="mt-6 space-y-8">
@@ -240,7 +240,7 @@ export function Order() {
                   .map(item => {
                     const inCart = cart.find(c => c.menuItem.id === item.id)
                     return (
-                      <div key={item.id} className="flex items-center justify-between gap-4 border-b border-stone/50 pb-4">
+                      <div key={item.id} className="flex items-center justify-between gap-4 border-b border-warm/50 pb-4">
                         <div className="flex-1 min-w-0">
                           <p className="font-serif text-lg text-ink">{item.name}</p>
                           {item.description && (
@@ -253,7 +253,7 @@ export function Order() {
                         <div className="flex items-center gap-3">
                           <button
                             onClick={() => updateCart(item, -1)}
-                            className="w-8 h-8 border border-stone text-ink-muted hover:border-ink hover:text-ink flex items-center justify-center transition-colors text-lg"
+                            className="w-8 h-8 border border-warm text-ink-muted hover:border-ink hover:text-ink flex items-center justify-center transition-colors text-lg"
                             disabled={!inCart}
                           >
                             &minus;
@@ -263,7 +263,7 @@ export function Order() {
                           </span>
                           <button
                             onClick={() => updateCart(item, 1)}
-                            className="w-8 h-8 border border-stone text-ink-muted hover:border-ink hover:text-ink flex items-center justify-center transition-colors text-lg"
+                            className="w-8 h-8 border border-warm text-ink-muted hover:border-ink hover:text-ink flex items-center justify-center transition-colors text-lg"
                           >
                             +
                           </button>
@@ -279,7 +279,7 @@ export function Order() {
 
       {/* Order Summary */}
       {cart.length > 0 && (
-        <div className="border border-stone bg-parchment-light p-6 md:p-10 mb-8">
+        <div className="border border-warm bg-parchment-light p-6 md:p-10 mb-8">
           <p className="text-[10px] tracking-[0.2em] uppercase text-ink-muted mb-4">Order Summary</p>
           {cart.map(item => (
             <div key={item.menuItem.id} className="flex justify-between font-serif text-ink py-1">
@@ -287,7 +287,7 @@ export function Order() {
               <span>${((item.menuItem.price || 0) * item.quantity).toFixed(2)}</span>
             </div>
           ))}
-          <div className="border-t border-stone mt-3 pt-3 flex justify-between font-serif text-lg text-ink">
+          <div className="border-t border-warm mt-3 pt-3 flex justify-between font-serif text-lg text-ink">
             <span>Total</span>
             <span>${total.toFixed(2)}</span>
           </div>
@@ -295,7 +295,7 @@ export function Order() {
       )}
 
       {/* Guest Info */}
-      <div className="border border-stone bg-parchment-light p-6 md:p-10 mb-8 space-y-6">
+      <div className="border border-warm bg-parchment-light p-6 md:p-10 mb-8 space-y-6">
         <p className="text-[10px] tracking-[0.2em] uppercase text-ink-muted mb-2">Your Info</p>
         <div className="flex items-baseline gap-4">
           <label className="text-[10px] tracking-[0.2em] uppercase text-ink-muted whitespace-nowrap min-w-[80px]">Name</label>
@@ -304,7 +304,7 @@ export function Order() {
             onChange={e => setFirstName(e.target.value)}
             placeholder="Enter your name"
             required
-            className="flex-1 border-0 border-b border-stone bg-transparent py-2 font-script text-lg text-ink italic placeholder:text-stone-dark placeholder:italic outline-none focus:border-ink transition-colors"
+            className="flex-1 border-0 border-b border-warm bg-transparent py-2 font-script text-lg text-ink italic placeholder:text-stone-dark placeholder:italic outline-none focus:border-ink transition-colors"
           />
         </div>
         <div className="flex items-baseline gap-4">
@@ -314,7 +314,7 @@ export function Order() {
             value={email}
             onChange={e => setEmail(e.target.value)}
             placeholder="email@address.com"
-            className="flex-1 border-0 border-b border-stone bg-transparent py-2 font-script text-lg text-ink italic placeholder:text-stone-dark placeholder:italic outline-none focus:border-ink transition-colors"
+            className="flex-1 border-0 border-b border-warm bg-transparent py-2 font-script text-lg text-ink italic placeholder:text-stone-dark placeholder:italic outline-none focus:border-ink transition-colors"
           />
         </div>
         <div className="flex items-baseline gap-4">
@@ -324,7 +324,7 @@ export function Order() {
             value={phone}
             onChange={e => setPhone(e.target.value)}
             placeholder="Or provide phone"
-            className="flex-1 border-0 border-b border-stone bg-transparent py-2 font-script text-lg text-ink italic placeholder:text-stone-dark placeholder:italic outline-none focus:border-ink transition-colors"
+            className="flex-1 border-0 border-b border-warm bg-transparent py-2 font-script text-lg text-ink italic placeholder:text-stone-dark placeholder:italic outline-none focus:border-ink transition-colors"
           />
         </div>
       </div>
@@ -334,7 +334,7 @@ export function Order() {
         <button
           onClick={handleSubmit}
           disabled={submitting || cart.length === 0}
-          className="border border-stone px-10 py-4 text-xs tracking-[0.2em] uppercase text-ink hover:border-ink hover:bg-ink hover:text-parchment transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+          className="border border-forest px-10 py-4 text-xs tracking-[0.2em] uppercase text-forest hover:bg-forest hover:text-cream transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
         >
           {submitting ? 'Processing...' : `[ Pay $${total.toFixed(2)} with Venmo ]`}
         </button>
