@@ -8,25 +8,23 @@ export function MenuDisplay({ items }: MenuDisplayProps) {
   const categories = Array.from(new Set(items.map(i => i.category || 'Other')))
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       {categories.map(cat => (
         <div key={cat}>
-          <h3 className="font-serif text-lg text-forest-dark mb-3 border-b border-warm pb-1">
-            {cat}
-          </h3>
+          <p className="text-[10px] tracking-[0.2em] uppercase text-ink-muted mb-4">{cat}</p>
           <div className="space-y-3">
             {items
               .filter(i => (i.category || 'Other') === cat)
               .map(item => (
-                <div key={item.id} className="flex justify-between items-start gap-4">
+                <div key={item.id} className="flex justify-between items-baseline gap-4 border-b border-stone/50 pb-3">
                   <div className="flex-1 min-w-0">
-                    <p className="font-medium text-ink">{item.name}</p>
+                    <p className="font-serif text-lg text-ink">{item.name}</p>
                     {item.description && (
-                      <p className="text-sm text-ink/60 mt-0.5">{item.description}</p>
+                      <p className="font-serif text-sm text-ink-muted italic mt-0.5">{item.description}</p>
                     )}
                   </div>
                   {item.price != null && (
-                    <p className="text-sm font-medium text-forest whitespace-nowrap">
+                    <p className="font-serif text-ink whitespace-nowrap">
                       ${item.price.toFixed(2)}
                     </p>
                   )}

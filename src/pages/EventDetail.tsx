@@ -2,10 +2,9 @@ import { useState, useEffect } from 'react'
 import { useParams, Link, useSearchParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import type { Event, Menu, MenuItem, RSVP, PublicGuestProfile } from '../lib/types'
-import { formatEventDateTime } from '../lib/utils/date'
+import { formatDate, formatTime } from '../lib/utils/date'
 import { getGuestToken } from '../lib/utils/guest-token'
 import { PageLoader } from '../components/ui/LoadingSpinner'
-import { Button } from '../components/ui/Button'
 import { RSVPForm } from '../components/events/RSVPForm'
 import { RSVPList } from '../components/events/RSVPList'
 import { MenuDisplay } from '../components/menus/MenuDisplay'
@@ -81,8 +80,8 @@ export function EventDetail() {
   if (loading) return <PageLoader />
   if (!event) {
     return (
-      <div className="max-w-2xl mx-auto px-4 py-12 text-center">
-        <p className="text-ink/60">Event not found.</p>
+      <div className="max-w-3xl mx-auto px-6 py-16 text-center">
+        <p className="font-serif text-xl text-ink-muted italic">Event not found.</p>
       </div>
     )
   }
@@ -92,62 +91,97 @@ export function EventDetail() {
   const isFull = event.capacity ? yesCount >= event.capacity : false
 
   return (
-    <div className="max-w-2xl mx-auto px-4 py-6">
-      {/* Flyer */}
-      {event.flyer_url && (
-        <div className="rounded-xl overflow-hidden mb-6">
-          <img src={event.flyer_url} alt={event.title} className="w-full" />
+    <div className="max-w-3xl mx-auto px-6 py-8">
+      {/* Main archival card */}
+      <div className="relative border border-stone bg-parchment-light p-6 md:p-10 mb-8">
+        {/* Vertical reference text */}
+        <div className="absolute top-6 right-3 vertical-text text-[10px] tracking-[0.15em] uppercase text-stone-dark hidden md:block">
+          Ref: CK&mdash;{formatDate(event.date).replace(/\s/g, '').replace(',', '')} // {event.location.split(',')[0]?.toUpperCase()}
         </div>
-      )}
 
-      {/* Invite Banner */}
-      {invitedBy && (
-        <div className="bg-forest/10 border border-forest/20 rounded-lg p-3 mb-4 text-center">
-          <p className="text-forest text-sm font-medium">
-            You've been invited by {invitedBy}!
+        {/* Header */}
+        <p className="text-xs tracking-[0.25em] uppercase text-ink-muted mb-2">
+          Cafe Kadhem Experiences
+        </p>
+        <h1 className="font-serif text-3xl md:text-4xl text-ink italic mb-6 pr-8">
+          {event.title}
+        </h1>
+
+        {/* Thin divider */}
+        <div className="border-t border-stone mb-6" />
+
+        {/* Info grid */}
+        <div className="grid grid-cols-3 gap-4 mb-6">
+          <div>
+            <p className="text-[10px] tracking-[0.2em] uppercase text-ink-muted mb-1">Date</p>
+            <p className="font-serif text-lg text-ink">{formatDate(event.date)}</p>
+          </div>
+          <div>
+            <p className="text-[10px] tracking-[0.2em] uppercase text-ink-muted mb-1">Time</p>
+            <p className="font-serif text-lg text-ink">{formatTime(event.start_time)}{event.end_time ? ` \u2013 ${formatTime(event.end_time)}` : ''}</p>
+          </div>
+          <div>
+            <p className="text-[10px] tracking-[0.2em] uppercase text-ink-muted mb-1">Seats</p>
+            <p className="font-serif text-lg text-ink">{event.capacity || 'Open'}</p>
+          </div>
+        </div>
+
+        {/* Thin divider */}
+        <div className="border-t border-stone mb-6" />
+
+        {/* Description */}
+        {event.description && (
+          <p className="font-serif text-lg text-ink-muted italic leading-relaxed mb-6 whitespace-pre-line">
+            {event.description}
           </p>
-        </div>
-      )}
+        )}
 
-      {/* Event Info */}
-      <h1 className="font-serif text-3xl text-forest-dark mb-2">{event.title}</h1>
-      <p className="text-ink/70 mb-1">{formatEventDateTime(event.date, event.start_time, event.end_time)}</p>
-      <p className="text-ink/60 mb-4">{event.location}</p>
+        {/* Invite Banner */}
+        {invitedBy && (
+          <div className="border border-stone rounded px-4 py-3 mb-6 text-center">
+            <p className="font-serif text-ink italic">
+              You've been invited by <span className="text-ink font-medium not-italic">{invitedBy}</span>
+            </p>
+          </div>
+        )}
 
-      {event.description && (
-        <p className="text-ink/80 mb-6 whitespace-pre-line">{event.description}</p>
-      )}
+        {/* Flyer image */}
+        {event.flyer_url && (
+          <div className="relative mb-8 flex justify-center">
+            <div className="relative inline-block">
+              <div className="border-4 border-white shadow-sm">
+                <img
+                  src={event.flyer_url}
+                  alt={event.title}
+                  className="max-w-full max-h-[500px] object-contain"
+                />
+              </div>
+            </div>
+          </div>
+        )}
 
-      {/* Donation Info */}
-      {event.donation_info && (
-        <div className="bg-white border border-warm rounded-lg p-4 mb-6">
-          <h3 className="font-serif text-lg text-forest-dark mb-1">Where proceeds go</h3>
-          <p className="text-ink/70 text-sm">{event.donation_info}</p>
-        </div>
-      )}
-
-      {/* Capacity */}
-      {event.capacity && (
-        <div className="mb-6">
-          <div className="flex items-center gap-2">
-            <div className="flex-1 bg-warm/50 rounded-full h-2.5">
+        {/* Capacity bar */}
+        {event.capacity && (
+          <div className="mb-6">
+            <div className="flex items-center justify-between text-sm mb-2">
+              <span className="text-[10px] tracking-[0.2em] uppercase text-ink-muted">
+                {isFull
+                  ? `Full${waitlistCount > 0 ? ` \u2014 ${waitlistCount} on waitlist` : ''}`
+                  : `${yesCount} / ${event.capacity} seats reserved`}
+              </span>
+            </div>
+            <div className="h-px bg-stone relative">
               <div
-                className="bg-forest rounded-full h-2.5 transition-all"
+                className="absolute top-0 left-0 h-px bg-ink transition-all"
                 style={{ width: `${Math.min((yesCount / event.capacity) * 100, 100)}%` }}
               />
             </div>
-            <span className="text-sm text-ink/60 whitespace-nowrap">
-              {isFull
-                ? `Full${waitlistCount > 0 ? ` — ${waitlistCount} on waitlist` : ''}`
-                : `${yesCount} / ${event.capacity} spots`}
-            </span>
           </div>
-        </div>
-      )}
+        )}
+      </div>
 
       {/* RSVP Section */}
-      <div className="bg-white border border-warm rounded-xl p-5 mb-6">
-        <h2 className="font-serif text-xl text-forest-dark mb-4">RSVP</h2>
+      <div className="border border-stone bg-parchment-light p-6 md:p-10 mb-8">
         <RSVPForm
           eventId={event.id}
           existingRsvp={myRsvp}
@@ -156,40 +190,72 @@ export function EventDetail() {
         />
       </div>
 
-      {/* RSVP List */}
-      <RSVPList rsvps={rsvps} />
-
-      {/* Share & Invite */}
-      <div className="bg-white border border-warm rounded-xl p-5 my-6 space-y-4">
-        <h2 className="font-serif text-xl text-forest-dark">Share</h2>
-        <ShareButton eventId={event.id} eventTitle={event.title} />
-        <div className="border-t border-warm pt-4">
-          <p className="text-sm text-ink/60 mb-2">Invite a friend directly:</p>
-          <InviteForm eventId={event.id} />
-        </div>
-      </div>
-
-      {/* Menu */}
-      {menu && menuItems.length > 0 && (
-        <div className="mb-6">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="font-serif text-2xl text-forest-dark">Menu</h2>
-            {menuItems.some(item => item.price) && (
-              <Link to={`/events/${event.id}/order`}>
-                <Button>Pre-Order</Button>
-              </Link>
+      {/* Accordion sections */}
+      <div className="border border-stone bg-parchment-light divide-y divide-stone">
+        {/* Location */}
+        <details open className="group">
+          <summary className="px-6 md:px-10 py-5 text-xs tracking-[0.2em] uppercase text-ink-light font-medium">
+            Location
+          </summary>
+          <div className="px-6 md:px-10 pb-6">
+            <p className="font-serif text-2xl text-ink italic mb-1">{event.location}</p>
+            {event.donation_info && (
+              <div className="mt-4">
+                <p className="text-[10px] tracking-[0.2em] uppercase text-ink-muted mb-1">Where Proceeds Go</p>
+                <p className="font-serif text-ink-light italic">{event.donation_info}</p>
+              </div>
             )}
           </div>
-          <MenuDisplay items={menuItems} />
-          {menuItems.some(item => item.price) && (
-            <div className="mt-4 text-center">
-              <Link to={`/events/${event.id}/order`}>
-                <Button size="lg" className="w-full md:w-auto">Pre-Order from This Menu</Button>
-              </Link>
+        </details>
+
+        {/* Guest List */}
+        {rsvps.length > 0 && (
+          <details className="group">
+            <summary className="px-6 md:px-10 py-5 text-xs tracking-[0.2em] uppercase text-ink-light font-medium">
+              Who's At The Table ({rsvps.filter(r => r.status === 'yes').length})
+            </summary>
+            <div className="px-6 md:px-10 pb-6">
+              <RSVPList rsvps={rsvps} />
             </div>
-          )}
-        </div>
-      )}
+          </details>
+        )}
+
+        {/* Menu */}
+        {menu && menuItems.length > 0 && (
+          <details className="group">
+            <summary className="px-6 md:px-10 py-5 text-xs tracking-[0.2em] uppercase text-ink-light font-medium">
+              The Menu
+            </summary>
+            <div className="px-6 md:px-10 pb-6">
+              <MenuDisplay items={menuItems} />
+              {menuItems.some(item => item.price) && (
+                <div className="mt-6">
+                  <Link
+                    to={`/events/${event.id}/order`}
+                    className="inline-block border border-stone px-8 py-3 text-xs tracking-[0.2em] uppercase text-ink-light hover:border-ink hover:text-ink transition-colors"
+                  >
+                    [ Pre-Order ]
+                  </Link>
+                </div>
+              )}
+            </div>
+          </details>
+        )}
+
+        {/* Share & Invite */}
+        <details className="group">
+          <summary className="px-6 md:px-10 py-5 text-xs tracking-[0.2em] uppercase text-ink-light font-medium">
+            Invite A Friend
+          </summary>
+          <div className="px-6 md:px-10 pb-6 space-y-4">
+            <ShareButton eventId={event.id} eventTitle={event.title} />
+            <div className="border-t border-stone pt-4">
+              <p className="text-xs tracking-[0.15em] uppercase text-ink-muted mb-3">Send a direct invite</p>
+              <InviteForm eventId={event.id} />
+            </div>
+          </div>
+        </details>
+      </div>
     </div>
   )
 }

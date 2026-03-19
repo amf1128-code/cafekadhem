@@ -5,9 +5,6 @@ import { getGuestToken, setGuestToken } from '../../lib/utils/guest-token'
 import { normalizePhone } from '../../lib/utils/phone'
 import { normalizeInstagram, isValidInstagram } from '../../lib/utils/instagram'
 import { sendNotification } from '../../lib/notifications'
-import { Button } from '../ui/Button'
-import { Input } from '../ui/Input'
-import { Select } from '../ui/Select'
 import { useToast } from '../ui/Toast'
 
 interface RSVPFormProps {
@@ -15,6 +12,23 @@ interface RSVPFormProps {
   existingRsvp: RSVP | null
   isFull: boolean
   onRsvpComplete: () => void
+}
+
+function UnderlineInput({
+  label,
+  ...props
+}: { label: string } & React.InputHTMLAttributes<HTMLInputElement>) {
+  return (
+    <div className="flex items-baseline gap-4">
+      <label className="text-[10px] tracking-[0.2em] uppercase text-ink-muted whitespace-nowrap min-w-[80px]">
+        {label}
+      </label>
+      <input
+        className="flex-1 border-0 border-b border-stone bg-transparent py-2 font-script text-lg text-ink italic placeholder:text-stone-dark placeholder:italic outline-none focus:border-ink transition-colors"
+        {...props}
+      />
+    </div>
+  )
 }
 
 export function RSVPForm({ eventId, existingRsvp, isFull, onRsvpComplete }: RSVPFormProps) {
@@ -163,79 +177,105 @@ export function RSVPForm({ eventId, existingRsvp, isFull, onRsvpComplete }: RSVP
     const statusLabels: Record<string, string> = { yes: 'Going', maybe: 'Maybe', no: 'Not going', waitlisted: 'Waitlisted' }
     const isWaitlisted = existingRsvp.status === 'waitlisted'
     return (
-      <div className="text-center">
-        <p className="text-ink/70 mb-2">
-          Your RSVP: <span className={`font-medium ${isWaitlisted ? 'text-amber-700' : 'text-forest'}`}>
+      <div className="text-center py-4">
+        <p className="font-serif text-xl text-ink italic mb-1">
+          Your RSVP: <span className={isWaitlisted ? 'text-accent' : 'text-ink'}>
             {statusLabels[existingRsvp.status] || existingRsvp.status}
           </span>
         </p>
         {isWaitlisted && existingRsvp.waitlist_position && (
-          <p className="text-sm text-ink/50 mb-2">Position #{existingRsvp.waitlist_position} on the waitlist</p>
+          <p className="text-sm text-ink-muted mb-3">Position #{existingRsvp.waitlist_position} on the waitlist</p>
         )}
-        <Button variant="outline" size="sm" onClick={() => setShowForm(true)}>
-          Change RSVP
-        </Button>
+        <button
+          onClick={() => setShowForm(true)}
+          className="border border-stone px-6 py-2 text-xs tracking-[0.2em] uppercase text-ink-muted hover:border-ink hover:text-ink transition-colors"
+        >
+          [ Change RSVP ]
+        </button>
       </div>
     )
   }
 
   return (
-    <form onSubmit={(e: FormEvent) => e.preventDefault()} className="space-y-3">
-      <div className="grid grid-cols-2 gap-3">
-        <Input
-          label="First Name"
-          value={firstName}
-          onChange={e => setFirstName(e.target.value)}
-          required
-        />
-        <Input
-          label="Last Name"
-          value={lastName}
-          onChange={e => setLastName(e.target.value)}
-          placeholder="Optional"
-        />
-      </div>
-      <Input
+    <form onSubmit={(e: FormEvent) => e.preventDefault()} className="space-y-6">
+      <UnderlineInput
+        label="Name"
+        value={firstName}
+        onChange={e => setFirstName(e.target.value)}
+        placeholder="Enter your first name"
+        required
+      />
+      <UnderlineInput
+        label="Last Name"
+        value={lastName}
+        onChange={e => setLastName(e.target.value)}
+        placeholder="Optional"
+      />
+      <UnderlineInput
         label="Email"
         type="email"
         value={email}
         onChange={e => setEmail(e.target.value)}
-        placeholder="Required if no phone"
+        placeholder="email@address.com"
       />
-      <Input
+      <UnderlineInput
         label="Phone"
         type="tel"
         value={phone}
         onChange={e => setPhone(e.target.value)}
         placeholder="Required if no email"
       />
-      <Input
+      <UnderlineInput
         label="Instagram"
         value={instagram}
         onChange={e => setInstagram(e.target.value)}
         placeholder="Optional (without @)"
       />
-      <Select
-        label="Notification preference"
-        value={notifPref}
-        onChange={e => setNotifPref(e.target.value)}
-        options={[
-          { value: 'email', label: 'Email' },
-          { value: 'sms', label: 'SMS' },
-          { value: 'none', label: 'None' },
-        ]}
-      />
 
-      <div className="flex gap-2 pt-2">
-        <Button onClick={() => handleRSVP('yes')} loading={loading} className="flex-1">
-          {isFull ? 'Join Waitlist' : 'Yes'}
-        </Button>
-        <Button onClick={() => handleRSVP('maybe')} loading={loading} variant="secondary" className="flex-1">
-          Maybe
-        </Button>
-        <Button onClick={() => handleRSVP('no')} loading={loading} variant="ghost" className="flex-1">
-          No
-        </Button>
+      {/* Notification preference */}
+      <div className="flex items-baseline gap-4">
+        <label className="text-[10px] tracking-[0.2em] uppercase text-ink-muted whitespace-nowrap min-w-[80px]">
+          Notify via
+        </label>
+        <select
+          value={notifPref}
+          onChange={e => setNotifPref(e.target.value)}
+          className="flex-1 border-0 border-b border-stone bg-transparent py-2 font-script text-lg text-ink italic outline-none focus:border-ink transition-colors appearance-none cursor-pointer"
+        >
+          <option value="email">Email</option>
+          <option value="sms">SMS</option>
+          <option value="none">None</option>
+        </select>
+      </div>
+
+      {/* RSVP buttons — bracket style */}
+      <div className="flex justify-center pt-4">
+        <div className="flex gap-3">
+          <button
+            type="button"
+            onClick={() => handleRSVP('yes')}
+            disabled={loading}
+            className="border border-stone px-8 py-3 text-xs tracking-[0.2em] uppercase text-ink hover:border-ink hover:bg-ink hover:text-parchment transition-colors disabled:opacity-50"
+          >
+            [ {isFull ? 'Join Waitlist' : 'Reserve a Seat'} ]
+          </button>
+          <button
+            type="button"
+            onClick={() => handleRSVP('maybe')}
+            disabled={loading}
+            className="border border-stone px-6 py-3 text-xs tracking-[0.2em] uppercase text-ink-muted hover:border-ink hover:text-ink transition-colors disabled:opacity-50"
+          >
+            [ Maybe ]
+          </button>
+          <button
+            type="button"
+            onClick={() => handleRSVP('no')}
+            disabled={loading}
+            className="px-4 py-3 text-xs tracking-[0.2em] uppercase text-stone-dark hover:text-ink transition-colors disabled:opacity-50"
+          >
+            Decline
+          </button>
+        </div>
       </div>
     </form>
   )

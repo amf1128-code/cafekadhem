@@ -15,30 +15,28 @@ export function RSVPList({ rsvps }: RSVPListProps) {
   }
 
   return (
-    <div className="mb-6">
-      <h2 className="font-serif text-xl text-forest-dark mb-3">Guest List</h2>
-
+    <div className="space-y-6">
       {going.length > 0 && (
-        <div className="mb-4">
-          <h3 className="text-sm font-medium text-ink/60 mb-2">
+        <div>
+          <p className="text-[10px] tracking-[0.2em] uppercase text-ink-muted mb-3">
             Going ({going.length})
-          </h3>
-          <div className="flex flex-wrap gap-2">
+          </p>
+          <div className="flex flex-wrap gap-x-6 gap-y-2">
             {going.map(rsvp => (
-              <GuestChip key={rsvp.id} guest={rsvp.guest} />
+              <GuestName key={rsvp.id} guest={rsvp.guest} />
             ))}
           </div>
         </div>
       )}
 
       {maybe.length > 0 && (
-        <div className="mb-4">
-          <h3 className="text-sm font-medium text-ink/60 mb-2">
+        <div>
+          <p className="text-[10px] tracking-[0.2em] uppercase text-ink-muted mb-3">
             Maybe ({maybe.length})
-          </h3>
-          <div className="flex flex-wrap gap-2">
+          </p>
+          <div className="flex flex-wrap gap-x-6 gap-y-2">
             {maybe.map(rsvp => (
-              <GuestChip key={rsvp.id} guest={rsvp.guest} />
+              <GuestName key={rsvp.id} guest={rsvp.guest} />
             ))}
           </div>
         </div>
@@ -46,12 +44,12 @@ export function RSVPList({ rsvps }: RSVPListProps) {
 
       {waitlisted.length > 0 && (
         <div>
-          <h3 className="text-sm font-medium text-ink/60 mb-2">
+          <p className="text-[10px] tracking-[0.2em] uppercase text-ink-muted mb-3">
             Waitlist ({waitlisted.length})
-          </h3>
-          <div className="flex flex-wrap gap-2">
+          </p>
+          <div className="flex flex-wrap gap-x-6 gap-y-2">
             {waitlisted.map(rsvp => (
-              <GuestChip key={rsvp.id} guest={rsvp.guest} />
+              <GuestName key={rsvp.id} guest={rsvp.guest} />
             ))}
           </div>
         </div>
@@ -60,16 +58,16 @@ export function RSVPList({ rsvps }: RSVPListProps) {
   )
 }
 
-function GuestChip({ guest }: { guest: PublicGuestProfile }) {
+function GuestName({ guest }: { guest: PublicGuestProfile }) {
   return (
-    <span className="inline-flex items-center gap-1 bg-white border border-warm rounded-full px-3 py-1 text-sm">
-      <span className="text-ink">{guest.first_name}</span>
+    <span className="inline-flex items-center gap-1.5 font-serif text-ink">
+      {guest.first_name}
       {guest.instagram && (
         <a
           href={instagramUrl(guest.instagram)}
           target="_blank"
           rel="noopener noreferrer"
-          className="text-forest hover:text-forest-light text-xs"
+          className="text-xs text-ink-muted hover:text-accent transition-colors"
         >
           @{guest.instagram}
         </a>

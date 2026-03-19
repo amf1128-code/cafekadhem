@@ -28,11 +28,11 @@ export function AdminLogin() {
   }
 
   return (
-    <div className="min-h-screen bg-cream flex items-center justify-center px-4">
+    <div className="min-h-screen bg-parchment flex items-center justify-center px-4">
       <div className="max-w-sm w-full">
         <div className="text-center mb-8">
-          <h1 className="font-serif text-3xl text-forest-dark mb-1">Cafe Kadhem</h1>
-          <p className="font-script text-xl text-forest">Admin</p>
+          <p className="text-xs tracking-[0.25em] uppercase text-ink-muted mb-2">Cafe Kadhem</p>
+          <h1 className="font-serif text-3xl text-ink italic">Admin</h1>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
@@ -57,7 +57,7 @@ export function AdminLogin() {
         </form>
 
         <p className="text-center mt-4">
-          <Link to="/admin/forgot-password" className="text-forest hover:underline text-sm">
+          <Link to="/admin/forgot-password" className="text-ink-muted hover:text-ink text-sm transition-colors">
             Forgot password?
           </Link>
         </p>

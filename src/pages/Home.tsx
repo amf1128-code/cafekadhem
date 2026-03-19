@@ -41,54 +41,113 @@ export function Home() {
   if (loading) return <PageLoader />
 
   return (
-    <div className="max-w-4xl mx-auto px-4 py-8">
-      <div className="text-center mb-12">
-        <h1 className="font-serif text-4xl md:text-5xl text-forest-dark mb-2">Cafe Kadhem</h1>
-        <p className="font-script text-2xl md:text-3xl text-forest mb-4">
-          &#1603;&#1575;&#1601;&#1610;&#1607; &#1603;&#1575;&#1592;&#1605;
+    <div className="max-w-3xl mx-auto px-6 py-12">
+      {/* Title area */}
+      <div className="text-center mb-16">
+        <p className="text-xs tracking-[0.3em] uppercase text-ink-muted mb-4">
+          Cafe Kadhem Experiences
         </p>
-        <p className="text-ink/70 max-w-md mx-auto">
-          An intimate dining experience. Join us for our upcoming events.
+        <h1 className="font-serif text-4xl md:text-5xl text-ink italic mb-4">
+          Upcoming Gatherings
+        </h1>
+        <p className="font-serif text-lg text-ink-muted italic">
+          An intimate dining experience. Join us at the table.
         </p>
       </div>
 
       {events.length === 0 ? (
-        <div className="text-center py-12">
-          <p className="text-ink/60 font-serif text-lg">No upcoming events at the moment.</p>
-          <p className="text-ink/40 mt-2">Check back soon for new events.</p>
+        <div className="text-center py-16">
+          <p className="font-serif text-xl text-ink-muted italic">
+            No upcoming gatherings at the moment.
+          </p>
+          <p className="text-sm text-ink-muted mt-3">Check back soon.</p>
         </div>
       ) : (
-        <div className="grid gap-6 md:grid-cols-2">
-          {events.map(event => (
+        <div className="space-y-8">
+          {events.map((event, index) => (
             <Link
               key={event.id}
               to={`/events/${event.id}`}
-              className="block bg-white rounded-xl border border-warm overflow-hidden hover:shadow-lg transition-shadow"
+              className="block group"
             >
-              {event.flyer_url && (
-                <div className="aspect-[4/3] overflow-hidden">
-                  <img
-                    src={event.flyer_url}
-                    alt={event.title}
-                    className="w-full h-full object-cover"
-                  />
+              {/* Archival card */}
+              <div className="relative border border-stone bg-parchment-light p-6 md:p-8 transition-colors hover:border-ink-muted">
+                {/* Vertical ref text on right edge */}
+                <div className="absolute top-4 right-2 vertical-text text-[10px] tracking-[0.15em] uppercase text-stone-dark hidden md:block">
+                  Gathering No. {String(index + 1).padStart(2, '0')}
                 </div>
-              )}
-              <div className="p-5">
-                <h2 className="font-serif text-xl text-forest-dark mb-2">{event.title}</h2>
-                <p className="text-sm text-ink/70 mb-1">
-                  {formatDate(event.date)} at {formatTime(event.start_time)}
-                </p>
-                <p className="text-sm text-ink/60 mb-3">{event.location}</p>
-                <div className="flex items-center justify-between">
-                  <span className="text-xs text-forest font-medium">
-                    {event.rsvp_count} {event.rsvp_count === 1 ? 'guest' : 'guests'} going
-                  </span>
-                  {event.capacity && (
-                    <span className="text-xs text-ink/50">
-                      {event.rsvp_count >= event.capacity ? 'Full' : `${event.capacity - event.rsvp_count} spots left`}
-                    </span>
-                  )}
+
+                {/* Top metadata row */}
+                <div className="flex items-start justify-between mb-6">
+                  <div>
+                    <p className="text-xs tracking-[0.2em] uppercase text-ink-muted mb-1">
+                      Cafe Kadhem
+                    </p>
+                    <h2 className="font-serif text-2xl md:text-3xl text-ink italic">
+                      {event.title}
+                    </h2>
+                  </div>
+                  <div className="text-right text-sm hidden sm:block">
+                    <div className="flex gap-8">
+                      <div>
+                        <p className="text-[10px] tracking-[0.2em] uppercase text-ink-muted mb-0.5">Date</p>
+                        <p className="font-serif text-ink">{formatDate(event.date)}</p>
+                      </div>
+                      <div>
+                        <p className="text-[10px] tracking-[0.2em] uppercase text-ink-muted mb-0.5">Time</p>
+                        <p className="font-serif text-ink">{formatTime(event.start_time)}</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Flyer image — taped on */}
+                {event.flyer_url && (
+                  <div className="relative mb-6">
+                    <div className="border-4 border-white shadow-sm">
+                      <img
+                        src={event.flyer_url}
+                        alt={event.title}
+                        className="w-full aspect-[16/9] object-cover"
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {/* Info row with thin dividers */}
+                <div className="border-t border-b border-stone py-4 grid grid-cols-3 text-center">
+                  <div className="border-r border-stone">
+                    <p className="text-[10px] tracking-[0.2em] uppercase text-ink-muted mb-1 sm:hidden">Date</p>
+                    <p className="text-xs tracking-[0.15em] uppercase text-ink-muted hidden sm:block">
+                      {event.location}
+                    </p>
+                    <p className="font-serif text-ink sm:hidden">{formatDate(event.date)}</p>
+                  </div>
+                  <div className="border-r border-stone">
+                    {event.capacity ? (
+                      <>
+                        <p className="font-serif text-xl text-ink">{event.capacity - event.rsvp_count > 0 ? event.capacity - event.rsvp_count : 0}</p>
+                        <p className="text-[10px] tracking-[0.15em] uppercase text-ink-muted">
+                          {event.rsvp_count >= event.capacity ? 'Waitlist' : 'Seats Left'}
+                        </p>
+                      </>
+                    ) : (
+                      <>
+                        <p className="font-serif text-xl text-ink">{event.rsvp_count}</p>
+                        <p className="text-[10px] tracking-[0.15em] uppercase text-ink-muted">Guests</p>
+                      </>
+                    )}
+                  </div>
+                  <div>
+                    <p className="text-xs tracking-[0.15em] uppercase text-ink-muted">
+                      RSVP Required
+                    </p>
+                  </div>
+                </div>
+
+                {/* Mobile date/location */}
+                <div className="sm:hidden mt-4 text-sm text-ink-muted">
+                  <p>{event.location}</p>
                 </div>
               </div>
             </Link>

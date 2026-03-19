@@ -7,8 +7,6 @@ import { normalizePhone } from '../lib/utils/phone'
 import { getPaymentProvider } from '../lib/payment'
 import { sendNotification } from '../lib/notifications'
 import { PageLoader } from '../components/ui/LoadingSpinner'
-import { Button } from '../components/ui/Button'
-import { Input } from '../components/ui/Input'
 import { useToast } from '../components/ui/Toast'
 
 export function Order() {
@@ -193,22 +191,28 @@ export function Order() {
 
   if (!event) {
     return (
-      <div className="max-w-2xl mx-auto px-4 py-12 text-center">
-        <p className="text-ink/60">Event not found.</p>
+      <div className="max-w-3xl mx-auto px-6 py-16 text-center">
+        <p className="font-serif text-xl text-ink-muted italic">Event not found.</p>
       </div>
     )
   }
 
   if (submitted) {
     return (
-      <div className="max-w-2xl mx-auto px-4 py-12 text-center">
-        <h1 className="font-serif text-3xl text-forest-dark mb-4">Thanks!</h1>
-        <p className="text-ink/70 mb-2">Your order has been submitted.</p>
-        <p className="text-ink/60 text-sm mb-6">
-          Payment status will be confirmed by the host. After paying on Venmo, your host will confirm your payment.
+      <div className="max-w-3xl mx-auto px-6 py-16 text-center">
+        <p className="text-xs tracking-[0.25em] uppercase text-ink-muted mb-4">Order Confirmed</p>
+        <h1 className="font-serif text-4xl text-ink italic mb-4">Thank You</h1>
+        <p className="font-serif text-lg text-ink-muted italic mb-2">
+          Your order has been submitted.
         </p>
-        <Link to={`/events/${event.id}`}>
-          <Button variant="outline">Back to Event</Button>
+        <p className="text-sm text-ink-muted mb-8">
+          Payment status will be confirmed by the host.
+        </p>
+        <Link
+          to={`/events/${event.id}`}
+          className="inline-block border border-stone px-8 py-3 text-xs tracking-[0.2em] uppercase text-ink-muted hover:border-ink hover:text-ink transition-colors"
+        >
+          [ Back to Event ]
         </Link>
       </div>
     )
@@ -218,68 +222,72 @@ export function Order() {
   const categories = Array.from(new Set(menuItems.map(i => i.category || 'Other')))
 
   return (
-    <div className="max-w-2xl mx-auto px-4 py-6">
-      <h1 className="font-serif text-2xl text-forest-dark mb-1">Pre-Order</h1>
-      <p className="text-ink/60 text-sm mb-6">{event.title}</p>
+    <div className="max-w-3xl mx-auto px-6 py-8">
+      {/* Header card */}
+      <div className="border border-stone bg-parchment-light p-6 md:p-10 mb-8">
+        <p className="text-xs tracking-[0.25em] uppercase text-ink-muted mb-2">Pre-Order</p>
+        <h1 className="font-serif text-3xl text-ink italic mb-1">{event.title}</h1>
+        <div className="border-t border-stone mt-6" />
 
-      {/* Menu Items */}
-      <div className="space-y-6 mb-8">
-        {categories.map(cat => (
-          <div key={cat}>
-            <h3 className="font-serif text-lg text-forest-dark mb-3">{cat}</h3>
-            <div className="space-y-3">
-              {menuItems
-                .filter(i => (i.category || 'Other') === cat)
-                .map(item => {
-                  const inCart = cart.find(c => c.menuItem.id === item.id)
-                  return (
-                    <div key={item.id} className="bg-white border border-warm rounded-lg p-4 flex items-center justify-between gap-4">
-                      <div className="flex-1 min-w-0">
-                        <p className="font-medium text-ink">{item.name}</p>
-                        {item.description && (
-                          <p className="text-sm text-ink/60 mt-0.5">{item.description}</p>
-                        )}
-                        {item.price != null && (
-                          <p className="text-sm text-forest font-medium mt-1">${item.price.toFixed(2)}</p>
-                        )}
+        {/* Menu Items */}
+        <div className="mt-6 space-y-8">
+          {categories.map(cat => (
+            <div key={cat}>
+              <p className="text-[10px] tracking-[0.2em] uppercase text-ink-muted mb-4">{cat}</p>
+              <div className="space-y-4">
+                {menuItems
+                  .filter(i => (i.category || 'Other') === cat)
+                  .map(item => {
+                    const inCart = cart.find(c => c.menuItem.id === item.id)
+                    return (
+                      <div key={item.id} className="flex items-center justify-between gap-4 border-b border-stone/50 pb-4">
+                        <div className="flex-1 min-w-0">
+                          <p className="font-serif text-lg text-ink">{item.name}</p>
+                          {item.description && (
+                            <p className="font-serif text-sm text-ink-muted italic mt-0.5">{item.description}</p>
+                          )}
+                          {item.price != null && (
+                            <p className="text-sm text-ink mt-1">${item.price.toFixed(2)}</p>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <button
+                            onClick={() => updateCart(item, -1)}
+                            className="w-8 h-8 border border-stone text-ink-muted hover:border-ink hover:text-ink flex items-center justify-center transition-colors text-lg"
+                            disabled={!inCart}
+                          >
+                            &minus;
+                          </button>
+                          <span className="w-6 text-center font-serif text-lg text-ink">
+                            {inCart?.quantity || 0}
+                          </span>
+                          <button
+                            onClick={() => updateCart(item, 1)}
+                            className="w-8 h-8 border border-stone text-ink-muted hover:border-ink hover:text-ink flex items-center justify-center transition-colors text-lg"
+                          >
+                            +
+                          </button>
+                        </div>
                       </div>
-                      <div className="flex items-center gap-2">
-                        <button
-                          onClick={() => updateCart(item, -1)}
-                          className="w-8 h-8 rounded-full border border-warm text-ink/60 hover:bg-warm/50 flex items-center justify-center"
-                          disabled={!inCart}
-                        >
-                          -
-                        </button>
-                        <span className="w-6 text-center text-sm font-medium">
-                          {inCart?.quantity || 0}
-                        </span>
-                        <button
-                          onClick={() => updateCart(item, 1)}
-                          className="w-8 h-8 rounded-full border border-forest text-forest hover:bg-forest hover:text-cream flex items-center justify-center"
-                        >
-                          +
-                        </button>
-                      </div>
-                    </div>
-                  )
-                })}
+                    )
+                  })}
+              </div>
             </div>
-          </div>
-        ))}
+          ))}
+        </div>
       </div>
 
       {/* Order Summary */}
       {cart.length > 0 && (
-        <div className="bg-white border border-warm rounded-xl p-5 mb-6">
-          <h3 className="font-serif text-lg text-forest-dark mb-3">Order Summary</h3>
+        <div className="border border-stone bg-parchment-light p-6 md:p-10 mb-8">
+          <p className="text-[10px] tracking-[0.2em] uppercase text-ink-muted mb-4">Order Summary</p>
           {cart.map(item => (
-            <div key={item.menuItem.id} className="flex justify-between text-sm py-1">
-              <span>{item.menuItem.name} x{item.quantity}</span>
+            <div key={item.menuItem.id} className="flex justify-between font-serif text-ink py-1">
+              <span>{item.menuItem.name} &times; {item.quantity}</span>
               <span>${((item.menuItem.price || 0) * item.quantity).toFixed(2)}</span>
             </div>
           ))}
-          <div className="border-t border-warm mt-2 pt-2 flex justify-between font-medium">
+          <div className="border-t border-stone mt-3 pt-3 flex justify-between font-serif text-lg text-ink">
             <span>Total</span>
             <span>${total.toFixed(2)}</span>
           </div>
@@ -287,44 +295,53 @@ export function Order() {
       )}
 
       {/* Guest Info */}
-      <div className="bg-white border border-warm rounded-xl p-5 mb-6 space-y-3">
-        <h3 className="font-serif text-lg text-forest-dark">Your Info</h3>
-        <Input
-          label="First Name"
-          value={firstName}
-          onChange={e => setFirstName(e.target.value)}
-          required
-        />
-        <Input
-          label="Email"
-          type="email"
-          value={email}
-          onChange={e => setEmail(e.target.value)}
-          placeholder="Or provide phone below"
-        />
-        <Input
-          label="Phone"
-          type="tel"
-          value={phone}
-          onChange={e => setPhone(e.target.value)}
-          placeholder="Or provide email above"
-        />
+      <div className="border border-stone bg-parchment-light p-6 md:p-10 mb-8 space-y-6">
+        <p className="text-[10px] tracking-[0.2em] uppercase text-ink-muted mb-2">Your Info</p>
+        <div className="flex items-baseline gap-4">
+          <label className="text-[10px] tracking-[0.2em] uppercase text-ink-muted whitespace-nowrap min-w-[80px]">Name</label>
+          <input
+            value={firstName}
+            onChange={e => setFirstName(e.target.value)}
+            placeholder="Enter your name"
+            required
+            className="flex-1 border-0 border-b border-stone bg-transparent py-2 font-script text-lg text-ink italic placeholder:text-stone-dark placeholder:italic outline-none focus:border-ink transition-colors"
+          />
+        </div>
+        <div className="flex items-baseline gap-4">
+          <label className="text-[10px] tracking-[0.2em] uppercase text-ink-muted whitespace-nowrap min-w-[80px]">Email</label>
+          <input
+            type="email"
+            value={email}
+            onChange={e => setEmail(e.target.value)}
+            placeholder="email@address.com"
+            className="flex-1 border-0 border-b border-stone bg-transparent py-2 font-script text-lg text-ink italic placeholder:text-stone-dark placeholder:italic outline-none focus:border-ink transition-colors"
+          />
+        </div>
+        <div className="flex items-baseline gap-4">
+          <label className="text-[10px] tracking-[0.2em] uppercase text-ink-muted whitespace-nowrap min-w-[80px]">Phone</label>
+          <input
+            type="tel"
+            value={phone}
+            onChange={e => setPhone(e.target.value)}
+            placeholder="Or provide phone"
+            className="flex-1 border-0 border-b border-stone bg-transparent py-2 font-script text-lg text-ink italic placeholder:text-stone-dark placeholder:italic outline-none focus:border-ink transition-colors"
+          />
+        </div>
       </div>
 
       {/* Submit */}
-      <Button
-        onClick={handleSubmit}
-        loading={submitting}
-        disabled={cart.length === 0}
-        size="lg"
-        className="w-full"
-      >
-        Pay ${total.toFixed(2)} with Venmo
-      </Button>
-
-      <p className="text-xs text-ink/50 text-center mt-3">
-        You will be redirected to Venmo to complete payment.
-      </p>
+      <div className="text-center">
+        <button
+          onClick={handleSubmit}
+          disabled={submitting || cart.length === 0}
+          className="border border-stone px-10 py-4 text-xs tracking-[0.2em] uppercase text-ink hover:border-ink hover:bg-ink hover:text-parchment transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+        >
+          {submitting ? 'Processing...' : `[ Pay $${total.toFixed(2)} with Venmo ]`}
+        </button>
+        <p className="text-xs text-ink-muted mt-4">
+          You will be redirected to Venmo to complete payment.
+        </p>
+      </div>
     </div>
   )
 }

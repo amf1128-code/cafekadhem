@@ -1,16 +1,28 @@
 @import "tailwindcss";
 
 @theme {
-  --color-cream: #F2E6D0;
+  /* Archival / editorial palette inspired by nativeiftar.com */
+  --color-parchment: #E8E3DB;
+  --color-parchment-light: #F0ECE6;
+  --color-stone: #C8C1B5;
+  --color-stone-dark: #A39E95;
+  --color-ink: #1A1A1A;
+  --color-ink-light: #4A4A4A;
+  --color-ink-muted: #8A8680;
+  --color-accent: #7A2E2E;
+  --color-accent-hover: #5C2020;
+
+  /* Keep old names as aliases for admin pages */
+  --color-cream: #F0ECE6;
   --color-forest: #2D5A27;
   --color-forest-light: #3D7A34;
   --color-forest-dark: #1E3D1A;
-  --color-warm: #D4C4A8;
-  --color-ink: #1A1A1A;
+  --color-warm: #C8C1B5;
 
-  --font-serif: "Playfair Display", Georgia, serif;
+  --font-serif: "Cormorant Garamond", "Playfair Display", Georgia, serif;
   --font-sans: "Inter", system-ui, sans-serif;
   --font-script: "Cormorant Garamond", Georgia, serif;
+  --font-mono: "JetBrains Mono", ui-monospace, monospace;
 }
 
 body {
@@ -18,4 +30,34 @@ body {
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+/* Vertical text utility */
+.vertical-text {
+  writing-mode: vertical-rl;
+  text-orientation: mixed;
+}
+
+/* Accordion details styling */
+details summary {
+  cursor: pointer;
+  list-style: none;
+}
+
+details summary::-webkit-details-marker {
+  display: none;
+}
+
+details summary::before {
+  content: '\25B6';
+  display: inline-block;
+  margin-right: 0.75rem;
+  font-size: 0.625rem;
+  color: var(--color-accent);
+  transition: transform 0.2s;
+  vertical-align: middle;
+}
+
+details[open] summary::before {
+  transform: rotate(90deg);
 }

@@ -2,7 +2,6 @@ import { useState } from 'react'
 import { supabase } from '../../lib/supabase'
 import { getGuestToken } from '../../lib/utils/guest-token'
 import { shareLink } from '../../lib/utils/share'
-import { Button } from '../ui/Button'
 import { useToast } from '../ui/Toast'
 
 interface ShareButtonProps {
@@ -47,8 +46,12 @@ export function ShareButton({ eventId, eventTitle }: ShareButtonProps) {
   }
 
   return (
-    <Button variant="outline" onClick={handleShare} loading={loading}>
-      Share Event
-    </Button>
+    <button
+      onClick={handleShare}
+      disabled={loading}
+      className="border border-stone px-6 py-2.5 text-xs tracking-[0.2em] uppercase text-ink-muted hover:border-ink hover:text-ink transition-colors disabled:opacity-50"
+    >
+      {loading ? 'Creating link...' : '[ Share Event ]'}
+    </button>
   )
 }

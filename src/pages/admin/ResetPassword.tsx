@@ -54,10 +54,10 @@ export function ResetPassword() {
 
   if (success) {
     return (
-      <div className="min-h-screen bg-cream flex items-center justify-center px-4">
+      <div className="min-h-screen bg-parchment flex items-center justify-center px-4">
         <div className="max-w-sm w-full text-center">
-          <h1 className="font-serif text-3xl text-forest-dark mb-4">Password Updated</h1>
-          <p className="text-ink/70 mb-6">Your password has been successfully reset.</p>
+          <h1 className="font-serif text-3xl text-ink italic mb-4">Password Updated</h1>
+          <p className="text-ink-muted mb-6">Your password has been successfully reset.</p>
           <Button onClick={() => navigate('/admin')}>Go to Dashboard</Button>
         </div>
       </div>
@@ -65,15 +65,15 @@ export function ResetPassword() {
   }
 
   return (
-    <div className="min-h-screen bg-cream flex items-center justify-center px-4">
+    <div className="min-h-screen bg-parchment flex items-center justify-center px-4">
       <div className="max-w-sm w-full">
         <div className="text-center mb-8">
-          <h1 className="font-serif text-3xl text-forest-dark mb-1">Cafe Kadhem</h1>
-          <p className="font-script text-xl text-forest">Reset Password</p>
+          <p className="text-xs tracking-[0.25em] uppercase text-ink-muted mb-2">Cafe Kadhem</p>
+          <h1 className="font-serif text-3xl text-ink italic">Reset Password</h1>
         </div>
 
         {!sessionReady ? (
-          <p className="text-center text-ink/70">Verifying reset link...</p>
+          <p className="text-center text-ink-muted">Verifying reset link...</p>
         ) : (
           <form onSubmit={handleSubmit} className="space-y-4">
             <Input

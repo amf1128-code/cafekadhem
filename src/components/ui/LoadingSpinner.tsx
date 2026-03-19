@@ -13,7 +13,7 @@ export function LoadingSpinner({ size = 'md', className = '' }: LoadingSpinnerPr
   return (
     <div className={`flex items-center justify-center ${className}`}>
       <svg
-        className={`animate-spin text-forest ${sizes[size]}`}
+        className={`animate-spin text-ink-muted ${sizes[size]}`}
         fill="none"
         viewBox="0 0 24 24"
       >
