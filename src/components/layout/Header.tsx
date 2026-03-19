@@ -5,7 +5,7 @@ export function Header() {
     <header className="bg-cream">
       <div className="max-w-3xl mx-auto px-6 py-6 flex items-center justify-between">
         <Link to="/" className="group">
-          <span className="text-sm tracking-[0.3em] uppercase text-ink font-medium">
+          <span className="font-serif text-xl text-forest-dark">
             Cafe Kadhem
           </span>
         </Link>

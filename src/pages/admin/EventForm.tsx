@@ -77,7 +77,10 @@ export function AdminEventForm() {
     const path = `${Date.now()}.${ext}`
 
     const { error } = await supabase.storage.from('flyers').upload(path, file)
-    if (error) throw error
+    if (error) {
+      console.error('[Flyer Upload] Failed:', error.message, error)
+      throw new Error(`Flyer upload failed: ${error.message}`)
+    }
 
     const { data } = supabase.storage.from('flyers').getPublicUrl(path)
     return data.publicUrl
@@ -114,17 +117,26 @@ export function AdminEventForm() {
       }
 
       if (isEdit) {
+        console.log('[Event Update] Saving event data:', eventData)
         const { error } = await supabase.from('events').update(eventData).eq('id', id!)
-        if (error) throw error
+        if (error) {
+          console.error('[Event Update] Failed:', error.message, error.details, error.hint, error)
+          throw new Error(`Failed to update event: ${error.message}`)
+        }
         addToast('Event updated')
       } else {
+        console.log('[Event Create] Saving event data:', eventData)
         const { error } = await supabase.from('events').insert(eventData)
-        if (error) throw error
+        if (error) {
+          console.error('[Event Create] Failed:', error.message, error.details, error.hint, error)
+          throw new Error(`Failed to create event: ${error.message}`)
+        }
         addToast('Event created')
       }
 
       navigate('/admin')
     } catch (err) {
+      console.error('[Event Save] Error:', err)
       addToast(err instanceof Error ? err.message : 'Failed to save event', 'error')
     } finally {
       setSaving(false)

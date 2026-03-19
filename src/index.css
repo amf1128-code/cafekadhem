@@ -2,17 +2,17 @@
 
 @theme {
   /* Original warm palette — restored */
-  --color-cream: #F2E6D0;
+  --color-cream: #E5E1DB;
   --color-forest: #2D5A27;
   --color-forest-light: #3D7A34;
   --color-forest-dark: #1E3D1A;
-  --color-warm: #D4C4A8;
+  --color-warm: #CBC5BA;
   --color-ink: #1A1A1A;
 
   /* Editorial additions */
-  --color-parchment: #F2E6D0;
-  --color-parchment-light: #F7F1E6;
-  --color-stone: #D4C4A8;
+  --color-parchment: #E5E1DB;
+  --color-parchment-light: #EDEAE4;
+  --color-stone: #CBC5BA;
   --color-stone-dark: #A39E95;
   --color-ink-light: #4A4A4A;
   --color-ink-muted: #8A8680;
