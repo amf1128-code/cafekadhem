@@ -164,9 +164,10 @@ export function Order() {
       )
 
       // Generate payment link
+      if (!settings?.venmo_handle) throw new Error('Venmo handle not configured — please set it in admin settings')
       const provider = getPaymentProvider('venmo')
       const guest = { id: guestId, first_name: firstName.trim() } as any
-      const paymentLink = provider.generatePaymentLink(order, guest, event!, settings!.venmo_handle)
+      const paymentLink = provider.generatePaymentLink(order, guest, event!, settings.venmo_handle)
 
       // Open Venmo
       window.open(paymentLink.url, '_blank')
