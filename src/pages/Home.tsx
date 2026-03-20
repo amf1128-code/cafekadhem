@@ -7,6 +7,7 @@ import { PageLoader } from '../components/ui/LoadingSpinner'
 
 export function Home() {
   const [events, setEvents] = useState<(Event & { rsvp_count: number })[]>([])
+  const [pastEvents, setPastEvents] = useState<Event[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -21,8 +22,11 @@ export function Home() {
       .order('date', { ascending: true })
 
     if (data) {
+      const upcoming = data.filter(e => isUpcoming(e.date))
+      const past = data.filter(e => !isUpcoming(e.date)).reverse()
+
       const eventsWithCounts = await Promise.all(
-        data.filter(e => isUpcoming(e.date)).map(async (event) => {
+        upcoming.map(async (event) => {
           const { count } = await supabase
             .from('rsvps')
             .select('*', { count: 'exact', head: true })
@@ -33,6 +37,7 @@ export function Home() {
         })
       )
       setEvents(eventsWithCounts)
+      setPastEvents(past)
     }
     setLoading(false)
   }
@@ -156,6 +161,48 @@ export function Home() {
               </div>
             </Link>
           ))}
+        </div>
+      )}
+
+      {/* Past Gatherings */}
+      {pastEvents.length > 0 && (
+        <div className="mt-16">
+          <div className="text-center mb-8">
+            <p className="text-[10px] tracking-[0.3em] uppercase text-ink-muted">Archive</p>
+            <h2 className="font-serif text-xl text-forest-dark italic mt-1">Past Gatherings</h2>
+          </div>
+          <div className="space-y-4">
+            {pastEvents.map(event => (
+              <Link
+                key={event.id}
+                to={`/events/${event.id}`}
+                className="block group"
+              >
+                <div className="border border-warm/60 bg-parchment-light/50 p-4 md:p-6 transition-colors hover:border-forest/30 opacity-80 hover:opacity-100">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h3 className="font-serif text-lg text-forest-dark italic">
+                        {event.title}
+                      </h3>
+                      <p className="text-xs text-ink-muted mt-1">
+                        {formatDate(event.date)}
+                        {event.gathering_number && <span className="ml-3">Gathering {event.gathering_number}</span>}
+                      </p>
+                    </div>
+                    {event.flyer_url && (
+                      <div className="border-2 border-white shadow-sm ml-4 flex-shrink-0">
+                        <img
+                          src={event.flyer_url}
+                          alt={event.title}
+                          className="w-16 h-16 object-cover"
+                        />
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </Link>
+            ))}
+          </div>
         </div>
       )}
     </div>

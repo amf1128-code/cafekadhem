@@ -8,7 +8,9 @@ import { Button } from '../../components/ui/Button'
 import { Badge } from '../../components/ui/Badge'
 
 export function AdminDashboard() {
-  const [events, setEvents] = useState<(Event & { rsvp_yes: number; rsvp_maybe: number; rsvp_waitlisted: number; order_count: number })[]>([])
+  type EventWithCounts = Event & { rsvp_yes: number; rsvp_maybe: number; rsvp_waitlisted: number; order_count: number }
+  const [events, setEvents] = useState<EventWithCounts[]>([])
+  const [pastEvents, setPastEvents] = useState<EventWithCounts[]>([])
   const [recentRsvps, setRecentRsvps] = useState<(RSVP & { guest: PublicGuestProfile; event_title: string })[]>([])
   const [loading, setLoading] = useState(true)
 
@@ -25,7 +27,7 @@ export function AdminDashboard() {
 
     if (eventsData) {
       const withCounts = await Promise.all(
-        eventsData.filter(e => isUpcoming(e.date)).map(async (event) => {
+        eventsData.map(async (event) => {
           const [yesResult, maybeResult, waitlistedResult, orderResult] = await Promise.all([
             supabase.from('rsvps').select('*', { count: 'exact', head: true }).eq('event_id', event.id).eq('status', 'yes'),
             supabase.from('rsvps').select('*', { count: 'exact', head: true }).eq('event_id', event.id).eq('status', 'maybe'),
@@ -41,7 +43,8 @@ export function AdminDashboard() {
           }
         })
       )
-      setEvents(withCounts)
+      setEvents(withCounts.filter(e => isUpcoming(e.date)))
+      setPastEvents(withCounts.filter(e => !isUpcoming(e.date)).reverse())
     }
 
     // Load recent RSVPs
@@ -120,6 +123,40 @@ export function AdminDashboard() {
                     <Button variant="ghost" size="sm">Waitlist</Button>
                   </Link>
                 )}
+                <Link to={`/events/${event.id}`} target="_blank">
+                  <Button variant="ghost" size="sm">View</Button>
+                </Link>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Past Events */}
+      <h2 className="font-serif text-lg text-forest-dark mb-3">Past Events</h2>
+      {pastEvents.length === 0 ? (
+        <p className="text-ink/60 text-sm mb-8">No past events.</p>
+      ) : (
+        <div className="grid gap-4 md:grid-cols-2 mb-8">
+          {pastEvents.map(event => (
+            <div key={event.id} className="bg-white/70 border border-warm/60 rounded-lg p-4 opacity-80">
+              <div className="flex items-start justify-between gap-2 mb-2">
+                <h3 className="font-serif text-lg text-forest-dark">{event.title}</h3>
+                <Badge variant={event.is_published ? 'success' : 'warning'}>
+                  {event.is_published ? 'Published' : 'Draft'}
+                </Badge>
+              </div>
+              <p className="text-sm text-ink/60 mb-3">
+                {formatDate(event.date)} at {formatTime(event.start_time)}
+              </p>
+              <div className="flex gap-4 text-sm text-ink/70 mb-3">
+                <span>{event.rsvp_yes} went</span>
+                <span>{event.order_count} orders</span>
+              </div>
+              <div className="flex gap-2">
+                <Link to={`/admin/events/${event.id}/edit`}>
+                  <Button variant="outline" size="sm">Edit</Button>
+                </Link>
                 <Link to={`/events/${event.id}`} target="_blank">
                   <Button variant="ghost" size="sm">View</Button>
                 </Link>
