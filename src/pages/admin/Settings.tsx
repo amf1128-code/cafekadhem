@@ -33,17 +33,29 @@ export function AdminSettings() {
 
   async function handleSave(e: FormEvent) {
     e.preventDefault()
-    if (!settings) return
     setSaving(true)
 
-    const { error } = await supabase
-      .from('admin_settings')
-      .update({
-        venmo_handle: venmoHandle.trim(),
-        cafe_name: cafeName.trim(),
-        contact_email: contactEmail.trim() || null,
-      })
-      .eq('id', settings.id)
+    const payload = {
+      venmo_handle: venmoHandle.trim(),
+      cafe_name: cafeName.trim(),
+      contact_email: contactEmail.trim() || null,
+    }
+
+    let error
+    if (settings) {
+      ;({ error } = await supabase
+        .from('admin_settings')
+        .update(payload)
+        .eq('id', settings.id))
+    } else {
+      const result = await supabase
+        .from('admin_settings')
+        .insert(payload)
+        .select('*')
+        .single()
+      error = result.error
+      if (result.data) setSettings(result.data)
+    }
 
     if (error) {
       addToast('Failed to save settings', 'error')
