@@ -250,12 +250,12 @@ export function RSVPForm({ eventId, existingRsvp, isFull, onRsvpComplete }: RSVP
 
       {/* RSVP buttons — bracket style */}
       <div className="flex justify-center pt-4">
-        <div className="flex gap-3">
+        <div className="flex flex-wrap justify-center gap-3">
           <button
             type="button"
             onClick={() => handleRSVP('yes')}
             disabled={loading}
-            className="border border-forest px-8 py-3 text-xs tracking-[0.2em] uppercase text-forest hover:bg-forest hover:text-cream transition-colors disabled:opacity-50"
+            className="border border-forest px-8 py-3 text-xs tracking-[0.2em] uppercase text-forest hover:bg-forest hover:text-cream transition-colors disabled:opacity-50 whitespace-nowrap"
           >
             [ {isFull ? 'Join Waitlist' : 'Reserve a Seat'} ]
           </button>
@@ -263,7 +263,7 @@ export function RSVPForm({ eventId, existingRsvp, isFull, onRsvpComplete }: RSVP
             type="button"
             onClick={() => handleRSVP('maybe')}
             disabled={loading}
-            className="border border-warm px-6 py-3 text-xs tracking-[0.2em] uppercase text-ink-muted hover:border-ink hover:text-ink transition-colors disabled:opacity-50"
+            className="border border-warm px-6 py-3 text-xs tracking-[0.2em] uppercase text-ink-muted hover:border-ink hover:text-ink transition-colors disabled:opacity-50 whitespace-nowrap"
           >
             [ Maybe ]
           </button>
