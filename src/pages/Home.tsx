@@ -117,7 +117,7 @@ export function Home() {
                       <img
                         src={event.flyer_url}
                         alt={event.title}
-                        className="w-full aspect-[16/9] object-cover"
+                        className="w-full aspect-[3/4] object-cover"
                       />
                     </div>
                   </div>

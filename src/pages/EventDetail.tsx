@@ -150,14 +150,12 @@ export function EventDetail() {
         {/* Flyer image */}
         {event.flyer_url && (
           <div className="relative mb-8 flex justify-center">
-            <div className="relative inline-block">
-              <div className="border-4 border-white shadow-sm">
-                <img
-                  src={event.flyer_url}
-                  alt={event.title}
-                  className="max-w-full max-h-[500px] object-contain"
-                />
-              </div>
+            <div className="border-4 border-white shadow-sm w-full">
+              <img
+                src={event.flyer_url}
+                alt={event.title}
+                className="w-full aspect-[3/4] object-cover"
+              />
             </div>
           </div>
         )}
