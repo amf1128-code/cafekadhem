@@ -200,6 +200,7 @@ export function AdminDashboard() {
       {/* Quick Links */}
       <div className="mt-8 flex gap-3 flex-wrap">
         <Link to="/admin/menus"><Button variant="outline">Manage Menus</Button></Link>
+        <Link to="/admin/pickup"><Button variant="outline">Pickup Orders</Button></Link>
         <Link to="/admin/guests"><Button variant="outline">Guest Directory</Button></Link>
         <Link to="/admin/settings"><Button variant="outline">Settings</Button></Link>
       </div>

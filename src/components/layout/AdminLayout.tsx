@@ -5,6 +5,7 @@ const navItems = [
   { path: '/admin', label: 'Dashboard' },
   { path: '/admin/events/new', label: 'New Event' },
   { path: '/admin/menus', label: 'Menus' },
+  { path: '/admin/pickup', label: 'Pickup' },
   { path: '/admin/guests', label: 'Guests' },
   { path: '/admin/settings', label: 'Settings' },
 ]
@@ -39,7 +40,7 @@ export function AdminLayout() {
               key={item.path}
               to={item.path}
               className={`px-4 py-2.5 text-sm whitespace-nowrap transition-colors ${
-                location.pathname === item.path
+                location.pathname === item.path || (item.path !== '/admin' && location.pathname.startsWith(item.path))
                   ? 'bg-cream/20 text-cream'
                   : 'text-cream/70 hover:text-cream hover:bg-cream/10'
               }`}

@@ -133,3 +133,54 @@ export interface CartItem {
   menuItem: MenuItem
   quantity: number
 }
+
+// Pickup order system
+export interface PickupConfig {
+  id: string
+  menu_id: string | null
+  is_active: boolean
+  created_at: string
+  updated_at: string
+  // Joined
+  menu?: Menu
+  slots?: PickupSlot[]
+}
+
+export interface PickupSlot {
+  id: string
+  pickup_config_id: string
+  day_of_week: number // 0=Sunday
+  start_time: string
+  end_time: string
+  max_orders: number | null
+  is_active: boolean
+  created_at: string
+}
+
+export interface PickupOrder {
+  id: string
+  guest_id: string
+  menu_id: string
+  pickup_date: string
+  pickup_time: string
+  status: 'pending' | 'confirmed' | 'paid' | 'picked_up' | 'cancelled'
+  payment_method: 'venmo' | 'stripe'
+  total: number | null
+  venmo_note: string | null
+  notes: string | null
+  created_at: string
+  updated_at: string
+  // Joined
+  items?: PickupOrderItem[]
+  guest?: Guest
+}
+
+export interface PickupOrderItem {
+  id: string
+  pickup_order_id: string
+  menu_item_id: string
+  quantity: number
+  unit_price: number | null
+  // Joined
+  menu_item?: MenuItem
+}

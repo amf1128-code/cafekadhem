@@ -9,9 +9,14 @@ export function Header() {
             Cafe Kadhem
           </span>
         </Link>
-        <span className="font-arabic text-2xl text-forest">
-          &#1603;&#1575;&#1601;&#1610;&#1607; &#1603;&#1575;&#1592;&#1605;
-        </span>
+        <div className="flex items-center gap-4">
+          <Link to="/pickup" className="text-xs tracking-[0.15em] uppercase text-ink-muted hover:text-forest transition-colors">
+            Pick-Up
+          </Link>
+          <span className="font-arabic text-2xl text-forest">
+            &#1603;&#1575;&#1601;&#1610;&#1607; &#1603;&#1575;&#1592;&#1605;
+          </span>
+        </div>
       </div>
     </header>
   )
