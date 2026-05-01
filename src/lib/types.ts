@@ -15,6 +15,7 @@ export interface Event {
   end_time: string | null
   location: string
   flyer_url: string | null
+  home_flyer_url: string | null
   menu_id: string | null
   capacity: number | null
   donation_info: string | null

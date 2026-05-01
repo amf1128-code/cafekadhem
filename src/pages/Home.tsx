@@ -110,12 +110,12 @@ export function Home() {
                   </div>
                 </div>
 
-                {/* Flyer image */}
-                {event.flyer_url && (
+                {/* Flyer image — prefer home-specific image, fall back to full flyer */}
+                {(event.home_flyer_url || event.flyer_url) && (
                   <div className="relative mb-6">
                     <div className="border-4 border-white shadow-sm">
                       <img
-                        src={event.flyer_url}
+                        src={event.home_flyer_url || event.flyer_url!}
                         alt={event.title}
                         className="w-full aspect-[3/4] object-cover"
                       />
@@ -189,10 +189,10 @@ export function Home() {
                         {event.gathering_number && <span className="ml-3">Gathering {event.gathering_number}</span>}
                       </p>
                     </div>
-                    {event.flyer_url && (
+                    {(event.home_flyer_url || event.flyer_url) && (
                       <div className="border-2 border-white shadow-sm ml-4 flex-shrink-0">
                         <img
-                          src={event.flyer_url}
+                          src={event.home_flyer_url || event.flyer_url!}
                           alt={event.title}
                           className="w-16 h-16 object-cover"
                         />
