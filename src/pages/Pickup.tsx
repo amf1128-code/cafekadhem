@@ -9,8 +9,6 @@ import { getPaymentProvider } from '../lib/payment'
 import { PageLoader } from '../components/ui/LoadingSpinner'
 import { useToast } from '../components/ui/Toast'
 
-const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
-
 export function Pickup() {
   const { addToast } = useToast()
   const [config, setConfig] = useState<PickupConfig | null>(null)
