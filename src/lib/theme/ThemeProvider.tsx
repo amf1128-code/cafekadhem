@@ -3,7 +3,7 @@ import { supabase } from '../supabase'
 import { ThemeContext, THEMES, DEFAULT_THEME, type ThemeId } from './themes'
 
 function isValidTheme(value: unknown): value is ThemeId {
-  return value === 'theme1' || value === 'theme2'
+  return value === 'theme1' || value === 'theme2' || value === 'theme3'
 }
 
 export function ThemeProvider({ children }: { children: ReactNode }) {

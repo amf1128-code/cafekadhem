@@ -65,6 +65,38 @@
      up the theme's choice automatically. */
 }
 
+/* Theme 3 — "Watch Party"
+ * Poster-inspired gradient backdrop (orange → magenta → purple → blue) with
+ * grain noise, white display headings carrying a soft halo glow, and floating
+ * blurred geometric shapes echoing the swirling poster artwork.
+ */
+[data-theme="theme3"] {
+  --color-cream: #1A1530;                  /* dark surface tone for cards */
+  --color-forest: #FFFFFF;                 /* primary "ink" reads as white on the gradient */
+  --color-forest-light: #FFFFFF;
+  --color-forest-dark: #FFFFFF;
+  --color-warm: rgba(255, 255, 255, 0.18);
+  --color-ink: #FFFFFF;
+
+  --color-parchment: #1A1530;
+  --color-parchment-light: rgba(26, 21, 48, 0.55);   /* translucent dark for cards over the gradient */
+  --color-stone: rgba(255, 255, 255, 0.22);
+  --color-stone-dark: rgba(255, 255, 255, 0.45);
+  --color-ink-light: rgba(255, 255, 255, 0.88);
+  --color-ink-muted: rgba(255, 255, 255, 0.7);
+  --color-accent: #FF6B35;
+
+  /* Aileron is the English face from the poster. Cdnfonts ships several
+     weights (UltraLight → Black). We layer Inter as a metrics-similar
+     fallback so layout is stable while Aileron downloads. */
+  --font-serif: "Aileron", "Inter", system-ui, sans-serif;
+  --font-sans: "Aileron", "Inter", system-ui, sans-serif;
+  --font-script: "Aileron", "Inter", system-ui, sans-serif;
+  /* Gumela Arabic isn't on a public CDN; Tajawal carries the same modern,
+     evenly-weighted naskh look the poster uses. */
+  --font-arabic: "Gumela Arabic", "Tajawal", "Cairo", "Amiri", serif;
+}
+
 /*
  * Page backdrop. In theme 1 this is just the cream wash. In theme 2 it becomes
  * the vertical sage-and-cream stripe pattern. Apply to elements that should
@@ -105,6 +137,158 @@
 
 [data-theme="theme2"] .vertical-text {
   letter-spacing: 0.25em;
+}
+
+/* ============================================================
+ * Theme 3 — page chrome, headings, floating shapes, grain
+ * ============================================================
+ *
+ * Layout wrappers, the header and the footer all use `.page-bg`. We want a
+ * single cohesive gradient + grain + shapes covering the full viewport, not
+ * three repeats. So the gradient is pinned to a fixed pseudo-element on
+ * <body>, and `.page-bg` becomes transparent in this theme.
+ */
+[data-theme="theme3"] body {
+  background: #1A1530;
+  position: relative;
+  /* Aileron is wider than Inter at the same px size. Tighten letter spacing
+     a touch so the body text doesn't feel oversized after the swap. */
+  letter-spacing: -0.005em;
+}
+
+[data-theme="theme3"] .page-bg {
+  background: transparent;
+}
+
+/* The gradient itself — orange in the top-right, magenta/pink mid, purple
+   bottom-left, with a deep blue pocket. Pinned with `fixed` so scrolling
+   long pages doesn't reveal a seam. */
+[data-theme="theme3"] body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: -2;
+  background:
+    radial-gradient(ellipse 70% 60% at 85% 15%, #FF8A3D 0%, transparent 55%),
+    radial-gradient(ellipse 60% 55% at 15% 25%, #FF6B35 0%, transparent 55%),
+    radial-gradient(ellipse 70% 60% at 90% 85%, #C71F62 0%, transparent 55%),
+    radial-gradient(ellipse 55% 50% at 20% 90%, #5C2A8A 0%, transparent 55%),
+    radial-gradient(ellipse 50% 45% at 50% 65%, #1A2D8C 0%, transparent 55%),
+    linear-gradient(135deg, #FF6B35 0%, #C71F62 35%, #5C2A8A 65%, #1A2D8C 100%);
+  pointer-events: none;
+}
+
+/* Grain / noise overlay — fractal SVG noise tiled at low opacity gives the
+   matte poster feel. Sits between the gradient and the floating shapes so
+   the shapes read crisp on top. */
+[data-theme="theme3"] body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  opacity: 0.35;
+  mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='240' height='240'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 0.6 0'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>");
+}
+
+/* Floating geometric shapes — three blurred translucent blobs drifting
+   across the viewport, echoing the swirling 3D forms in the poster.
+   Hosted on the layout wrapper (the outermost .page-bg) so we don't get
+   duplicates from header/footer. Wrapper is positioned relative + clips
+   so the shapes stay anchored to the visible content area. */
+[data-theme="theme3"] .min-h-screen.page-bg {
+  position: relative;
+  overflow-x: hidden;
+  isolation: isolate;
+}
+
+[data-theme="theme3"] .min-h-screen.page-bg::before,
+[data-theme="theme3"] .min-h-screen.page-bg::after {
+  content: '';
+  position: absolute;
+  z-index: -1;
+  pointer-events: none;
+  border-radius: 42% 58% 65% 35% / 38% 45% 55% 62%;
+  filter: blur(40px);
+  opacity: 0.55;
+  mix-blend-mode: screen;
+}
+
+/* Top-left swirl — orange/pink gradient blob */
+[data-theme="theme3"] .min-h-screen.page-bg::before {
+  top: 8%;
+  left: -8%;
+  width: 360px;
+  height: 360px;
+  background: linear-gradient(135deg, #FFB347 0%, #FF6B35 35%, #C71F62 70%, #4B1B7A 100%);
+  transform: rotate(-18deg);
+}
+
+/* Bottom-right swirl — magenta/purple gradient blob */
+[data-theme="theme3"] .min-h-screen.page-bg::after {
+  bottom: 6%;
+  right: -10%;
+  width: 420px;
+  height: 420px;
+  background: linear-gradient(135deg, #FFA07A 0%, #C71F62 40%, #5C2A8A 75%, #1A2D8C 100%);
+  border-radius: 55% 45% 38% 62% / 50% 38% 62% 50%;
+  transform: rotate(24deg);
+}
+
+/* Headings carry the subtle white halo glow seen on the poster's "WORLD CUP
+   WATCH PARTY" lockup — a stack of soft white shadows. */
+[data-theme="theme3"] h1,
+[data-theme="theme3"] h2,
+[data-theme="theme3"] h3 {
+  color: #FFFFFF;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  text-shadow:
+    0 0 18px rgba(255, 255, 255, 0.45),
+    0 0 36px rgba(255, 255, 255, 0.28),
+    0 0 72px rgba(255, 255, 255, 0.18);
+}
+
+/* Same glow as a utility for non-heading lockups (the brand wordmark in
+   the header/footer, the Arabic wordmark, etc.). */
+[data-theme="theme3"] .font-arabic {
+  text-shadow:
+    0 0 14px rgba(255, 255, 255, 0.4),
+    0 0 28px rgba(255, 255, 255, 0.22);
+  font-weight: 500;
+}
+
+/* The brand wordmark in the header uses .font-serif at xl. In theme 3 we
+   want it to render in Aileron with the glow, matching the poster lockup. */
+[data-theme="theme3"] header .font-serif,
+[data-theme="theme3"] footer .font-serif {
+  color: #FFFFFF;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  text-shadow:
+    0 0 14px rgba(255, 255, 255, 0.4),
+    0 0 28px rgba(255, 255, 255, 0.22);
+}
+
+/* Buttons / borders / muted body copy were tuned for cream backgrounds; on
+   the gradient we want them to read as light-on-dark instead. The CSS
+   variables above already swap most of these, but a few utilities
+   reference cream/forest directly — make sure they remain legible. */
+[data-theme="theme3"] .bg-cream,
+[data-theme="theme3"] .bg-parchment,
+[data-theme="theme3"] .bg-parchment-light {
+  background-color: rgba(26, 21, 48, 0.55);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+[data-theme="theme3"] hr,
+[data-theme="theme3"] .border-stone,
+[data-theme="theme3"] .border-warm {
+  border-color: rgba(255, 255, 255, 0.2);
 }
 
 body {

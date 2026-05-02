@@ -32,7 +32,11 @@ export function AdminSettings() {
       setVenmoHandle(data.venmo_handle)
       setContactEmail(data.contact_email || '')
       setSiteUrl(data.site_url || '')
-      setTheme(data.theme === 'theme2' ? 'theme2' : 'theme1')
+      setTheme(
+        data.theme === 'theme2' ? 'theme2'
+          : data.theme === 'theme3' ? 'theme3'
+          : 'theme1',
+      )
     }
     setLoading(false)
   }

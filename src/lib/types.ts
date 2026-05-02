@@ -3,7 +3,7 @@ export interface AdminSettings {
   venmo_handle: string
   contact_email: string | null
   site_url: string
-  theme: 'theme1' | 'theme2'
+  theme: 'theme1' | 'theme2' | 'theme3'
   updated_at: string
 }
 
