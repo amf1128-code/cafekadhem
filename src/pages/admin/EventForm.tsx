@@ -254,7 +254,7 @@ export function AdminEventForm() {
         {/* Home Page Image — optional alternate cropped for the home card */}
         <div>
           <label className="block text-sm font-medium text-ink mb-1">Home Page Image <span className="text-ink-muted font-normal">(optional)</span></label>
-          <p className="text-xs text-ink-muted mb-2">Shown on the home page card (3:4 aspect ratio). Falls back to the flyer above if left empty.</p>
+          <p className="text-xs text-ink-muted mb-2">Shown on the home page card at the image's natural aspect ratio. Falls back to the flyer above if left empty.</p>
           {homeFlyerUrl && !homeFlyerFile && (
             <div className="mb-2">
               <img src={homeFlyerUrl} alt="Current home image" className="w-32 h-auto rounded border border-warm" />

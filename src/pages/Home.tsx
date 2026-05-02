@@ -110,14 +110,16 @@ export function Home() {
                   </div>
                 </div>
 
-                {/* Flyer image — prefer home-specific image, fall back to full flyer */}
+                {/* Flyer image — prefer home-specific image, fall back to full flyer.
+                    Renders at the image's natural aspect ratio so admins can
+                    upload a home-specific crop and have it shown intact. */}
                 {(event.home_flyer_url || event.flyer_url) && (
                   <div className="relative mb-6">
                     <div className="border-4 border-white shadow-sm">
                       <img
                         src={event.home_flyer_url || event.flyer_url!}
                         alt={event.title}
-                        className="w-full aspect-[3/4] object-cover"
+                        className="w-full h-auto block"
                       />
                     </div>
                   </div>
