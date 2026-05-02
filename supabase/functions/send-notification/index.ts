@@ -77,6 +77,12 @@ async function generateAndUploadQr(token: string, encodedUrl: string): Promise<s
 
 const messageTemplates: Record<string, (data: Record<string, string>) => { subject: string; body: string; html?: string }> = {
   rsvp_confirmation: (data) => {
+    if (data.status === 'waitlisted') {
+      return {
+        subject: `You're on the waitlist - ${data.event_title || 'Cafe Kadhem'}`,
+        body: `Thanks for joining the waitlist! We'll follow up soon if a spot opens up!`,
+      }
+    }
     if (data.is_ticketed === 'true' && data.status === 'yes') {
       return {
         subject: `We got your RSVP - ${data.event_title || 'Cafe Kadhem'}`,
@@ -100,10 +106,19 @@ const messageTemplates: Record<string, (data: Record<string, string>) => { subje
     subject: `Reminder - ${data.event_title || 'Cafe Kadhem'} Tomorrow!`,
     body: `Reminder: ${data.event_title || 'Your event'} is tomorrow! See you there.`,
   }),
-  waitlist_promoted: (data) => ({
-    subject: `You're In! - ${data.event_title || 'Cafe Kadhem'}`,
-    body: `Great news! A spot opened up at ${data.event_title || 'our event'} and you've been promoted from the waitlist. You're confirmed! See you there.`,
-  }),
+  waitlist_promoted: (data) => {
+    if (data.is_ticketed === 'true') {
+      const eventLink = data.event_url ? `\n\nReserve your seat by paying for your ticket here: ${data.event_url}` : ''
+      return {
+        subject: `A spot opened up - ${data.event_title || 'Cafe Kadhem'}`,
+        body: `Good news — a spot opened up at ${data.event_title || 'our event'} and you're off the waitlist! To confirm your seat, send your ticket payment via Venmo. We'll follow up with your ticket once payment is received.${eventLink}`,
+      }
+    }
+    return {
+      subject: `You're In! - ${data.event_title || 'Cafe Kadhem'}`,
+      body: `Great news! A spot opened up at ${data.event_title || 'our event'} and you've been promoted from the waitlist. You're confirmed! See you there.`,
+    }
+  },
   ticket_issued: (data) => {
     const eventTitle = data.event_title || 'Cafe Kadhem'
     const ticketUrl = data.ticket_url || ''
@@ -247,15 +262,19 @@ Deno.serve(async (req: Request) => {
       if (event) data.event_title = event.title
     }
 
-    // Server-side ticket URL + QR generation. Single source of truth =
-    // admin_settings.site_url, so the link in the email always reflects
-    // whatever the admin has set as the canonical domain.
+    // Server-side URL building. Single source of truth = admin_settings.site_url,
+    // so links in emails always reflect whatever the admin has set as the
+    // canonical domain (regardless of where the admin happened to click from).
     if (type === 'ticket_issued' && data.ticket_token) {
       const siteUrl = await getSiteUrl()
       const token = data.ticket_token as string
       data.ticket_url = `${siteUrl}/ticket/${token}`
       const qrImageUrl = await generateAndUploadQr(token, data.ticket_url)
       if (qrImageUrl) data.qr_image_url = qrImageUrl
+    }
+    if (type === 'waitlist_promoted' && eventId) {
+      const siteUrl = await getSiteUrl()
+      data.event_url = `${siteUrl}/events/${eventId}`
     }
 
     const template = messageTemplates[type]
