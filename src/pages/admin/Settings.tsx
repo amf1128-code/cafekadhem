@@ -3,11 +3,15 @@ import { supabase } from '../../lib/supabase'
 import type { AdminSettings as AdminSettingsType } from '../../lib/types'
 import { Button } from '../../components/ui/Button'
 import { Input } from '../../components/ui/Input'
+import { Select } from '../../components/ui/Select'
 import { useToast } from '../../components/ui/Toast'
 import { PageLoader } from '../../components/ui/LoadingSpinner'
+import { useTheme } from '../../lib/theme/themes'
+import { THEMES, DEFAULT_THEME, type ThemeId } from '../../lib/theme/themes'
 
 export function AdminSettings() {
   const { addToast } = useToast()
+  const { applyTheme } = useTheme()
   const [settings, setSettings] = useState<AdminSettingsType | null>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -15,6 +19,7 @@ export function AdminSettings() {
   const [venmoHandle, setVenmoHandle] = useState('')
   const [cafeName, setCafeName] = useState('')
   const [contactEmail, setContactEmail] = useState('')
+  const [theme, setTheme] = useState<ThemeId>(DEFAULT_THEME)
 
   useEffect(() => {
     loadSettings()
@@ -27,8 +32,14 @@ export function AdminSettings() {
       setVenmoHandle(data.venmo_handle)
       setCafeName(data.cafe_name)
       setContactEmail(data.contact_email || '')
+      setTheme(data.theme === 'theme2' ? 'theme2' : 'theme1')
     }
     setLoading(false)
+  }
+
+  function handleThemeChange(next: ThemeId) {
+    setTheme(next)
+    applyTheme(next) // live preview for the admin while editing
   }
 
   async function handleSave(e: FormEvent) {
@@ -39,6 +50,7 @@ export function AdminSettings() {
       venmo_handle: venmoHandle.trim(),
       cafe_name: cafeName.trim(),
       contact_email: contactEmail.trim() || null,
+      theme,
     }
 
     let error
@@ -91,6 +103,17 @@ export function AdminSettings() {
           onChange={e => setContactEmail(e.target.value)}
           placeholder="Optional"
         />
+        <div>
+          <Select
+            label="Site Theme"
+            value={theme}
+            onChange={e => handleThemeChange(e.target.value as ThemeId)}
+            options={THEMES.map(t => ({ value: t.id, label: `${t.name} — ${t.tagline}` }))}
+          />
+          <p className="text-xs text-ink-muted mt-1">
+            Applies to all visitors. Changes preview here immediately; click Save to publish.
+          </p>
+        </div>
         <Button type="submit" loading={saving}>Save Settings</Button>
       </form>
     </div>

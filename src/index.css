@@ -52,7 +52,17 @@
   --color-ink-muted: #5C6A92;
   --color-accent: #1A21BC;
 
-  --font-serif: "Bodoni Moda", "Playfair Display", "Cormorant Garamond", Georgia, serif;
+  /* Theme 2 swaps the editorial serif out for a chunky condensed display
+     sans. "Sailors Condensed" is a paid foundry face — listed first so a
+     locally installed copy is used if present; otherwise the browser falls
+     through to Anton / Bebas Neue (both loaded from Google Fonts) and finally
+     to system condensed sans. */
+  --font-serif: "Sailors Condensed", "Anton", "Bebas Neue", "Impact",
+    "Oswald", "Arial Narrow", system-ui, sans-serif;
+  /* Arabic font intentionally inherits theme 1 here. To change it for a
+     theme, override --font-arabic with a different family. The font-arabic
+     utility resolves through this variable, so any element using it picks
+     up the theme's choice automatically. */
 }
 
 /*

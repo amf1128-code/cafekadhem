@@ -1,29 +1,37 @@
 import { useEffect, useState, type ReactNode } from 'react'
-import { ThemeContext, THEMES, type ThemeId } from './themes'
+import { supabase } from '../supabase'
+import { ThemeContext, THEMES, DEFAULT_THEME, type ThemeId } from './themes'
 
-const STORAGE_KEY = 'cafekadhem.theme'
-const DEFAULT_THEME: ThemeId = 'theme1'
-
-function readStoredTheme(): ThemeId {
-  if (typeof window === 'undefined') return DEFAULT_THEME
-  const stored = window.localStorage.getItem(STORAGE_KEY)
-  return stored === 'theme1' || stored === 'theme2' ? stored : DEFAULT_THEME
+function isValidTheme(value: unknown): value is ThemeId {
+  return value === 'theme1' || value === 'theme2'
 }
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
-  const [theme, setThemeState] = useState<ThemeId>(readStoredTheme)
+  const [theme, setTheme] = useState<ThemeId>(DEFAULT_THEME)
 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme)
-    window.localStorage.setItem(STORAGE_KEY, theme)
   }, [theme])
 
-  const setTheme = (next: ThemeId) => setThemeState(next)
-  const toggleTheme = () =>
-    setThemeState(prev => (prev === 'theme1' ? 'theme2' : 'theme1'))
+  // Fetch the admin-controlled theme once on mount and apply it for everyone.
+  useEffect(() => {
+    let cancelled = false
+    supabase
+      .from('admin_settings')
+      .select('theme')
+      .limit(1)
+      .single()
+      .then(({ data }) => {
+        if (cancelled) return
+        if (data && isValidTheme(data.theme)) setTheme(data.theme)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   return (
-    <ThemeContext.Provider value={{ theme, setTheme, toggleTheme, themes: THEMES }}>
+    <ThemeContext.Provider value={{ theme, applyTheme: setTheme, themes: THEMES }}>
       {children}
     </ThemeContext.Provider>
   )
