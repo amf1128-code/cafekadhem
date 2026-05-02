@@ -6,12 +6,27 @@ import { Input } from '../../components/ui/Input'
 import { Select } from '../../components/ui/Select'
 import { useToast } from '../../components/ui/Toast'
 import { PageLoader } from '../../components/ui/LoadingSpinner'
-import { useTheme } from '../../lib/theme/themes'
-import { THEMES, DEFAULT_THEME, type ThemeId } from '../../lib/theme/themes'
+import { THEMES, type SiteThemeChoice } from '../../lib/theme/themes'
+
+const SITE_THEME_OPTIONS: { value: SiteThemeChoice; label: string }[] = [
+  { value: 'default', label: 'Default — follow next event' },
+  ...THEMES.map(t => ({
+    value: t.id as SiteThemeChoice,
+    label: `${t.name} — ${t.tagline}`,
+  })),
+]
+
+function isValidSiteTheme(value: unknown): value is SiteThemeChoice {
+  return (
+    value === 'default' ||
+    value === 'theme1' ||
+    value === 'theme2' ||
+    value === 'theme3'
+  )
+}
 
 export function AdminSettings() {
   const { addToast } = useToast()
-  const { applyTheme } = useTheme()
   const [settings, setSettings] = useState<AdminSettingsType | null>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -19,7 +34,7 @@ export function AdminSettings() {
   const [venmoHandle, setVenmoHandle] = useState('')
   const [contactEmail, setContactEmail] = useState('')
   const [siteUrl, setSiteUrl] = useState('')
-  const [theme, setTheme] = useState<ThemeId>(DEFAULT_THEME)
+  const [theme, setTheme] = useState<SiteThemeChoice>('default')
 
   useEffect(() => {
     loadSettings()
@@ -32,18 +47,9 @@ export function AdminSettings() {
       setVenmoHandle(data.venmo_handle)
       setContactEmail(data.contact_email || '')
       setSiteUrl(data.site_url || '')
-      setTheme(
-        data.theme === 'theme2' ? 'theme2'
-          : data.theme === 'theme3' ? 'theme3'
-          : 'theme1',
-      )
+      setTheme(isValidSiteTheme(data.theme) ? data.theme : 'default')
     }
     setLoading(false)
-  }
-
-  function handleThemeChange(next: ThemeId) {
-    setTheme(next)
-    applyTheme(next) // live preview for the admin while editing
   }
 
   async function handleSave(e: FormEvent) {
@@ -129,13 +135,14 @@ export function AdminSettings() {
           <Select
             label="Site Theme"
             value={theme}
-            onChange={e => handleThemeChange(e.target.value as ThemeId)}
-            options={THEMES.map(t => ({ value: t.id, label: `${t.name} — ${t.tagline}` }))}
+            onChange={e => setTheme(e.target.value as SiteThemeChoice)}
+            options={SITE_THEME_OPTIONS}
           />
           <p className="text-xs text-ink-muted mt-1">
-            Applies to all visitors of the public site. The admin console always
-            uses the default palette so it stays readable. Click Save to publish,
-            then open the public site to preview.
+            Controls the home page only. <strong>Default</strong> follows the
+            next upcoming event's theme. The other options force the home page
+            into that theme regardless of upcoming events. Each event's detail
+            page always uses its own theme (set in the event editor).
           </p>
         </div>
         <Button type="submit" loading={saving}>Save Settings</Button>

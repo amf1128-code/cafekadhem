@@ -3,7 +3,7 @@ export interface AdminSettings {
   venmo_handle: string
   contact_email: string | null
   site_url: string
-  theme: 'theme1' | 'theme2' | 'theme3'
+  theme: 'default' | 'theme1' | 'theme2' | 'theme3'
   updated_at: string
 }
 
@@ -25,6 +25,7 @@ export interface Event {
   is_published: boolean
   ticketing_enabled: boolean
   ticket_price: number | null
+  theme: 'theme1' | 'theme2' | 'theme3'
   created_at: string
   updated_at: string
   // Joined fields

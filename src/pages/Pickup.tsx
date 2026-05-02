@@ -8,9 +8,13 @@ import { formatTime } from '../lib/utils/date'
 import { getPaymentProvider } from '../lib/payment'
 import { PageLoader } from '../components/ui/LoadingSpinner'
 import { useToast } from '../components/ui/Toast'
+import { usePageTheme } from '../lib/theme/themes'
 
 export function Pickup() {
   const { addToast } = useToast()
+  // Pickup isn't tied to an event — keep it on the editorial archival theme
+  // regardless of which event-driven theme the home page just rendered in.
+  usePageTheme('theme1')
   const [config, setConfig] = useState<PickupConfig | null>(null)
   const [slots, setSlots] = useState<PickupSlot[]>([])
   const [menuItems, setMenuItems] = useState<MenuItem[]>([])

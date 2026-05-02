@@ -8,6 +8,7 @@ import { getPaymentProvider } from '../lib/payment'
 import { sendNotification } from '../lib/notifications'
 import { PageLoader } from '../components/ui/LoadingSpinner'
 import { useToast } from '../components/ui/Toast'
+import { usePageTheme } from '../lib/theme/themes'
 
 export function Order() {
   const { id } = useParams<{ id: string }>()
@@ -24,6 +25,8 @@ export function Order() {
   const [firstName, setFirstName] = useState('')
   const [email, setEmail] = useState('')
   const [phone, setPhone] = useState('')
+
+  usePageTheme(event?.theme)
 
   useEffect(() => {
     if (id) loadData()

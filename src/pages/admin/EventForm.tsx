@@ -8,6 +8,7 @@ import { Select } from '../../components/ui/Select'
 import { useToast } from '../../components/ui/Toast'
 import { PageLoader } from '../../components/ui/LoadingSpinner'
 import { sendNotification } from '../../lib/notifications'
+import { THEMES, type ThemeId } from '../../lib/theme/themes'
 
 const MAX_FILE_SIZE = 5 * 1024 * 1024 // 5MB
 const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp']
@@ -36,6 +37,7 @@ export function AdminEventForm() {
   const [flyerUrl, setFlyerUrl] = useState<string | null>(null)
   const [homeFlyerFile, setHomeFlyerFile] = useState<File | null>(null)
   const [homeFlyerUrl, setHomeFlyerUrl] = useState<string | null>(null)
+  const [theme, setTheme] = useState<ThemeId>('theme1')
 
   const [menus, setMenus] = useState<Menu[]>([])
   const [loading, setLoading] = useState(true)
@@ -68,6 +70,9 @@ export function AdminEventForm() {
         setTicketPrice(event.ticket_price != null ? String(event.ticket_price) : '')
         setFlyerUrl(event.flyer_url)
         setHomeFlyerUrl(event.home_flyer_url)
+        if (event.theme === 'theme1' || event.theme === 'theme2' || event.theme === 'theme3') {
+          setTheme(event.theme)
+        }
       }
     }
 
@@ -132,6 +137,7 @@ export function AdminEventForm() {
         ticket_price: ticketingEnabled && ticketPrice ? parseFloat(ticketPrice) : null,
         flyer_url: uploadedFlyerUrl,
         home_flyer_url: uploadedHomeFlyerUrl,
+        theme,
       }
 
       if (isEdit) {
@@ -232,6 +238,19 @@ export function AdminEventForm() {
           options={menus.map(m => ({ value: m.id, label: m.name }))}
           placeholder="No menu"
         />
+
+        <div>
+          <Select
+            label="Theme"
+            value={theme}
+            onChange={e => setTheme(e.target.value as ThemeId)}
+            options={THEMES.map(t => ({ value: t.id, label: `${t.name} — ${t.tagline}` }))}
+          />
+          <p className="text-xs text-ink-muted mt-1">
+            Visual treatment for this event's detail and ticket pages. Also drives the
+            home page when Site Theme is set to Default and this is the next upcoming event.
+          </p>
+        </div>
 
         {/* Flyer Upload — full image shown on the event detail page */}
         <div>

@@ -4,11 +4,27 @@ import { supabase } from '../lib/supabase'
 import type { Event } from '../lib/types'
 import { formatDate, formatTime, isUpcoming } from '../lib/utils/date'
 import { PageLoader } from '../components/ui/LoadingSpinner'
+import { useTheme, usePageTheme, type ThemeId } from '../lib/theme/themes'
 
 export function Home() {
+  const { siteTheme } = useTheme()
   const [events, setEvents] = useState<(Event & { rsvp_count: number })[]>([])
   const [pastEvents, setPastEvents] = useState<Event[]>([])
   const [loading, setLoading] = useState(true)
+
+  // Resolve the home page's theme: an explicit site setting wins outright;
+  // otherwise follow the next upcoming event's theme (events[0] is the
+  // soonest after the date sort below). While events are still loading we
+  // pass `undefined` so usePageTheme leaves the previously-applied theme
+  // in place — this keeps the cached theme on screen instead of flashing
+  // theme1 in the gap before the fetch resolves.
+  const homeTheme: ThemeId | undefined =
+    siteTheme !== 'default'
+      ? siteTheme
+      : loading
+        ? undefined
+        : (events[0]?.theme ?? 'theme1')
+  usePageTheme(homeTheme)
 
   useEffect(() => {
     loadEvents()

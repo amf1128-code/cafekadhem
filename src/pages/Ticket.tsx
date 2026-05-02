@@ -6,12 +6,16 @@ import { formatDate, formatTime } from '../lib/utils/date'
 import { ticketUrl } from '../lib/utils/ticket'
 import { PageLoader } from '../components/ui/LoadingSpinner'
 import { QRCode } from '../components/tickets/QRCode'
+import { usePageTheme, type ThemeId } from '../lib/theme/themes'
 
 export function Ticket() {
   const { token } = useParams<{ token: string }>()
   const [ticket, setTicket] = useState<TicketView | null>(null)
+  const [eventTheme, setEventTheme] = useState<ThemeId | undefined>(undefined)
   const [loading, setLoading] = useState(true)
   const [notFound, setNotFound] = useState(false)
+
+  usePageTheme(eventTheme)
 
   useEffect(() => {
     if (!token) {
@@ -21,11 +25,20 @@ export function Ticket() {
     }
     supabase
       .rpc('get_ticket', { p_token: token })
-      .then(({ data, error }) => {
+      .then(async ({ data, error }) => {
         if (error || !data) {
           setNotFound(true)
         } else {
-          setTicket(data as TicketView)
+          const view = data as TicketView
+          setTicket(view)
+          // The RPC return shape doesn't include theme; fetch it from the
+          // event row directly so the ticket page matches the event's look.
+          const { data: ev } = await supabase
+            .from('events')
+            .select('theme')
+            .eq('id', view.event_id)
+            .single()
+          if (ev?.theme) setEventTheme(ev.theme as ThemeId)
         }
         setLoading(false)
       })
