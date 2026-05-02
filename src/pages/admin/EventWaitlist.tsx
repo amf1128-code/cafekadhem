@@ -192,7 +192,6 @@ export function AdminEventWaitlist() {
                       size="sm"
                       onClick={() => handlePromote(entry.id, entry.guest_id)}
                       loading={promoting === entry.id}
-                      disabled={spotsAvailable !== null && spotsAvailable <= 0}
                     >
                       Promote
                     </Button>

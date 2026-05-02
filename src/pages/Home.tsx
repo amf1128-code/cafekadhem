@@ -143,12 +143,19 @@ export function Home() {
                   </div>
                   <div className="border-r border-warm">
                     {event.capacity ? (
-                      <>
-                        <p className="font-serif text-xl text-forest-dark">{event.capacity - event.rsvp_count > 0 ? event.capacity - event.rsvp_count : 0}</p>
-                        <p className="text-[10px] tracking-[0.15em] uppercase text-ink-muted">
-                          {event.rsvp_count >= event.capacity ? 'Waitlist' : 'Seats Left'}
-                        </p>
-                      </>
+                      event.capacity - event.rsvp_count > 0 ? (
+                        <>
+                          <p className="font-serif text-xl text-forest-dark">{event.capacity - event.rsvp_count}</p>
+                          <p className="text-[10px] tracking-[0.15em] uppercase text-ink-muted">
+                            {event.ticketing_enabled ? 'Tickets Left' : 'Seats Left'}
+                          </p>
+                        </>
+                      ) : (
+                        <>
+                          <p className="font-serif text-base text-forest-dark">Event Full</p>
+                          <p className="text-[10px] tracking-[0.15em] uppercase text-ink-muted">Join the Waitlist</p>
+                        </>
+                      )
                     ) : (
                       <>
                         <p className="font-serif text-xl text-forest-dark">{event.rsvp_count}</p>

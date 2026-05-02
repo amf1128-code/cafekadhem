@@ -108,10 +108,10 @@ const messageTemplates: Record<string, (data: Record<string, string>) => { subje
   }),
   waitlist_promoted: (data) => {
     if (data.is_ticketed === 'true') {
-      const eventLink = data.event_url ? `\n\nReserve your seat by paying for your ticket here: ${data.event_url}` : ''
+      const eventLink = data.event_url ? `\n\n${data.event_url}` : ''
       return {
         subject: `A spot opened up - ${data.event_title || 'Cafe Kadhem'}`,
-        body: `Good news — a spot opened up at ${data.event_title || 'our event'} and you're off the waitlist! To confirm your seat, send your ticket payment via Venmo. We'll follow up with your ticket once payment is received.${eventLink}`,
+        body: `Good news — a spot opened up at ${data.event_title || 'our event'} and you're off the waitlist! To confirm your seat, please buy your ticket ASAP. We'll follow up with your ticket once payment is received.${eventLink}`,
       }
     }
     return {
@@ -123,7 +123,7 @@ const messageTemplates: Record<string, (data: Record<string, string>) => { subje
     const eventTitle = data.event_title || 'Cafe Kadhem'
     const ticketUrl = data.ticket_url || ''
     const qrImageUrl = data.qr_image_url || ''
-    const text = `You're confirmed for ${eventTitle}.\n\nShow this at the door for entry: ${ticketUrl}\n\nIf the QR isn't visible in this email, open the link above.`
+    const text = `You're confirmed for ${eventTitle}.\n\nView your ticket and QR code here:\n${ticketUrl}\n\nShow the QR (in this email or on the page above) at the door for entry.`
     const html = `<!doctype html>
 <html><body style="margin:0;padding:0;background:#fdfaf3;font-family:Georgia,'Times New Roman',serif;color:#1a2e1f;">
   <table width="100%" cellpadding="0" cellspacing="0" style="background:#fdfaf3;padding:32px 16px;">
@@ -138,12 +138,15 @@ const messageTemplates: Record<string, (data: Record<string, string>) => { subje
         <tr><td align="center" style="padding:16px 0 8px;border-top:1px solid #e7e0cf;">
           <p style="margin:0;font-size:14px;color:#3a3a3a;">You're confirmed. Show this QR at the door:</p>
         </td></tr>
+        ${qrImageUrl ? `<tr><td align="center" style="padding:16px 0;">
+          <img src="${escapeHtml(qrImageUrl)}" alt="Ticket QR code" width="280" height="280" style="display:block;border:1px solid #e7e0cf;background:#fdfaf3;" />
+        </td></tr>` : ''}
         <tr><td align="center" style="padding:16px 0;">
-          ${qrImageUrl ? `<img src="${escapeHtml(qrImageUrl)}" alt="Ticket QR code" width="280" height="280" style="display:block;border:1px solid #e7e0cf;background:#fdfaf3;" />` : ''}
+          <a href="${escapeHtml(ticketUrl)}" style="display:inline-block;background:#1a2e1f;color:#fdfaf3;text-decoration:none;padding:14px 28px;letter-spacing:0.2em;text-transform:uppercase;font-size:12px;">View Your Ticket</a>
         </td></tr>
         <tr><td align="center" style="padding-top:16px;border-top:1px solid #e7e0cf;">
-          <p style="margin:0 0 8px;font-size:12px;letter-spacing:0.15em;text-transform:uppercase;color:#6b6452;">Or view your ticket online</p>
-          <p style="margin:0;font-size:14px;"><a href="${escapeHtml(ticketUrl)}" style="color:#1a2e1f;">${escapeHtml(ticketUrl)}</a></p>
+          <p style="margin:0 0 6px;font-size:12px;color:#6b6452;font-style:italic;">If the QR above doesn't show, open this link to view your ticket:</p>
+          <p style="margin:0;font-size:13px;word-break:break-all;"><a href="${escapeHtml(ticketUrl)}" style="color:#1a2e1f;">${escapeHtml(ticketUrl)}</a></p>
         </td></tr>
       </table>
     </td></tr>
