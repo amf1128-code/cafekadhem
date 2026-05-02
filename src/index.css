@@ -105,6 +105,11 @@
 .page-bg {
   background-color: var(--color-cream);
 }
+/* Theme 2's stripe backdrop. The selector must match BOTH the data-theme
+   element itself (the layout root) AND its `.page-bg` descendants
+   (Header/Footer). The descendant combinator alone would skip the root,
+   leaving the body content area on the base solid cream rule. */
+[data-theme="theme2"].page-bg,
 [data-theme="theme2"] .page-bg {
   background-color: #B7CEC2;
   background-image: repeating-linear-gradient(
