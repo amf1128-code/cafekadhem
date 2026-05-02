@@ -1,9 +1,11 @@
 import { useEffect, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useLocation } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 
 export function Header() {
   const [pickupActive, setPickupActive] = useState(false)
+  const { pathname } = useLocation()
+  const isHome = pathname === '/'
 
   useEffect(() => {
     let cancelled = false
@@ -23,22 +25,30 @@ export function Header() {
 
   return (
     <header className="page-bg">
-      <div className="max-w-3xl mx-auto px-6 py-6 flex items-center justify-between gap-4">
-        <Link to="/" className="group">
-          <span className="font-serif text-xl text-forest-dark">
+      <div className="max-w-3xl mx-auto px-6 py-4 flex items-center justify-between gap-4">
+        {/* Brand link only appears off the home page — on home the big
+            hero lockup is the brand, so duplicating it here would clutter
+            the chrome. */}
+        {isHome ? (
+          <span aria-hidden="true" />
+        ) : (
+          <Link
+            to="/"
+            className="text-xs tracking-[0.2em] uppercase text-ink-muted hover:text-forest transition-colors"
+          >
             Cafe Kadhem
-          </span>
-        </Link>
-        <div className="flex items-center gap-4">
+          </Link>
+        )}
+        <nav className="flex items-center gap-5">
           {pickupActive && (
-            <Link to="/pickup" className="text-xs tracking-[0.15em] uppercase text-ink-muted hover:text-forest transition-colors">
+            <Link
+              to="/pickup"
+              className="text-xs tracking-[0.2em] uppercase text-ink-muted hover:text-forest transition-colors"
+            >
               Pick-Up
             </Link>
           )}
-          <span className="font-arabic text-2xl text-forest">
-            &#1603;&#1575;&#1601;&#1610;&#1607; &#1603;&#1575;&#1592;&#1605;
-          </span>
-        </div>
+        </nav>
       </div>
     </header>
   )

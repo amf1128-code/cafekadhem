@@ -21,6 +21,8 @@ export function AdminEventForm() {
 
   const [title, setTitle] = useState('')
   const [gatheringNumber, setGatheringNumber] = useState('')
+  const [eventType, setEventType] = useState('')
+  const [rsvpRequired, setRsvpRequired] = useState(true)
   const [description, setDescription] = useState('')
   const [date, setDate] = useState('')
   const [startTime, setStartTime] = useState('')
@@ -56,6 +58,8 @@ export function AdminEventForm() {
       if (event) {
         setTitle(event.title)
         setGatheringNumber(event.gathering_number || '')
+        setEventType(event.event_type || '')
+        setRsvpRequired(event.rsvp_required ?? true)
         setDescription(event.description || '')
         setDate(event.date)
         setStartTime(event.start_time)
@@ -123,6 +127,8 @@ export function AdminEventForm() {
       const eventData = {
         title: title.trim(),
         gathering_number: gatheringNumber.trim() || null,
+        event_type: eventType.trim() || null,
+        rsvp_required: rsvpRequired,
         description: description.trim() || null,
         date,
         start_time: startTime,
@@ -203,6 +209,12 @@ export function AdminEventForm() {
 
       <form onSubmit={handleSave} className="max-w-2xl space-y-4">
         <Input label="Title" value={title} onChange={e => setTitle(e.target.value)} required />
+        <Input
+          label="Event Type"
+          value={eventType}
+          onChange={e => setEventType(e.target.value)}
+          placeholder='e.g. "Watch Party", "Pop-Up", "Darty" (free-form, shown above the title)'
+        />
         <Input label="Gathering Number" value={gatheringNumber} onChange={e => setGatheringNumber(e.target.value)} placeholder='e.g. "No. 01" (optional, shown on public page)' />
         <Textarea label="Description" value={description} onChange={e => setDescription(e.target.value)} />
 
@@ -336,6 +348,21 @@ export function AdminEventForm() {
               />
             </div>
           )}
+        </div>
+
+        <div>
+          <label className="flex items-center gap-2 text-sm">
+            <input
+              type="checkbox"
+              checked={rsvpRequired}
+              onChange={e => setRsvpRequired(e.target.checked)}
+              className="rounded border-warm text-forest focus:ring-forest"
+            />
+            RSVP required for this event
+          </label>
+          <p className="text-xs text-ink-muted mt-1 ml-6">
+            When checked, the home card reads "RSVP Required". Uncheck to soften it to "RSVP Requested".
+          </p>
         </div>
 
         <label className="flex items-center gap-2 text-sm">
