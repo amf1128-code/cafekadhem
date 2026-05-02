@@ -22,8 +22,11 @@ import { AdminPickupConfig } from './pages/admin/PickupConfig'
 import { AdminPickupOrders } from './pages/admin/PickupOrders'
 import { Pickup } from './pages/Pickup'
 import { Ticket } from './pages/Ticket'
+import { FindTickets } from './pages/FindTickets'
+import { MyTickets } from './pages/MyTickets'
 import { AdminEventTickets } from './pages/admin/EventTickets'
 import { AdminEventCheckIn } from './pages/admin/EventCheckIn'
+import { AdminEventBulkInvite } from './pages/admin/EventBulkInvite'
 
 export const router = createBrowserRouter([
   {
@@ -36,6 +39,8 @@ export const router = createBrowserRouter([
       { path: 'pickup', element: <Pickup /> },
       { path: 'ticket/:token', element: <Ticket /> },
       { path: 'invite/:token', element: <InviteLanding /> },
+      { path: 'find-tickets', element: <FindTickets /> },
+      { path: 'my-tickets', element: <MyTickets /> },
     ],
   },
   {
@@ -60,6 +65,7 @@ export const router = createBrowserRouter([
       { path: 'events/:id/orders', element: <AdminEventOrders /> },
       { path: 'events/:id/tickets', element: <AdminEventTickets /> },
       { path: 'events/:id/checkin', element: <AdminEventCheckIn /> },
+      { path: 'events/:id/invite', element: <AdminEventBulkInvite /> },
       { path: 'events/:id/waitlist', element: <AdminEventWaitlist /> },
       { path: 'menus', element: <AdminMenuList /> },
       { path: 'menus/new', element: <AdminMenuForm /> },
