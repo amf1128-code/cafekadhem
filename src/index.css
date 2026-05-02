@@ -143,68 +143,58 @@
  * Theme 3 — page chrome, headings, floating shapes, grain
  * ============================================================
  *
- * Layout wrappers, the header and the footer all use `.page-bg`. We want a
- * single cohesive gradient + grain + shapes covering the full viewport, not
- * three repeats. So the gradient is pinned to a fixed pseudo-element on
- * <body>, and `.page-bg` becomes transparent in this theme.
+ * The `data-theme` attribute is set on the PublicLayout root (see
+ * PublicLayout.tsx) — that same element also carries `.min-h-screen.page-bg`,
+ * so it covers the full public-facing viewport. The gradient + grain are
+ * stacked as `background-image` layers on this element with
+ * `background-attachment: fixed`, which gives a single cohesive backdrop
+ * regardless of scroll. The two ::before/::after pseudos host the floating
+ * blob shapes layered on top.
+ *
+ * Because the attribute is scoped to PublicLayout, the admin console (which
+ * uses AdminLayout, no data-theme ancestor) always renders in the default
+ * theme1 palette and is unaffected by theme3 styling.
  */
-[data-theme="theme3"] body {
-  background: #1A1530;
+[data-theme="theme3"] {
   position: relative;
+  isolation: isolate;
+  overflow-x: hidden;
   /* Aileron is wider than Inter at the same px size. Tighten letter spacing
-     a touch so the body text doesn't feel oversized after the swap. */
+     a touch so body text doesn't feel oversized after the swap. */
   letter-spacing: -0.005em;
 }
 
+/* The header and footer also carry `.page-bg`, but in theme 3 the gradient
+   lives on the root layout wrapper — descendants must be transparent so the
+   gradient bleeds through behind them. */
 [data-theme="theme3"] .page-bg {
   background: transparent;
 }
 
-/* The gradient itself — orange in the top-right, magenta/pink mid, purple
-   bottom-left, with a deep blue pocket. Pinned with `fixed` so scrolling
-   long pages doesn't reveal a seam. */
-[data-theme="theme3"] body::before {
-  content: '';
-  position: fixed;
-  inset: 0;
-  z-index: -2;
-  background:
+/* Page backdrop: SVG fractal-noise grain layered over a stack of radial
+   gradients (orange top-right, magenta mid, purple bottom-left, blue
+   pocket) over a 135° linear sweep. `background-attachment: fixed` pins
+   it to the viewport so long pages don't reveal a seam. */
+[data-theme="theme3"].page-bg {
+  background-color: #1A1530;
+  background-image:
+    url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='240' height='240'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 0.5 0'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>"),
     radial-gradient(ellipse 70% 60% at 85% 15%, #FF8A3D 0%, transparent 55%),
     radial-gradient(ellipse 60% 55% at 15% 25%, #FF6B35 0%, transparent 55%),
     radial-gradient(ellipse 70% 60% at 90% 85%, #C71F62 0%, transparent 55%),
     radial-gradient(ellipse 55% 50% at 20% 90%, #5C2A8A 0%, transparent 55%),
     radial-gradient(ellipse 50% 45% at 50% 65%, #1A2D8C 0%, transparent 55%),
     linear-gradient(135deg, #FF6B35 0%, #C71F62 35%, #5C2A8A 65%, #1A2D8C 100%);
-  pointer-events: none;
+  background-size: 240px 240px, auto, auto, auto, auto, auto, auto;
+  background-repeat: repeat, no-repeat, no-repeat, no-repeat, no-repeat, no-repeat, no-repeat;
+  background-attachment: fixed, fixed, fixed, fixed, fixed, fixed, fixed;
+  background-blend-mode: overlay, normal, normal, normal, normal, normal, normal;
 }
 
-/* Grain / noise overlay — fractal SVG noise tiled at low opacity gives the
-   matte poster feel. Sits between the gradient and the floating shapes so
-   the shapes read crisp on top. */
-[data-theme="theme3"] body::after {
-  content: '';
-  position: fixed;
-  inset: 0;
-  z-index: -1;
-  pointer-events: none;
-  opacity: 0.35;
-  mix-blend-mode: overlay;
-  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='240' height='240'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 0.6 0'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>");
-}
-
-/* Floating geometric shapes — three blurred translucent blobs drifting
-   across the viewport, echoing the swirling 3D forms in the poster.
-   Hosted on the layout wrapper (the outermost .page-bg) so we don't get
-   duplicates from header/footer. Wrapper is positioned relative + clips
-   so the shapes stay anchored to the visible content area. */
-[data-theme="theme3"] .min-h-screen.page-bg {
-  position: relative;
-  overflow-x: hidden;
-  isolation: isolate;
-}
-
-[data-theme="theme3"] .min-h-screen.page-bg::before,
-[data-theme="theme3"] .min-h-screen.page-bg::after {
+/* Floating geometric shapes — two large blurred organic blobs anchored to
+   the layout wrapper, echoing the swirling 3D forms in the poster. */
+[data-theme="theme3"]::before,
+[data-theme="theme3"]::after {
   content: '';
   position: absolute;
   z-index: -1;
@@ -216,7 +206,7 @@
 }
 
 /* Top-left swirl — orange/pink gradient blob */
-[data-theme="theme3"] .min-h-screen.page-bg::before {
+[data-theme="theme3"]::before {
   top: 8%;
   left: -8%;
   width: 360px;
@@ -226,7 +216,7 @@
 }
 
 /* Bottom-right swirl — magenta/purple gradient blob */
-[data-theme="theme3"] .min-h-screen.page-bg::after {
+[data-theme="theme3"]::after {
   bottom: 6%;
   right: -10%;
   width: 420px;

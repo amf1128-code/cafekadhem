@@ -9,9 +9,10 @@ function isValidTheme(value: unknown): value is ThemeId {
 export function ThemeProvider({ children }: { children: ReactNode }) {
   const [theme, setTheme] = useState<ThemeId>(DEFAULT_THEME)
 
-  useEffect(() => {
-    document.documentElement.setAttribute('data-theme', theme)
-  }, [theme])
+  // The theme is applied via `data-theme` on the PublicLayout wrapper (see
+  // PublicLayout.tsx) so it scopes to the public-facing site only and the
+  // admin console always renders in the stable default palette. We
+  // intentionally do NOT set the attribute on documentElement here.
 
   // Fetch the admin-controlled theme once on mount and apply it for everyone.
   useEffect(() => {

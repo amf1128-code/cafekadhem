@@ -133,7 +133,9 @@ export function AdminSettings() {
             options={THEMES.map(t => ({ value: t.id, label: `${t.name} — ${t.tagline}` }))}
           />
           <p className="text-xs text-ink-muted mt-1">
-            Applies to all visitors. Changes preview here immediately; click Save to publish.
+            Applies to all visitors of the public site. The admin console always
+            uses the default palette so it stays readable. Click Save to publish,
+            then open the public site to preview.
           </p>
         </div>
         <Button type="submit" loading={saving}>Save Settings</Button>
