@@ -1,6 +1,6 @@
 import { RouterProvider } from 'react-router-dom'
 import { ToastProvider } from './components/ui/Toast'
-import { ThemeProvider } from './lib/theme/ThemeContext'
+import { ThemeProvider } from './lib/theme/ThemeProvider'
 import { router } from './routes'
 
 function App() {

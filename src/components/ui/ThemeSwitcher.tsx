@@ -1,4 +1,4 @@
-import { useTheme, type ThemeId } from '../../lib/theme/ThemeContext'
+import { useTheme, type ThemeId } from '../../lib/theme/themes'
 
 export function ThemeSwitcher() {
   const { theme, setTheme, themes } = useTheme()
