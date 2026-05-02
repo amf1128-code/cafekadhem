@@ -17,7 +17,6 @@ export function AdminSettings() {
   const [saving, setSaving] = useState(false)
 
   const [venmoHandle, setVenmoHandle] = useState('')
-  const [cafeName, setCafeName] = useState('')
   const [contactEmail, setContactEmail] = useState('')
   const [theme, setTheme] = useState<ThemeId>(DEFAULT_THEME)
 
@@ -30,7 +29,6 @@ export function AdminSettings() {
     if (data) {
       setSettings(data)
       setVenmoHandle(data.venmo_handle)
-      setCafeName(data.cafe_name)
       setContactEmail(data.contact_email || '')
       setTheme(data.theme === 'theme2' ? 'theme2' : 'theme1')
     }
@@ -48,7 +46,6 @@ export function AdminSettings() {
 
     const payload = {
       venmo_handle: venmoHandle.trim(),
-      cafe_name: cafeName.trim(),
       contact_email: contactEmail.trim() || null,
       theme,
     }
@@ -99,12 +96,6 @@ export function AdminSettings() {
           label="Venmo Handle"
           value={venmoHandle}
           onChange={e => setVenmoHandle(e.target.value)}
-          required
-        />
-        <Input
-          label="Cafe Name"
-          value={cafeName}
-          onChange={e => setCafeName(e.target.value)}
           required
         />
         <Input
