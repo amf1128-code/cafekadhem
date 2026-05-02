@@ -103,9 +103,20 @@ async function sendEmail(to: string, subject: string, body: string): Promise<boo
   return response.ok
 }
 
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+}
+
+const jsonHeaders = { ...corsHeaders, 'Content-Type': 'application/json' }
+
 Deno.serve(async (req: Request) => {
+  if (req.method === 'OPTIONS') {
+    return new Response(null, { status: 204, headers: corsHeaders })
+  }
   if (req.method !== 'POST') {
-    return new Response('Method not allowed', { status: 405 })
+    return new Response('Method not allowed', { status: 405, headers: corsHeaders })
   }
 
   // Rate limit by IP
@@ -113,7 +124,7 @@ Deno.serve(async (req: Request) => {
   if (!checkRateLimit(`notif:${ip}`, 10)) {
     return new Response(JSON.stringify({ error: 'Rate limited' }), {
       status: 429,
-      headers: { 'Content-Type': 'application/json' },
+      headers: jsonHeaders,
     })
   }
 
@@ -130,7 +141,7 @@ Deno.serve(async (req: Request) => {
     if (!guest) {
       return new Response(JSON.stringify({ success: false, error: 'Guest not found' }), {
         status: 404,
-        headers: { 'Content-Type': 'application/json' },
+        headers: jsonHeaders,
       })
     }
 
@@ -148,7 +159,7 @@ Deno.serve(async (req: Request) => {
     if (!template) {
       return new Response(JSON.stringify({ success: false, error: 'Unknown notification type' }), {
         status: 400,
-        headers: { 'Content-Type': 'application/json' },
+        headers: jsonHeaders,
       })
     }
 
@@ -166,7 +177,7 @@ Deno.serve(async (req: Request) => {
     } else if (preference === 'none') {
       // Guest opted out
       return new Response(JSON.stringify({ success: true, channel: 'none', skipped: true }), {
-        headers: { 'Content-Type': 'application/json' },
+        headers: jsonHeaders,
       })
     } else {
       // Fallback: try email first, then SMS
@@ -191,12 +202,12 @@ Deno.serve(async (req: Request) => {
     })
 
     return new Response(JSON.stringify({ success, channel }), {
-      headers: { 'Content-Type': 'application/json' },
+      headers: jsonHeaders,
     })
   } catch (err) {
     return new Response(JSON.stringify({ success: false, error: String(err) }), {
       status: 500,
-      headers: { 'Content-Type': 'application/json' },
+      headers: jsonHeaders,
     })
   }
 })

@@ -20,16 +20,27 @@ function checkRateLimit(key: string, maxPerMinute: number): boolean {
   return true
 }
 
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+}
+
+const jsonHeaders = { ...corsHeaders, 'Content-Type': 'application/json' }
+
 Deno.serve(async (req: Request) => {
+  if (req.method === 'OPTIONS') {
+    return new Response(null, { status: 204, headers: corsHeaders })
+  }
   if (req.method !== 'POST') {
-    return new Response('Method not allowed', { status: 405 })
+    return new Response('Method not allowed', { status: 405, headers: corsHeaders })
   }
 
   const ip = req.headers.get('x-forwarded-for') || 'unknown'
   if (!checkRateLimit(`rsvp:${ip}`, 10)) {
     return new Response(JSON.stringify({ error: 'Rate limited' }), {
       status: 429,
-      headers: { 'Content-Type': 'application/json' },
+      headers: jsonHeaders,
     })
   }
 
@@ -39,7 +50,7 @@ Deno.serve(async (req: Request) => {
     if (!eventId || !guestId || !['yes', 'maybe', 'no'].includes(status)) {
       return new Response(JSON.stringify({ error: 'Invalid parameters' }), {
         status: 400,
-        headers: { 'Content-Type': 'application/json' },
+        headers: jsonHeaders,
       })
     }
 
@@ -53,7 +64,7 @@ Deno.serve(async (req: Request) => {
     if (error) {
       return new Response(JSON.stringify({ error: error.message }), {
         status: 400,
-        headers: { 'Content-Type': 'application/json' },
+        headers: jsonHeaders,
       })
     }
 
@@ -63,12 +74,12 @@ Deno.serve(async (req: Request) => {
     }
 
     return new Response(JSON.stringify(response), {
-      headers: { 'Content-Type': 'application/json' },
+      headers: jsonHeaders,
     })
   } catch (err) {
     return new Response(JSON.stringify({ error: String(err) }), {
       status: 500,
-      headers: { 'Content-Type': 'application/json' },
+      headers: jsonHeaders,
     })
   }
 })
