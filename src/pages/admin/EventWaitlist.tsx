@@ -65,11 +65,16 @@ export function AdminEventWaitlist() {
 
       addToast('Guest promoted from waitlist')
 
-      // Send notification to promoted guest
+      // Send notification to promoted guest. Pass ticketing context so the
+      // template can prompt for payment when this event requires a paid
+      // ticket. The edge function builds event_url from admin_settings.site_url.
       sendNotification({
         guestId,
         eventId: id!,
         type: 'waitlist_promoted',
+        data: {
+          is_ticketed: event?.ticketing_enabled ? 'true' : 'false',
+        },
       })
 
       await loadData()

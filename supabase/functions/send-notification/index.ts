@@ -1,4 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import QRCode from 'https://esm.sh/qrcode@1.5.3'
 
 const TELNYX_API_KEY = Deno.env.get('TELNYX_API_KEY') || ''
 const TELNYX_MESSAGING_PROFILE_ID = Deno.env.get('TELNYX_MESSAGING_PROFILE_ID') || ''
@@ -26,11 +27,73 @@ function checkRateLimit(key: string, maxPerMinute: number): boolean {
   return true
 }
 
-const messageTemplates: Record<string, (data: Record<string, string>) => { subject: string; body: string }> = {
-  rsvp_confirmation: (data) => ({
-    subject: `RSVP Confirmed - ${data.event_title || 'Cafe Kadhem'}`,
-    body: `Thanks for your RSVP! You're ${data.status === 'yes' ? 'going' : 'on the maybe list'} for ${data.event_title || 'our event'}. We look forward to seeing you!`,
-  }),
+function escapeHtml(s: string): string {
+  return s
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
+}
+
+async function getSiteUrl(): Promise<string> {
+  const { data } = await supabase
+    .from('admin_settings')
+    .select('site_url')
+    .limit(1)
+    .single()
+  return (data?.site_url || 'https://cafekadhem.com').replace(/\/$/, '')
+}
+
+async function generateAndUploadQr(token: string, encodedUrl: string): Promise<string | null> {
+  try {
+    const dataUrl: string = await QRCode.toDataURL(encodedUrl, {
+      width: 600,
+      margin: 2,
+      errorCorrectionLevel: 'M',
+      color: { dark: '#1a2e1f', light: '#fdfaf3' },
+    })
+    const base64 = dataUrl.split(',')[1]
+    const bytes = Uint8Array.from(atob(base64), (c) => c.charCodeAt(0))
+
+    const { error } = await supabase.storage
+      .from('tickets')
+      .upload(`${token}.png`, bytes, {
+        contentType: 'image/png',
+        upsert: true,
+      })
+    if (error) {
+      console.error('QR upload failed:', error.message)
+      return null
+    }
+
+    const { data } = supabase.storage.from('tickets').getPublicUrl(`${token}.png`)
+    return data.publicUrl
+  } catch (err) {
+    console.error('QR generation failed:', err)
+    return null
+  }
+}
+
+const messageTemplates: Record<string, (data: Record<string, string>) => { subject: string; body: string; html?: string }> = {
+  rsvp_confirmation: (data) => {
+    if (data.status === 'waitlisted') {
+      return {
+        subject: `You're on the waitlist - ${data.event_title || 'Cafe Kadhem'}`,
+        body: `Thanks for joining the waitlist! We'll follow up soon if a spot opens up!`,
+      }
+    }
+    if (data.is_ticketed === 'true' && data.status === 'yes') {
+      return {
+        subject: `We got your RSVP - ${data.event_title || 'Cafe Kadhem'}`,
+        body: `We got your RSVP! Make sure your ticket payment went through, and you'll receive a follow up with your ticket within 48 hours!`,
+      }
+    }
+    return {
+      subject: `RSVP Confirmed - ${data.event_title || 'Cafe Kadhem'}`,
+      body: `Thanks for your RSVP! You're ${data.status === 'yes' ? 'going' : 'on the maybe list'} for ${data.event_title || 'our event'}. We look forward to seeing you!`,
+    }
+  },
   order_confirmation: (data) => ({
     subject: `Order Confirmed - ${data.event_title || 'Cafe Kadhem'}`,
     body: `Your pre-order for ${data.event_title || 'our event'} has been submitted. Your host will confirm payment once received via Venmo.`,
@@ -43,18 +106,55 @@ const messageTemplates: Record<string, (data: Record<string, string>) => { subje
     subject: `Reminder - ${data.event_title || 'Cafe Kadhem'} Tomorrow!`,
     body: `Reminder: ${data.event_title || 'Your event'} is tomorrow! See you there.`,
   }),
-  waitlist_promoted: (data) => ({
-    subject: `You're In! - ${data.event_title || 'Cafe Kadhem'}`,
-    body: `Great news! A spot opened up at ${data.event_title || 'our event'} and you've been promoted from the waitlist. You're confirmed! See you there.`,
-  }),
-  ticket_payment_received: (data) => ({
-    subject: `Payment received - ${data.event_title || 'Cafe Kadhem'}`,
-    body: `We received your Venmo payment for ${data.event_title || 'our event'}. Sit tight — your host will confirm and send your ticket shortly.`,
-  }),
-  ticket_issued: (data) => ({
-    subject: `Your ticket - ${data.event_title || 'Cafe Kadhem'}`,
-    body: `You're confirmed for ${data.event_title || 'our event'}. View your ticket and QR code: ${data.ticket_url || ''}\n\nShow this at the door for entry.`,
-  }),
+  waitlist_promoted: (data) => {
+    if (data.is_ticketed === 'true') {
+      const eventLink = data.event_url ? `\n\nReserve your seat by paying for your ticket here: ${data.event_url}` : ''
+      return {
+        subject: `A spot opened up - ${data.event_title || 'Cafe Kadhem'}`,
+        body: `Good news — a spot opened up at ${data.event_title || 'our event'} and you're off the waitlist! To confirm your seat, send your ticket payment via Venmo. We'll follow up with your ticket once payment is received.${eventLink}`,
+      }
+    }
+    return {
+      subject: `You're In! - ${data.event_title || 'Cafe Kadhem'}`,
+      body: `Great news! A spot opened up at ${data.event_title || 'our event'} and you've been promoted from the waitlist. You're confirmed! See you there.`,
+    }
+  },
+  ticket_issued: (data) => {
+    const eventTitle = data.event_title || 'Cafe Kadhem'
+    const ticketUrl = data.ticket_url || ''
+    const qrImageUrl = data.qr_image_url || ''
+    const text = `You're confirmed for ${eventTitle}.\n\nShow this at the door for entry: ${ticketUrl}\n\nIf the QR isn't visible in this email, open the link above.`
+    const html = `<!doctype html>
+<html><body style="margin:0;padding:0;background:#fdfaf3;font-family:Georgia,'Times New Roman',serif;color:#1a2e1f;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#fdfaf3;padding:32px 16px;">
+    <tr><td align="center">
+      <table width="480" cellpadding="0" cellspacing="0" style="max-width:480px;background:#ffffff;border:1px solid #e7e0cf;padding:32px;">
+        <tr><td align="center" style="padding-bottom:8px;">
+          <p style="margin:0;letter-spacing:0.25em;text-transform:uppercase;font-size:11px;color:#6b6452;">Cafe Kadhem</p>
+        </td></tr>
+        <tr><td align="center" style="padding-bottom:24px;">
+          <h1 style="margin:8px 0 0;font-style:italic;font-weight:400;font-size:24px;color:#1a2e1f;">${escapeHtml(eventTitle)}</h1>
+        </td></tr>
+        <tr><td align="center" style="padding:16px 0 8px;border-top:1px solid #e7e0cf;">
+          <p style="margin:0;font-size:14px;color:#3a3a3a;">You're confirmed. Show this QR at the door:</p>
+        </td></tr>
+        <tr><td align="center" style="padding:16px 0;">
+          ${qrImageUrl ? `<img src="${escapeHtml(qrImageUrl)}" alt="Ticket QR code" width="280" height="280" style="display:block;border:1px solid #e7e0cf;background:#fdfaf3;" />` : ''}
+        </td></tr>
+        <tr><td align="center" style="padding-top:16px;border-top:1px solid #e7e0cf;">
+          <p style="margin:0 0 8px;font-size:12px;letter-spacing:0.15em;text-transform:uppercase;color:#6b6452;">Or view your ticket online</p>
+          <p style="margin:0;font-size:14px;"><a href="${escapeHtml(ticketUrl)}" style="color:#1a2e1f;">${escapeHtml(ticketUrl)}</a></p>
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body></html>`
+    return {
+      subject: `Your ticket - ${eventTitle}`,
+      body: text,
+      html,
+    }
+  },
 }
 
 async function sendSMS(to: string, body: string): Promise<boolean> {
@@ -80,11 +180,19 @@ async function sendSMS(to: string, body: string): Promise<boolean> {
   return response.ok
 }
 
-async function sendEmail(to: string, subject: string, body: string): Promise<boolean> {
+async function sendEmail(to: string, subject: string, body: string, html?: string): Promise<boolean> {
   if (!RESEND_API_KEY) {
     console.error('RESEND_API_KEY not configured')
     return false
   }
+
+  const payload: Record<string, unknown> = {
+    from: FROM_EMAIL,
+    to: [to],
+    subject,
+    text: body,
+  }
+  if (html) payload.html = html
 
   const response = await fetch('https://api.resend.com/emails', {
     method: 'POST',
@@ -92,14 +200,13 @@ async function sendEmail(to: string, subject: string, body: string): Promise<boo
       'Content-Type': 'application/json',
       'Authorization': `Bearer ${RESEND_API_KEY}`,
     },
-    body: JSON.stringify({
-      from: FROM_EMAIL,
-      to: [to],
-      subject,
-      text: body,
-    }),
+    body: JSON.stringify(payload),
   })
 
+  if (!response.ok) {
+    const errText = await response.text().catch(() => '')
+    console.error('Resend send failed:', response.status, errText)
+  }
   return response.ok
 }
 
@@ -155,6 +262,21 @@ Deno.serve(async (req: Request) => {
       if (event) data.event_title = event.title
     }
 
+    // Server-side URL building. Single source of truth = admin_settings.site_url,
+    // so links in emails always reflect whatever the admin has set as the
+    // canonical domain (regardless of where the admin happened to click from).
+    if (type === 'ticket_issued' && data.ticket_token) {
+      const siteUrl = await getSiteUrl()
+      const token = data.ticket_token as string
+      data.ticket_url = `${siteUrl}/ticket/${token}`
+      const qrImageUrl = await generateAndUploadQr(token, data.ticket_url)
+      if (qrImageUrl) data.qr_image_url = qrImageUrl
+    }
+    if (type === 'waitlist_promoted' && eventId) {
+      const siteUrl = await getSiteUrl()
+      data.event_url = `${siteUrl}/events/${eventId}`
+    }
+
     const template = messageTemplates[type]
     if (!template) {
       return new Response(JSON.stringify({ success: false, error: 'Unknown notification type' }), {
@@ -163,7 +285,7 @@ Deno.serve(async (req: Request) => {
       })
     }
 
-    const { subject, body } = template(data)
+    const { subject, body, html } = template(data)
     const preference = guest.notification_preference || 'email'
     let success = false
     let channel: 'sms' | 'email' = 'email'
@@ -173,7 +295,7 @@ Deno.serve(async (req: Request) => {
       success = await sendSMS(guest.phone, body)
     } else if (preference === 'email' && guest.email) {
       channel = 'email'
-      success = await sendEmail(guest.email, subject, body)
+      success = await sendEmail(guest.email, subject, body, html)
     } else if (preference === 'none') {
       // Guest opted out
       return new Response(JSON.stringify({ success: true, channel: 'none', skipped: true }), {
@@ -183,7 +305,7 @@ Deno.serve(async (req: Request) => {
       // Fallback: try email first, then SMS
       if (guest.email) {
         channel = 'email'
-        success = await sendEmail(guest.email, subject, body)
+        success = await sendEmail(guest.email, subject, body, html)
       } else if (guest.phone) {
         channel = 'sms'
         success = await sendSMS(guest.phone, body)

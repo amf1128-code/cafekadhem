@@ -2,6 +2,7 @@ export interface AdminSettings {
   id: string
   venmo_handle: string
   contact_email: string | null
+  site_url: string
   theme: 'theme1' | 'theme2'
   updated_at: string
 }

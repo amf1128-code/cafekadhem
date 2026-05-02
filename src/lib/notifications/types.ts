@@ -8,7 +8,6 @@ export interface NotificationPayload {
     | 'event_reminder'
     | 'invite'
     | 'waitlist_promoted'
-    | 'ticket_payment_received'
     | 'ticket_issued'
   data?: Record<string, string>
 }
