@@ -2,7 +2,7 @@ import { useState, useEffect, type FormEvent } from 'react'
 import { supabase } from '../../lib/supabase'
 import type { RSVP } from '../../lib/types'
 import { getGuestToken, setGuestToken } from '../../lib/utils/guest-token'
-import { normalizePhone } from '../../lib/utils/phone'
+import { normalizePhone, isValidPhone } from '../../lib/utils/phone'
 import { normalizeInstagram, isValidInstagram } from '../../lib/utils/instagram'
 import { sendNotification } from '../../lib/notifications'
 import { useToast } from '../ui/Toast'
@@ -70,6 +70,18 @@ export function RSVPForm({ eventId, existingRsvp, isFull, onRsvpComplete }: RSVP
     }
     if (!email.trim() && !phone.trim()) {
       addToast('Please provide an email or phone number.', 'error')
+      return
+    }
+    if (notifPref === 'email' && !email.trim()) {
+      addToast('Please provide an email address to be notified by email.', 'error')
+      return
+    }
+    if (notifPref === 'sms' && !phone.trim()) {
+      addToast('Please provide a phone number to be notified by SMS.', 'error')
+      return
+    }
+    if (phone.trim() && !isValidPhone(phone.trim())) {
+      addToast('Please enter a valid US phone number.', 'error')
       return
     }
     if (instagram && !isValidInstagram(instagram)) {

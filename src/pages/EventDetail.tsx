@@ -97,7 +97,7 @@ export function EventDetail() {
         {/* Vertical reference text — uses gathering_number from DB */}
         {event.gathering_number && (
           <div className="absolute top-6 right-3 vertical-text text-[10px] tracking-[0.15em] uppercase text-stone-dark hidden md:block">
-            Gathering {event.gathering_number} // {event.location.split(',')[0]?.toUpperCase()}
+            Gathering {event.gathering_number} // {(event.location_name || event.location.split(',')[0] || '').toUpperCase()}
           </div>
         )}
 
@@ -198,7 +198,10 @@ export function EventDetail() {
             Location
           </summary>
           <div className="px-6 md:px-10 pb-6">
-            <p className="font-serif text-2xl text-ink italic mb-1">{event.location}</p>
+            {event.location_name && (
+              <p className="font-serif text-2xl text-ink italic mb-1">{event.location_name}</p>
+            )}
+            <p className={`font-serif ${event.location_name ? 'text-lg text-ink-muted' : 'text-2xl text-ink italic'}`}>{event.location}</p>
             {event.donation_info && (
               <div className="mt-4">
                 <p className="text-[10px] tracking-[0.2em] uppercase text-ink-muted mb-1">Where Proceeds Go</p>
