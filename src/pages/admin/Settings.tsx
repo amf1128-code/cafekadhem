@@ -18,6 +18,7 @@ export function AdminSettings() {
 
   const [venmoHandle, setVenmoHandle] = useState('')
   const [contactEmail, setContactEmail] = useState('')
+  const [siteUrl, setSiteUrl] = useState('')
   const [theme, setTheme] = useState<ThemeId>(DEFAULT_THEME)
 
   useEffect(() => {
@@ -30,6 +31,7 @@ export function AdminSettings() {
       setSettings(data)
       setVenmoHandle(data.venmo_handle)
       setContactEmail(data.contact_email || '')
+      setSiteUrl(data.site_url || '')
       setTheme(data.theme === 'theme2' ? 'theme2' : 'theme1')
     }
     setLoading(false)
@@ -47,6 +49,7 @@ export function AdminSettings() {
     const payload = {
       venmo_handle: venmoHandle.trim(),
       contact_email: contactEmail.trim() || null,
+      site_url: siteUrl.trim().replace(/\/$/, '') || 'https://cafekadhem.com',
       theme,
     }
 
@@ -105,6 +108,19 @@ export function AdminSettings() {
           onChange={e => setContactEmail(e.target.value)}
           placeholder="Optional"
         />
+        <div>
+          <Input
+            label="Public Site URL"
+            type="url"
+            value={siteUrl}
+            onChange={e => setSiteUrl(e.target.value)}
+            placeholder="https://cafekadhem.com"
+            required
+          />
+          <p className="text-xs text-ink-muted mt-1">
+            The canonical domain used in outbound emails (ticket links, invites). No trailing slash.
+          </p>
+        </div>
         <div>
           <Select
             label="Site Theme"

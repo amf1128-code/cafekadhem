@@ -1,6 +1,4 @@
-export function ticketUrl(token: string): string {
-  const base =
-    import.meta.env.VITE_SITE_URL ||
-    (typeof window !== 'undefined' ? window.location.origin : '')
-  return `${base.replace(/\/$/, '')}/ticket/${token}`
+export function ticketUrl(token: string, base?: string): string {
+  const origin = (base || (typeof window !== 'undefined' ? window.location.origin : '')).replace(/\/$/, '')
+  return `${origin}/ticket/${token}`
 }

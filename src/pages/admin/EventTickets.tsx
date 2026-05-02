@@ -5,7 +5,6 @@ import type { Event, RSVP, Guest } from '../../lib/types'
 import { formatDate, formatTime } from '../../lib/utils/date'
 import { formatPhone } from '../../lib/utils/phone'
 import { sendNotification } from '../../lib/notifications'
-import { ticketUrl } from '../../lib/utils/ticket'
 import { Button } from '../../components/ui/Button'
 import { Badge } from '../../components/ui/Badge'
 import { useToast } from '../../components/ui/Toast'
@@ -63,7 +62,7 @@ export function AdminEventTickets() {
         guestId: row.guest_id,
         eventId: id!,
         type: 'ticket_issued',
-        data: { ticket_url: ticketUrl(updated.ticket_token!) },
+        data: { ticket_token: updated.ticket_token! },
       })
 
       await loadData()
@@ -97,7 +96,7 @@ export function AdminEventTickets() {
         guestId: row.guest_id,
         eventId: id!,
         type: 'ticket_issued',
-        data: { ticket_url: ticketUrl(row.ticket_token) },
+        data: { ticket_token: row.ticket_token },
       })
       addToast('Ticket re-sent')
     } finally {
