@@ -24,6 +24,7 @@ export function AdminEventForm() {
   const [date, setDate] = useState('')
   const [startTime, setStartTime] = useState('')
   const [endTime, setEndTime] = useState('')
+  const [locationName, setLocationName] = useState('')
   const [location, setLocation] = useState('')
   const [capacity, setCapacity] = useState('')
   const [donationInfo, setDonationInfo] = useState('')
@@ -56,6 +57,7 @@ export function AdminEventForm() {
         setStartTime(event.start_time)
         setEndTime(event.end_time || '')
         setLocation(event.location)
+        setLocationName(event.location_name || '')
         setCapacity(event.capacity != null ? String(event.capacity) : '')
         setDonationInfo(event.donation_info || '')
         setMenuId(event.menu_id || '')
@@ -117,6 +119,7 @@ export function AdminEventForm() {
         start_time: startTime,
         end_time: endTime || null,
         location: location.trim(),
+        location_name: locationName.trim() || null,
         capacity: capacity ? parseInt(capacity) : null,
         donation_info: donationInfo.trim() || null,
         menu_id: menuId || null,
@@ -201,7 +204,19 @@ export function AdminEventForm() {
           <Input label="Capacity" type="number" min="1" value={capacity} onChange={e => setCapacity(e.target.value)} placeholder="Unlimited" />
         </div>
 
-        <Input label="Location" value={location} onChange={e => setLocation(e.target.value)} required />
+        <Input
+          label="Location Name"
+          value={locationName}
+          onChange={e => setLocationName(e.target.value)}
+          placeholder='e.g. "The Roastery" (optional)'
+        />
+        <Input
+          label="Location Address"
+          value={location}
+          onChange={e => setLocation(e.target.value)}
+          placeholder="123 Main St, Brooklyn, NY"
+          required
+        />
         <Textarea label="Donation Info" value={donationInfo} onChange={e => setDonationInfo(e.target.value)} placeholder="Where proceeds go (optional)" />
 
         <Select

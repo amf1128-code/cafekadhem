@@ -127,7 +127,7 @@ export function Home() {
                 <div className="border-t border-b border-warm py-4 grid grid-cols-3 text-center">
                   <div className="border-r border-warm">
                     <p className="text-xs tracking-[0.15em] uppercase text-ink-muted hidden sm:block">
-                      {event.location}
+                      {event.location_name || event.location}
                     </p>
                     <p className="text-[10px] tracking-[0.2em] uppercase text-ink-muted mb-1 sm:hidden">Date</p>
                     <p className="font-serif text-ink sm:hidden">{formatDate(event.date)}</p>
@@ -156,6 +156,7 @@ export function Home() {
 
                 {/* Mobile location */}
                 <div className="sm:hidden mt-4 text-sm text-ink-muted">
+                  {event.location_name && <p className="font-medium text-ink">{event.location_name}</p>}
                   <p>{event.location}</p>
                 </div>
               </div>

@@ -50,9 +50,14 @@ export function formatPhone(phone: string): string {
 }
 
 /**
- * Basic phone number validation.
+ * Validate that a phone number is a US number with the right number of digits.
+ * Accepts 10 digits, or 11 digits with a leading 1 (country code).
+ * Rejects an area code or exchange code starting with 0 or 1 per NANP rules.
  */
 export function isValidPhone(phone: string): boolean {
   const digits = phone.replace(/\D/g, '')
-  return digits.length >= 10 && digits.length <= 15
+  const local = digits.length === 11 && digits.startsWith('1') ? digits.slice(1) : digits
+  if (local.length !== 10) return false
+  // NANP: area code and exchange code must start with 2-9
+  return /^[2-9]\d{2}[2-9]\d{6}$/.test(local)
 }
