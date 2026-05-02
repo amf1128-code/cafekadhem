@@ -1,5 +1,4 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
-import QRCode from 'https://esm.sh/qrcode@1.5.3'
 
 const TELNYX_API_KEY = Deno.env.get('TELNYX_API_KEY') || ''
 const TELNYX_MESSAGING_PROFILE_ID = Deno.env.get('TELNYX_MESSAGING_PROFILE_ID') || ''
@@ -45,34 +44,20 @@ async function getSiteUrl(): Promise<string> {
   return (data?.site_url || 'https://cafekadhem.com').replace(/\/$/, '')
 }
 
-async function generateAndUploadQr(token: string, encodedUrl: string): Promise<string | null> {
-  try {
-    const dataUrl: string = await QRCode.toDataURL(encodedUrl, {
-      width: 600,
-      margin: 2,
-      errorCorrectionLevel: 'M',
-      color: { dark: '#1a2e1f', light: '#fdfaf3' },
-    })
-    const base64 = dataUrl.split(',')[1]
-    const bytes = Uint8Array.from(atob(base64), (c) => c.charCodeAt(0))
-
-    const { error } = await supabase.storage
-      .from('tickets')
-      .upload(`${token}.png`, bytes, {
-        contentType: 'image/png',
-        upsert: true,
-      })
-    if (error) {
-      console.error('QR upload failed:', error.message)
-      return null
-    }
-
-    const { data } = supabase.storage.from('tickets').getPublicUrl(`${token}.png`)
-    return data.publicUrl
-  } catch (err) {
-    console.error('QR generation failed:', err)
-    return null
-  }
+// Build a hosted QR image URL via api.qrserver.com. The image is fetched
+// directly by the email client when the recipient opens the message — no
+// self-generation, no upload, no bucket dependency, works in every email
+// client without esm.sh / Deno compatibility concerns. Token is opaque so
+// the URL leak to a third party is acceptable for this use case.
+function buildQrImageUrl(encodedTargetUrl: string): string {
+  const params = new URLSearchParams({
+    size: '600x600',
+    data: encodedTargetUrl,
+    margin: '8',
+    color: '1A2E1F',
+    bgcolor: 'FDFAF3',
+  })
+  return `https://api.qrserver.com/v1/create-qr-code/?${params.toString()}`
 }
 
 const messageTemplates: Record<string, (data: Record<string, string>) => { subject: string; body: string; html?: string }> = {
@@ -268,12 +253,28 @@ Deno.serve(async (req: Request) => {
     // Server-side URL building. Single source of truth = admin_settings.site_url,
     // so links in emails always reflect whatever the admin has set as the
     // canonical domain (regardless of where the admin happened to click from).
-    if (type === 'ticket_issued' && data.ticket_token) {
+    if (type === 'ticket_issued') {
       const siteUrl = await getSiteUrl()
-      const token = data.ticket_token as string
-      data.ticket_url = `${siteUrl}/ticket/${token}`
-      const qrImageUrl = await generateAndUploadQr(token, data.ticket_url)
-      if (qrImageUrl) data.qr_image_url = qrImageUrl
+      // Accept ticket_token from new clients; fall back to a pre-built
+      // ticket_url from older clients. Either way the canonical URL in the
+      // email is rebuilt from siteUrl + token when possible.
+      const token = (data.ticket_token as string | undefined) || ''
+      if (token) {
+        data.ticket_url = `${siteUrl}/ticket/${token}`
+      } else if (data.ticket_url) {
+        // Old client passed a full URL; force the host to match site_url
+        // so the email still points at the canonical domain.
+        try {
+          const u = new URL(data.ticket_url)
+          const path = u.pathname + u.search
+          data.ticket_url = `${siteUrl}${path}`
+        } catch {
+          /* leave as-is */
+        }
+      }
+      if (data.ticket_url) {
+        data.qr_image_url = buildQrImageUrl(data.ticket_url)
+      }
     }
     if (type === 'waitlist_promoted' && eventId) {
       const siteUrl = await getSiteUrl()
