@@ -1,6 +1,6 @@
 import { createContext, useContext } from 'react'
 
-export type ThemeId = 'theme1' | 'theme2'
+export type ThemeId = 'theme1' | 'theme2' | 'theme3'
 
 export interface ThemeMeta {
   id: ThemeId
@@ -11,6 +11,7 @@ export interface ThemeMeta {
 export const THEMES: ThemeMeta[] = [
   { id: 'theme1', name: 'Archival', tagline: 'Editorial · Forest · Cream' },
   { id: 'theme2', name: 'Poster', tagline: 'Striped · Ultramarine · Bold' },
+  { id: 'theme3', name: 'Watch Party', tagline: 'Gradient · Glow · Floating shapes' },
 ]
 
 export const DEFAULT_THEME: ThemeId = 'theme1'
