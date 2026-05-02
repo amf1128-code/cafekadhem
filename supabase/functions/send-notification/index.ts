@@ -47,6 +47,14 @@ const messageTemplates: Record<string, (data: Record<string, string>) => { subje
     subject: `You're In! - ${data.event_title || 'Cafe Kadhem'}`,
     body: `Great news! A spot opened up at ${data.event_title || 'our event'} and you've been promoted from the waitlist. You're confirmed! See you there.`,
   }),
+  ticket_payment_received: (data) => ({
+    subject: `Payment received - ${data.event_title || 'Cafe Kadhem'}`,
+    body: `We received your Venmo payment for ${data.event_title || 'our event'}. Sit tight — your host will confirm and send your ticket shortly.`,
+  }),
+  ticket_issued: (data) => ({
+    subject: `Your ticket - ${data.event_title || 'Cafe Kadhem'}`,
+    body: `You're confirmed for ${data.event_title || 'our event'}. View your ticket and QR code: ${data.ticket_url || ''}\n\nShow this at the door for entry.`,
+  }),
 }
 
 async function sendSMS(to: string, body: string): Promise<boolean> {

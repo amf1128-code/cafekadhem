@@ -1,6 +1,6 @@
 import { useState, useEffect, type FormEvent } from 'react'
 import { supabase } from '../../lib/supabase'
-import type { RSVP } from '../../lib/types'
+import type { RSVP, Event, AdminSettings } from '../../lib/types'
 import { getGuestToken, setGuestToken } from '../../lib/utils/guest-token'
 import { normalizePhone, isValidPhone } from '../../lib/utils/phone'
 import { normalizeInstagram, isValidInstagram } from '../../lib/utils/instagram'
@@ -9,6 +9,7 @@ import { useToast } from '../ui/Toast'
 
 interface RSVPFormProps {
   eventId: string
+  event?: Event | null
   existingRsvp: RSVP | null
   isFull: boolean
   onRsvpComplete: () => void
@@ -31,7 +32,7 @@ function UnderlineInput({
   )
 }
 
-export function RSVPForm({ eventId, existingRsvp, isFull, onRsvpComplete }: RSVPFormProps) {
+export function RSVPForm({ eventId, event, existingRsvp, isFull, onRsvpComplete }: RSVPFormProps) {
   const { addToast } = useToast()
   const [firstName, setFirstName] = useState('')
   const [lastName, setLastName] = useState('')
@@ -41,6 +42,41 @@ export function RSVPForm({ eventId, existingRsvp, isFull, onRsvpComplete }: RSVP
   const [notifPref, setNotifPref] = useState('email')
   const [loading, setLoading] = useState(false)
   const [showForm, setShowForm] = useState(!existingRsvp)
+  const [venmoHandle, setVenmoHandle] = useState<string>('')
+  const [markingPaid, setMarkingPaid] = useState(false)
+
+  useEffect(() => {
+    supabase
+      .from('admin_settings')
+      .select('venmo_handle')
+      .limit(1)
+      .single()
+      .then(({ data }) => {
+        if (data) setVenmoHandle((data as Pick<AdminSettings, 'venmo_handle'>).venmo_handle)
+      })
+  }, [])
+
+  async function handleMarkPaymentPending() {
+    if (!existingRsvp) return
+    setMarkingPaid(true)
+    try {
+      const { error } = await supabase.rpc('mark_payment_pending', {
+        p_rsvp_id: existingRsvp.id,
+      })
+      if (error) throw error
+      addToast("Thanks — your host will confirm shortly.")
+      sendNotification({
+        guestId: existingRsvp.guest_id,
+        eventId,
+        type: 'ticket_payment_received',
+      })
+      onRsvpComplete()
+    } catch (err) {
+      addToast(err instanceof Error ? err.message : 'Failed to mark paid', 'error')
+    } finally {
+      setMarkingPaid(false)
+    }
+  }
 
   useEffect(() => {
     const guestToken = getGuestToken()
@@ -188,6 +224,27 @@ export function RSVPForm({ eventId, existingRsvp, isFull, onRsvpComplete }: RSVP
   if (existingRsvp && !showForm) {
     const statusLabels: Record<string, string> = { yes: 'Going', maybe: 'Maybe', no: 'Not going', waitlisted: 'Waitlisted' }
     const isWaitlisted = existingRsvp.status === 'waitlisted'
+    const ticketed = !!event?.ticketing_enabled
+    const showPaymentFlow =
+      ticketed &&
+      existingRsvp.status === 'yes' &&
+      existingRsvp.payment_status !== 'paid'
+    const showTicketLink =
+      ticketed &&
+      existingRsvp.status === 'yes' &&
+      existingRsvp.payment_status === 'paid' &&
+      !!existingRsvp.ticket_token
+
+    const amount = (event?.ticket_price ?? 0).toFixed(2)
+    const note = encodeURIComponent(`${firstName || 'Ticket'} - ${event?.title || 'Cafe Kadhem'}`)
+    const venmoMobileUrl = venmoHandle
+      ? `venmo://paycharge?txn=pay&recipients=${venmoHandle}&amount=${amount}&note=${note}`
+      : ''
+    const venmoWebUrl = venmoHandle
+      ? `https://venmo.com/${venmoHandle}?txn=pay&amount=${amount}&note=${note}`
+      : ''
+    const isMobile = typeof navigator !== 'undefined' && /iPhone|iPad|iPod|Android/i.test(navigator.userAgent)
+
     return (
       <div className="text-center py-4">
         <p className="font-serif text-xl text-ink italic mb-1">
@@ -198,6 +255,69 @@ export function RSVPForm({ eventId, existingRsvp, isFull, onRsvpComplete }: RSVP
         {isWaitlisted && existingRsvp.waitlist_position && (
           <p className="text-sm text-ink-muted mb-3">Position #{existingRsvp.waitlist_position} on the waitlist</p>
         )}
+
+        {showPaymentFlow && (
+          <div className="mt-6 mb-4 border border-warm rounded-lg p-5 text-left bg-cream/40">
+            <p className="text-[10px] tracking-[0.2em] uppercase text-ink-muted mb-2">Ticket Payment</p>
+            {existingRsvp.payment_status === 'pending' ? (
+              <>
+                <p className="font-serif text-lg text-ink italic mb-2">
+                  Payment received — awaiting confirmation.
+                </p>
+                <p className="text-sm text-ink-muted">
+                  Your host will verify the Venmo and send your QR-code ticket. If you haven't actually sent it yet, you can resend below.
+                </p>
+              </>
+            ) : (
+              <>
+                <p className="font-serif text-lg text-ink italic mb-3">
+                  Send <span className="font-medium not-italic">${amount}</span> via Venmo to confirm your seat.
+                </p>
+                <p className="text-sm text-ink-muted mb-3">
+                  Note must include your name and the event title so your host can match the payment.
+                </p>
+              </>
+            )}
+            {venmoHandle && (
+              <a
+                href={isMobile ? venmoMobileUrl : venmoWebUrl}
+                target={isMobile ? undefined : '_blank'}
+                rel="noopener noreferrer"
+                className="inline-block bg-forest text-cream px-6 py-3 text-xs tracking-[0.2em] uppercase hover:bg-forest-light transition-colors"
+              >
+                Pay ${amount} on Venmo
+              </a>
+            )}
+            <div className="mt-4">
+              <button
+                onClick={handleMarkPaymentPending}
+                disabled={markingPaid || existingRsvp.payment_status === 'pending'}
+                className="border border-warm px-5 py-2 text-xs tracking-[0.2em] uppercase text-ink-muted hover:border-ink hover:text-ink transition-colors disabled:opacity-50"
+              >
+                {existingRsvp.payment_status === 'pending'
+                  ? "[ Marked as Paid ]"
+                  : markingPaid
+                  ? '[ Recording... ]'
+                  : "[ I've Paid ]"}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {showTicketLink && (
+          <div className="mt-6 mb-4">
+            <a
+              href={`/ticket/${existingRsvp.ticket_token}`}
+              className="inline-block bg-forest text-cream px-8 py-3 text-xs tracking-[0.2em] uppercase hover:bg-forest-light transition-colors"
+            >
+              View Your Ticket
+            </a>
+            <p className="text-xs text-ink-muted mt-2 italic">
+              Also sent via {existingRsvp.checked_in_at ? 'your preferred channel' : 'email or SMS'}.
+            </p>
+          </div>
+        )}
+
         <button
           onClick={() => setShowForm(true)}
           className="border border-warm px-6 py-2 text-xs tracking-[0.2em] uppercase text-ink-muted hover:border-ink hover:text-ink transition-colors"

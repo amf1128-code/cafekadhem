@@ -182,8 +182,20 @@ export function EventDetail() {
 
       {/* RSVP Section */}
       <div className="border border-warm bg-parchment-light p-6 md:p-10 mb-8">
+        {event.ticketing_enabled && event.ticket_price != null && !myRsvp && (
+          <div className="mb-6 border border-warm rounded-lg p-4 bg-warm/20 text-center">
+            <p className="text-[10px] tracking-[0.2em] uppercase text-ink-muted mb-1">Ticketed Event</p>
+            <p className="font-serif text-xl text-ink italic">
+              ${event.ticket_price.toFixed(2)} per seat
+            </p>
+            <p className="text-sm text-ink-muted mt-1">
+              Reserve below, then send your Venmo payment to receive a QR-code ticket.
+            </p>
+          </div>
+        )}
         <RSVPForm
           eventId={event.id}
+          event={event}
           existingRsvp={myRsvp}
           isFull={isFull}
           onRsvpComplete={() => loadEvent()}

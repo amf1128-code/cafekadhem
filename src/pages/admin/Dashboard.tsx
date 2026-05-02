@@ -111,10 +111,20 @@ export function AdminDashboard() {
                 )}
                 <span>{event.order_count} orders</span>
               </div>
-              <div className="flex gap-2">
+              <div className="flex gap-2 flex-wrap">
                 <Link to={`/admin/events/${event.id}/edit`}>
                   <Button variant="outline" size="sm">Edit</Button>
                 </Link>
+                {event.ticketing_enabled && (
+                  <>
+                    <Link to={`/admin/events/${event.id}/tickets`}>
+                      <Button variant="ghost" size="sm">Tickets</Button>
+                    </Link>
+                    <Link to={`/admin/events/${event.id}/checkin`}>
+                      <Button variant="ghost" size="sm">Door</Button>
+                    </Link>
+                  </>
+                )}
                 <Link to={`/admin/events/${event.id}/orders`}>
                   <Button variant="ghost" size="sm">Orders</Button>
                 </Link>
