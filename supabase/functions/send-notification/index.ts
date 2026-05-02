@@ -1,4 +1,8 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+// qrcode-generator is pure JS with no Node-specific deps, so it loads cleanly
+// under Deno via esm.sh (unlike the npm 'qrcode' package which depends on
+// pngjs / Buffer and fails silently here).
+import qrcodeGenerator from 'https://esm.sh/qrcode-generator@1.4.4'
 
 const TELNYX_API_KEY = Deno.env.get('TELNYX_API_KEY') || ''
 const TELNYX_MESSAGING_PROFILE_ID = Deno.env.get('TELNYX_MESSAGING_PROFILE_ID') || ''
@@ -44,20 +48,43 @@ async function getSiteUrl(): Promise<string> {
   return (data?.site_url || 'https://cafekadhem.com').replace(/\/$/, '')
 }
 
-// Build a hosted QR image URL via api.qrserver.com. The image is fetched
-// directly by the email client when the recipient opens the message — no
-// self-generation, no upload, no bucket dependency, works in every email
-// client without esm.sh / Deno compatibility concerns. Token is opaque so
-// the URL leak to a third party is acceptable for this use case.
-function buildQrImageUrl(encodedTargetUrl: string): string {
-  const params = new URLSearchParams({
-    size: '600x600',
-    data: encodedTargetUrl,
-    margin: '8',
-    color: '1A2E1F',
-    bgcolor: 'FDFAF3',
-  })
-  return `https://api.qrserver.com/v1/create-qr-code/?${params.toString()}`
+// Generate a QR PNG-equivalent (GIF) for the ticket URL and upload it to
+// the public 'tickets' Supabase Storage bucket. The email <img> points at
+// the storage public URL; the image is served from our own infra. Returns
+// the public URL on success, or null on failure (caller falls back to the
+// plain ticket-page link in the email).
+async function generateAndUploadQr(token: string, encodedUrl: string): Promise<string | null> {
+  try {
+    const qr = qrcodeGenerator(0, 'M')
+    qr.addData(encodedUrl)
+    qr.make()
+    // createDataURL returns "data:image/gif;base64,...". GIF is universally
+    // rendered by email clients in <img> tags — no advantage to PNG here.
+    const dataUrl: string = qr.createDataURL(8, 4)
+    const base64 = dataUrl.split(',')[1]
+    if (!base64) {
+      console.error('QR generation: empty data URL')
+      return null
+    }
+    const bytes = Uint8Array.from(atob(base64), (c) => c.charCodeAt(0))
+
+    const { error: uploadError } = await supabase.storage
+      .from('tickets')
+      .upload(`${token}.gif`, bytes, {
+        contentType: 'image/gif',
+        upsert: true,
+      })
+    if (uploadError) {
+      console.error('QR upload failed:', uploadError.message)
+      return null
+    }
+
+    const { data } = supabase.storage.from('tickets').getPublicUrl(`${token}.gif`)
+    return data.publicUrl
+  } catch (err) {
+    console.error('QR generation failed:', err)
+    return null
+  }
 }
 
 const messageTemplates: Record<string, (data: Record<string, string>) => { subject: string; body: string; html?: string }> = {
@@ -252,29 +279,21 @@ Deno.serve(async (req: Request) => {
 
     // Server-side URL building. Single source of truth = admin_settings.site_url,
     // so links in emails always reflect whatever the admin has set as the
-    // canonical domain (regardless of where the admin happened to click from).
+    // canonical domain. Callers MUST pass ticket_token for ticket_issued and
+    // we reject the request otherwise — silent fallbacks would let a
+    // misbehaving caller send a broken email without anyone noticing.
     if (type === 'ticket_issued') {
+      const token = data.ticket_token as string | undefined
+      if (!token) {
+        return new Response(
+          JSON.stringify({ success: false, error: 'ticket_token is required for ticket_issued' }),
+          { status: 400, headers: jsonHeaders }
+        )
+      }
       const siteUrl = await getSiteUrl()
-      // Accept ticket_token from new clients; fall back to a pre-built
-      // ticket_url from older clients. Either way the canonical URL in the
-      // email is rebuilt from siteUrl + token when possible.
-      const token = (data.ticket_token as string | undefined) || ''
-      if (token) {
-        data.ticket_url = `${siteUrl}/ticket/${token}`
-      } else if (data.ticket_url) {
-        // Old client passed a full URL; force the host to match site_url
-        // so the email still points at the canonical domain.
-        try {
-          const u = new URL(data.ticket_url)
-          const path = u.pathname + u.search
-          data.ticket_url = `${siteUrl}${path}`
-        } catch {
-          /* leave as-is */
-        }
-      }
-      if (data.ticket_url) {
-        data.qr_image_url = buildQrImageUrl(data.ticket_url)
-      }
+      data.ticket_url = `${siteUrl}/ticket/${token}`
+      const qrImageUrl = await generateAndUploadQr(token, data.ticket_url)
+      if (qrImageUrl) data.qr_image_url = qrImageUrl
     }
     if (type === 'waitlist_promoted' && eventId) {
       const siteUrl = await getSiteUrl()
