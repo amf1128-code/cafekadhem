@@ -1,4 +1,4 @@
 -- Seed initial admin settings
-INSERT INTO admin_settings (venmo_handle, cafe_name, contact_email)
-VALUES ('amf1128', 'Cafe Kadhem', NULL)
+INSERT INTO admin_settings (venmo_handle, contact_email)
+VALUES ('amf1128', NULL)
 ON CONFLICT DO NOTHING;
