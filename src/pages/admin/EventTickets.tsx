@@ -53,16 +53,30 @@ export function AdminEventTickets() {
   async function handleMarkPaid(row: TicketRow) {
     setBusy(row.id)
     try {
-      const { data, error } = await supabase.rpc('mark_rsvp_paid', { p_rsvp_id: row.id })
+      const { error } = await supabase.rpc('mark_rsvp_paid', { p_rsvp_id: row.id })
       if (error) throw error
-      const updated = data as RSVP
+
+      // Re-fetch the row to get the issued ticket_token. The RPC returns a
+      // composite type whose JS-client shape is inconsistent enough that
+      // reading ticket_token off the rpc() return value can't be trusted;
+      // a fresh select is unambiguous.
+      const { data: refreshed, error: fetchError } = await supabase
+        .from('rsvps')
+        .select('ticket_token')
+        .eq('id', row.id)
+        .single()
+
+      if (fetchError || !refreshed?.ticket_token) {
+        throw new Error('Ticket marked paid, but token was not issued')
+      }
+
       addToast('Marked paid — issuing ticket')
 
       sendNotification({
         guestId: row.guest_id,
         eventId: id!,
         type: 'ticket_issued',
-        data: { ticket_token: updated.ticket_token! },
+        data: { ticket_token: refreshed.ticket_token },
       })
 
       await loadData()
