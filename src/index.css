@@ -1,7 +1,14 @@
 @import "tailwindcss";
 
+/*
+ * Theme tokens
+ * ------------
+ * Default values below are theme 1 (Archival).
+ * Theme 2 (Poster) overrides the same variables under [data-theme="theme2"]
+ * further down so every existing utility (bg-cream, text-forest, font-serif…)
+ * automatically picks up the new palette.
+ */
 @theme {
-  /* Original warm palette — restored */
   --color-cream: #E5E1DB;
   --color-forest: #2D5A27;
   --color-forest-light: #3D7A34;
@@ -9,7 +16,6 @@
   --color-warm: #CBC5BA;
   --color-ink: #1A1A1A;
 
-  /* Editorial additions */
   --color-parchment: #E5E1DB;
   --color-parchment-light: #EDEAE4;
   --color-stone: #CBC5BA;
@@ -23,6 +29,61 @@
   --font-script: "Cormorant Garamond", Georgia, serif;
   --font-arabic: "Amiri", "Noto Naskh Arabic", serif;
   --font-mono: "JetBrains Mono", ui-monospace, monospace;
+}
+
+/* Theme 2 — "Poster"
+ * Striped sage-and-cream backdrop with heavy ultramarine ink, inspired by a
+ * mid-century event flyer. Card surfaces stay solid for legibility; the page
+ * backdrop carries the stripes via .page-bg.
+ */
+[data-theme="theme2"] {
+  --color-cream: #F1ECE2;                /* warm paper cream, solid */
+  --color-forest: #1A21BC;               /* ultramarine takes over as primary */
+  --color-forest-light: #2731E1;
+  --color-forest-dark: #11187A;
+  --color-warm: #B6CDC0;                 /* faded sage for hairlines */
+  --color-ink: #11187A;                  /* deep ultramarine text */
+
+  --color-parchment: #F1ECE2;
+  --color-parchment-light: #F7F2E8;      /* slightly brighter paper for cards */
+  --color-stone: #B6CDC0;
+  --color-stone-dark: #6E8C7C;
+  --color-ink-light: #2731E1;
+  --color-ink-muted: #5C6A92;
+  --color-accent: #1A21BC;
+
+  --font-serif: "Bodoni Moda", "Playfair Display", "Cormorant Garamond", Georgia, serif;
+}
+
+/*
+ * Page backdrop. In theme 1 this is just the cream wash. In theme 2 it becomes
+ * the vertical sage-and-cream stripe pattern. Apply to elements that should
+ * carry the page-level background (layout wrappers, header, footer).
+ */
+.page-bg {
+  background-color: var(--color-cream);
+}
+[data-theme="theme2"] .page-bg {
+  background-color: #B7CEC2;
+  background-image: repeating-linear-gradient(
+    90deg,
+    transparent 0,
+    transparent 56px,
+    #F1ECE2 56px,
+    #F1ECE2 112px
+  );
+}
+
+/* Heavier display feel for headings in theme 2 */
+[data-theme="theme2"] h1,
+[data-theme="theme2"] h2,
+[data-theme="theme2"] h3 {
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+[data-theme="theme2"] .vertical-text {
+  letter-spacing: 0.25em;
 }
 
 body {

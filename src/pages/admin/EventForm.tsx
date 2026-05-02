@@ -31,6 +31,8 @@ export function AdminEventForm() {
   const [isPublished, setIsPublished] = useState(false)
   const [flyerFile, setFlyerFile] = useState<File | null>(null)
   const [flyerUrl, setFlyerUrl] = useState<string | null>(null)
+  const [homeFlyerFile, setHomeFlyerFile] = useState<File | null>(null)
+  const [homeFlyerUrl, setHomeFlyerUrl] = useState<string | null>(null)
 
   const [menus, setMenus] = useState<Menu[]>([])
   const [loading, setLoading] = useState(true)
@@ -59,6 +61,7 @@ export function AdminEventForm() {
         setMenuId(event.menu_id || '')
         setIsPublished(event.is_published)
         setFlyerUrl(event.flyer_url)
+        setHomeFlyerUrl(event.home_flyer_url)
       }
     }
 
@@ -101,6 +104,11 @@ export function AdminEventForm() {
         uploadedFlyerUrl = await uploadFlyer(flyerFile)
       }
 
+      let uploadedHomeFlyerUrl = homeFlyerUrl
+      if (homeFlyerFile) {
+        uploadedHomeFlyerUrl = await uploadFlyer(homeFlyerFile)
+      }
+
       const eventData = {
         title: title.trim(),
         gathering_number: gatheringNumber.trim() || null,
@@ -114,6 +122,7 @@ export function AdminEventForm() {
         menu_id: menuId || null,
         is_published: isPublished,
         flyer_url: uploadedFlyerUrl,
+        home_flyer_url: uploadedHomeFlyerUrl,
       }
 
       if (isEdit) {
@@ -203,9 +212,10 @@ export function AdminEventForm() {
           placeholder="No menu"
         />
 
-        {/* Flyer Upload */}
+        {/* Flyer Upload — full image shown on the event detail page */}
         <div>
           <label className="block text-sm font-medium text-ink mb-1">Flyer</label>
+          <p className="text-xs text-ink-muted mb-2">Shown in full on the event detail page.</p>
           {flyerUrl && !flyerFile && (
             <div className="mb-2">
               <img src={flyerUrl} alt="Current flyer" className="w-32 h-auto rounded border border-warm" />
@@ -223,6 +233,39 @@ export function AdminEventForm() {
               className="sr-only"
             />
           </label>
+          <p className="text-xs text-ink/50 mt-1">JPG, PNG, or WebP. Max 5MB.</p>
+        </div>
+
+        {/* Home Page Image — optional alternate cropped for the home card */}
+        <div>
+          <label className="block text-sm font-medium text-ink mb-1">Home Page Image <span className="text-ink-muted font-normal">(optional)</span></label>
+          <p className="text-xs text-ink-muted mb-2">Shown on the home page card (3:4 aspect ratio). Falls back to the flyer above if left empty.</p>
+          {homeFlyerUrl && !homeFlyerFile && (
+            <div className="mb-2">
+              <img src={homeFlyerUrl} alt="Current home image" className="w-32 h-auto rounded border border-warm" />
+            </div>
+          )}
+          <label className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border-2 border-forest text-forest cursor-pointer hover:bg-forest hover:text-cream transition-colors duration-200 text-sm font-medium">
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+            </svg>
+            {homeFlyerFile ? homeFlyerFile.name : 'Choose Image'}
+            <input
+              type="file"
+              accept=".jpg,.jpeg,.png,.webp"
+              onChange={e => setHomeFlyerFile(e.target.files?.[0] || null)}
+              className="sr-only"
+            />
+          </label>
+          {homeFlyerUrl && !homeFlyerFile && (
+            <button
+              type="button"
+              onClick={() => setHomeFlyerUrl(null)}
+              className="ml-3 text-xs tracking-[0.15em] uppercase text-ink-muted hover:text-forest transition-colors"
+            >
+              Remove
+            </button>
+          )}
           <p className="text-xs text-ink/50 mt-1">JPG, PNG, or WebP. Max 5MB.</p>
         </div>
 
