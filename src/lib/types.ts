@@ -22,6 +22,8 @@ export interface Event {
   donation_info: string | null
   gathering_number: string | null
   is_published: boolean
+  ticketing_enabled: boolean
+  ticket_price: number | null
   created_at: string
   updated_at: string
   // Joined fields
@@ -78,10 +80,43 @@ export interface RSVP {
   status: 'yes' | 'maybe' | 'no' | 'waitlisted'
   waitlist_position: number | null
   waitlisted_at: string | null
+  payment_status: 'unpaid' | 'pending' | 'paid' | 'refunded'
+  ticket_token: string | null
+  paid_at: string | null
+  checked_in_at: string | null
   created_at: string
   updated_at: string
   // Joined
   guest?: PublicGuestProfile
+}
+
+export interface TicketView {
+  rsvp_id: string
+  token: string
+  checked_in_at: string | null
+  paid_at: string | null
+  guest_first_name: string
+  guest_last_name: string | null
+  event_id: string
+  event_title: string
+  event_date: string
+  event_start_time: string
+  event_end_time: string | null
+  event_location: string
+  event_location_name: string | null
+  gathering_number: string | null
+}
+
+export interface CheckInResult {
+  success: boolean
+  error?: string
+  already_checked_in?: boolean
+  rsvp_id?: string
+  guest_first_name?: string
+  guest_last_name?: string | null
+  event_id?: string
+  event_title?: string
+  checked_in_at?: string
 }
 
 export interface Order {

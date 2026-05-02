@@ -30,6 +30,8 @@ export function AdminEventForm() {
   const [donationInfo, setDonationInfo] = useState('')
   const [menuId, setMenuId] = useState('')
   const [isPublished, setIsPublished] = useState(false)
+  const [ticketingEnabled, setTicketingEnabled] = useState(false)
+  const [ticketPrice, setTicketPrice] = useState('')
   const [flyerFile, setFlyerFile] = useState<File | null>(null)
   const [flyerUrl, setFlyerUrl] = useState<string | null>(null)
   const [homeFlyerFile, setHomeFlyerFile] = useState<File | null>(null)
@@ -62,6 +64,8 @@ export function AdminEventForm() {
         setDonationInfo(event.donation_info || '')
         setMenuId(event.menu_id || '')
         setIsPublished(event.is_published)
+        setTicketingEnabled(!!event.ticketing_enabled)
+        setTicketPrice(event.ticket_price != null ? String(event.ticket_price) : '')
         setFlyerUrl(event.flyer_url)
         setHomeFlyerUrl(event.home_flyer_url)
       }
@@ -124,6 +128,8 @@ export function AdminEventForm() {
         donation_info: donationInfo.trim() || null,
         menu_id: menuId || null,
         is_published: isPublished,
+        ticketing_enabled: ticketingEnabled,
+        ticket_price: ticketingEnabled && ticketPrice ? parseFloat(ticketPrice) : null,
         flyer_url: uploadedFlyerUrl,
         home_flyer_url: uploadedHomeFlyerUrl,
       }
@@ -282,6 +288,35 @@ export function AdminEventForm() {
             </button>
           )}
           <p className="text-xs text-ink/50 mt-1">JPG, PNG, or WebP. Max 5MB.</p>
+        </div>
+
+        {/* Ticketing */}
+        <div className="border border-warm rounded-lg p-4 bg-warm/10">
+          <label className="flex items-center gap-2 text-sm font-medium">
+            <input
+              type="checkbox"
+              checked={ticketingEnabled}
+              onChange={e => setTicketingEnabled(e.target.checked)}
+              className="rounded border-warm text-forest focus:ring-forest"
+            />
+            Require paid ticket for entry
+          </label>
+          <p className="text-xs text-ink-muted mt-1 ml-6">
+            Guests RSVP, pay via Venmo, then you confirm payment in the tickets queue. Each confirmed guest gets a QR-code ticket sent via their notification preference.
+          </p>
+          {ticketingEnabled && (
+            <div className="mt-3 ml-6">
+              <Input
+                label="Ticket Price (USD)"
+                type="number"
+                step="0.01"
+                min="0"
+                value={ticketPrice}
+                onChange={e => setTicketPrice(e.target.value)}
+                placeholder="e.g. 25"
+              />
+            </div>
+          )}
         </div>
 
         <label className="flex items-center gap-2 text-sm">

@@ -1,6 +1,6 @@
 # Cafe Kadhem — Build Plan & Status
 
-> **Last updated:** 2026-05-02
+> **Last updated:** 2026-05-02 (ticketing added)
 > Living document tracking progress against the original build plan. Annotated with `[DONE]`, `[CHANGED]`, `[ADDED]`, `[PARTIAL]`, and `[TODO]` markers.
 
 ---
@@ -74,6 +74,16 @@ Implemented as specified.
 
 ### `[DONE]` public_guest_profiles view
 Read-only view exposing only `id`, `first_name`, `instagram`. Used by all public guest list queries.
+
+### `[ADDED]` Ticketing
+Optional paid ticket flow on top of any event:
+- `events.ticketing_enabled` + `events.ticket_price` toggle ticketing per event.
+- `rsvps.payment_status` (`unpaid`/`pending`/`paid`/`refunded`), `ticket_token`, `paid_at`, `checked_in_at`.
+- RPCs: `mark_payment_pending` (guest self-mark after Venmo), `mark_rsvp_paid` (admin verifies + issues token), `mark_rsvp_unpaid` (undo), `get_ticket(token)` (public read-by-token), `check_in_ticket(token)` (door scan, authenticated), `undo_check_in`.
+- Public `/ticket/:token` page renders guest name + QR code of the same URL.
+- Admin payments queue at `/admin/events/:id/tickets` with pending/unpaid/paid filter, mark-paid and re-send actions.
+- Admin door scanner at `/admin/events/:id/checkin` using `html5-qrcode` plus a name-search manual fallback.
+- Notification templates: `ticket_payment_received` (auto-sent when guest taps "I've Paid"), `ticket_issued` (sent when admin marks paid).
 
 ### `[ADDED]` Pickup Order System
 New tables for an out-of-event ordering flow:
