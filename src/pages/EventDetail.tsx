@@ -203,7 +203,7 @@ export function EventDetail() {
               ${event.ticket_price.toFixed(2)} per seat
             </p>
             <p className="text-sm text-ink-muted mt-1">
-              Reserve below, then send your Venmo payment to receive a QR-code ticket.
+              RSVP and purchase your ticket via Venmo below, and we'll send your ticket once confirmed!
             </p>
           </div>
         )}
