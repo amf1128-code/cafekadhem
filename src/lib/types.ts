@@ -3,6 +3,7 @@ export interface AdminSettings {
   venmo_handle: string
   cafe_name: string
   contact_email: string | null
+  theme: 'theme1' | 'theme2'
   updated_at: string
 }
 

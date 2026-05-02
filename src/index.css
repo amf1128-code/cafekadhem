@@ -53,6 +53,10 @@
   --color-accent: #1A21BC;
 
   --font-serif: "Bodoni Moda", "Playfair Display", "Cormorant Garamond", Georgia, serif;
+  /* Arabic font intentionally inherits theme 1 here. To change it for a
+     theme, override --font-arabic with a different family. The font-arabic
+     utility resolves through this variable, so any element using it picks
+     up the theme's choice automatically. */
 }
 
 /*
