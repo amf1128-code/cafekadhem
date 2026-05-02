@@ -1,6 +1,14 @@
-import { createContext, useContext } from 'react'
+import { createContext, useContext, useEffect } from 'react'
 
 export type ThemeId = 'theme1' | 'theme2' | 'theme3'
+
+/**
+ * The admin's site-wide theme setting. `'default'` means the home page
+ * follows the next upcoming event's theme; the other values force the
+ * home page into that theme regardless of upcoming events. Event detail
+ * pages always use their own event's theme — unaffected by this setting.
+ */
+export type SiteThemeChoice = ThemeId | 'default'
 
 export interface ThemeMeta {
   id: ThemeId
@@ -17,13 +25,12 @@ export const THEMES: ThemeMeta[] = [
 export const DEFAULT_THEME: ThemeId = 'theme1'
 
 export interface ThemeContextValue {
-  theme: ThemeId
-  /**
-   * Apply a theme locally (updates the document attribute and provider state).
-   * Does NOT persist to the database — admin Settings save handles persistence.
-   * Used by the admin Settings page for live preview while editing.
-   */
-  applyTheme: (theme: ThemeId) => void
+  /** Currently active theme applied by PublicLayout. Pages set this via usePageTheme. */
+  activeTheme: ThemeId
+  /** Admin's site-wide setting (controls home page resolution). */
+  siteTheme: SiteThemeChoice
+  /** Imperatively swap the active theme. Used by usePageTheme and admin settings preview. */
+  setActiveTheme: (theme: ThemeId) => void
   themes: ThemeMeta[]
 }
 
@@ -33,4 +40,19 @@ export function useTheme() {
   const ctx = useContext(ThemeContext)
   if (!ctx) throw new Error('useTheme must be used within a ThemeProvider')
   return ctx
+}
+
+/**
+ * Page-driven theme: each public page declares the theme it should render in
+ * (typically derived from the event it just loaded). PublicLayout subscribes
+ * via context and swaps `data-theme` on the layout root. Pass `undefined`
+ * while the page is still resolving its theme — the previously-active value
+ * stays in place until you have a real answer, which (combined with the
+ * localStorage cache in ThemeProvider) eliminates the theme1→themeX flash.
+ */
+export function usePageTheme(theme: ThemeId | undefined) {
+  const { setActiveTheme } = useTheme()
+  useEffect(() => {
+    if (theme) setActiveTheme(theme)
+  }, [theme, setActiveTheme])
 }

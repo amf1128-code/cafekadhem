@@ -10,6 +10,7 @@ import { RSVPList } from '../components/events/RSVPList'
 import { MenuDisplay } from '../components/menus/MenuDisplay'
 import { ShareButton } from '../components/events/ShareButton'
 import { InviteForm } from '../components/guests/InviteForm'
+import { usePageTheme } from '../lib/theme/themes'
 
 export function EventDetail() {
   const { id } = useParams<{ id: string }>()
@@ -21,6 +22,10 @@ export function EventDetail() {
   const [rsvps, setRsvps] = useState<(RSVP & { guest: PublicGuestProfile })[]>([])
   const [myRsvp, setMyRsvp] = useState<RSVP | null>(null)
   const [loading, setLoading] = useState(true)
+
+  // Apply the event's theme as soon as the row arrives (typed as undefined
+  // until then so the cached theme stays in place rather than flashing).
+  usePageTheme(event?.theme)
 
   useEffect(() => {
     if (id) loadEvent()
