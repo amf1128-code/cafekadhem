@@ -65,11 +65,6 @@ export function RSVPForm({ eventId, event, existingRsvp, isFull, onRsvpComplete 
       })
       if (error) throw error
       addToast("Thanks — your host will confirm shortly.")
-      sendNotification({
-        guestId: existingRsvp.guest_id,
-        eventId,
-        type: 'ticket_payment_received',
-      })
       onRsvpComplete()
     } catch (err) {
       addToast(err instanceof Error ? err.message : 'Failed to mark paid', 'error')
@@ -191,10 +186,15 @@ export function RSVPForm({ eventId, event, existingRsvp, isFull, onRsvpComplete 
 
       // Send notification
       if (status !== 'no') {
+        const finalStatus = rsvpResult?.status || status
         sendNotification({
           guestId,
           eventId,
           type: 'rsvp_confirmation',
+          data: {
+            status: finalStatus,
+            is_ticketed: event?.ticketing_enabled ? 'true' : 'false',
+          },
         })
       }
 

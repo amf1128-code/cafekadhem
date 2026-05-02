@@ -27,10 +27,18 @@ function checkRateLimit(key: string, maxPerMinute: number): boolean {
 }
 
 const messageTemplates: Record<string, (data: Record<string, string>) => { subject: string; body: string }> = {
-  rsvp_confirmation: (data) => ({
-    subject: `RSVP Confirmed - ${data.event_title || 'Cafe Kadhem'}`,
-    body: `Thanks for your RSVP! You're ${data.status === 'yes' ? 'going' : 'on the maybe list'} for ${data.event_title || 'our event'}. We look forward to seeing you!`,
-  }),
+  rsvp_confirmation: (data) => {
+    if (data.is_ticketed === 'true' && data.status === 'yes') {
+      return {
+        subject: `We got your RSVP - ${data.event_title || 'Cafe Kadhem'}`,
+        body: `We got your RSVP! Make sure your ticket payment went through, and you'll receive a follow up with your ticket within 48 hours!`,
+      }
+    }
+    return {
+      subject: `RSVP Confirmed - ${data.event_title || 'Cafe Kadhem'}`,
+      body: `Thanks for your RSVP! You're ${data.status === 'yes' ? 'going' : 'on the maybe list'} for ${data.event_title || 'our event'}. We look forward to seeing you!`,
+    }
+  },
   order_confirmation: (data) => ({
     subject: `Order Confirmed - ${data.event_title || 'Cafe Kadhem'}`,
     body: `Your pre-order for ${data.event_title || 'our event'} has been submitted. Your host will confirm payment once received via Venmo.`,
@@ -46,10 +54,6 @@ const messageTemplates: Record<string, (data: Record<string, string>) => { subje
   waitlist_promoted: (data) => ({
     subject: `You're In! - ${data.event_title || 'Cafe Kadhem'}`,
     body: `Great news! A spot opened up at ${data.event_title || 'our event'} and you've been promoted from the waitlist. You're confirmed! See you there.`,
-  }),
-  ticket_payment_received: (data) => ({
-    subject: `Payment received - ${data.event_title || 'Cafe Kadhem'}`,
-    body: `We received your Venmo payment for ${data.event_title || 'our event'}. Sit tight — your host will confirm and send your ticket shortly.`,
   }),
   ticket_issued: (data) => ({
     subject: `Your ticket - ${data.event_title || 'Cafe Kadhem'}`,
