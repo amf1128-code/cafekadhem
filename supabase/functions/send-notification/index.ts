@@ -153,12 +153,8 @@ const messageTemplates: Record<string, (data: Record<string, string>) => { subje
         ${qrImageUrl ? `<tr><td align="center" style="padding:16px 0;">
           <img src="${escapeHtml(qrImageUrl)}" alt="Ticket QR code" width="280" height="280" style="display:block;border:1px solid #e7e0cf;background:#fdfaf3;" />
         </td></tr>` : ''}
-        <tr><td align="center" style="padding:16px 0;">
+        <tr><td align="center" style="padding:16px 0 8px;">
           <a href="${escapeHtml(ticketUrl)}" style="display:inline-block;background:#1a2e1f;color:#fdfaf3;text-decoration:none;padding:14px 28px;letter-spacing:0.2em;text-transform:uppercase;font-size:12px;">View Your Ticket</a>
-        </td></tr>
-        <tr><td align="center" style="padding-top:16px;border-top:1px solid #e7e0cf;">
-          <p style="margin:0 0 6px;font-size:12px;color:#6b6452;font-style:italic;">If the QR above doesn't show, open this link to view your ticket:</p>
-          <p style="margin:0;font-size:13px;word-break:break-all;"><a href="${escapeHtml(ticketUrl)}" style="color:#1a2e1f;">${escapeHtml(ticketUrl)}</a></p>
         </td></tr>
       </table>
     </td></tr>
