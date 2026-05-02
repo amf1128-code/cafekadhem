@@ -160,24 +160,38 @@ export function EventDetail() {
           </div>
         )}
 
-        {/* Capacity bar */}
-        {event.capacity && (
-          <div className="mb-6">
-            <div className="flex items-center justify-between text-sm mb-2">
-              <span className="text-[10px] tracking-[0.2em] uppercase text-ink-muted">
-                {isFull
-                  ? `Full${waitlistCount > 0 ? ` \u2014 ${waitlistCount} on waitlist` : ''}`
-                  : `${yesCount} / ${event.capacity} seats reserved`}
-              </span>
+        {/* Attendance summary */}
+        {event.capacity && (() => {
+          const ticketsLeft = event.capacity - yesCount
+          const leftLabel = event.ticketing_enabled ? 'Tickets Left' : 'Seats Left'
+          return (
+            <div className="mb-6 border-y border-warm py-4 flex items-center text-center divide-x divide-warm">
+              <div className="flex-1 px-2">
+                <p className="text-[10px] tracking-[0.2em] uppercase text-ink-muted mb-1">Attendees</p>
+                <p className="font-serif text-2xl text-ink">{yesCount}</p>
+              </div>
+              <div className="flex-1 px-2">
+                {ticketsLeft > 0 ? (
+                  <>
+                    <p className="text-[10px] tracking-[0.2em] uppercase text-ink-muted mb-1">{leftLabel}</p>
+                    <p className="font-serif text-2xl text-ink">{ticketsLeft}</p>
+                  </>
+                ) : (
+                  <>
+                    <p className="text-[10px] tracking-[0.2em] uppercase text-ink-muted mb-1">Status</p>
+                    <p className="font-serif text-lg italic text-ink mt-1">Event Full</p>
+                  </>
+                )}
+              </div>
+              {waitlistCount > 0 && (
+                <div className="flex-1 px-2">
+                  <p className="text-[10px] tracking-[0.2em] uppercase text-ink-muted mb-1">Waitlist</p>
+                  <p className="font-serif text-2xl text-ink">{waitlistCount}</p>
+                </div>
+              )}
             </div>
-            <div className="h-px bg-stone relative">
-              <div
-                className="absolute top-0 left-0 h-px bg-ink transition-all"
-                style={{ width: `${Math.min((yesCount / event.capacity) * 100, 100)}%` }}
-              />
-            </div>
-          </div>
-        )}
+          )
+        })()}
       </div>
 
       {/* RSVP Section */}
