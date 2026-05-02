@@ -92,6 +92,17 @@
   letter-spacing: -0.01em;
 }
 
+/* Body-sized serif text in theme 2 uses Oswald (multi-weight condensed
+   sans) at a lighter weight so the page chrome — descriptions, dates,
+   times, location lines — reads as a softer counterpoint to the chunky
+   Anton/Bebas-style headings. Headings (h1/h2/h3) are excluded because they
+   keep the display family from --font-serif. */
+[data-theme="theme2"] :is(p, span, li, a).font-serif {
+  font-family: "Oswald", "Barlow Condensed", "Roboto Condensed",
+    system-ui, sans-serif;
+  font-weight: 400;
+}
+
 [data-theme="theme2"] .vertical-text {
   letter-spacing: 0.25em;
 }
