@@ -53,6 +53,8 @@ export function AdminSettings() {
       theme,
     }
 
+    console.log('[Settings Save] Payload:', payload, 'existing settings row:', settings)
+
     let error
     if (settings) {
       ;({ error } = await supabase
@@ -70,8 +72,17 @@ export function AdminSettings() {
     }
 
     if (error) {
-      addToast('Failed to save settings', 'error')
+      console.error(
+        '[Settings Save] Failed:',
+        'message=', error.message,
+        'details=', error.details,
+        'hint=', error.hint,
+        'code=', error.code,
+        'full=', error,
+      )
+      addToast(`Failed to save settings: ${error.message || 'unknown error'}`, 'error')
     } else {
+      console.log('[Settings Save] Success')
       addToast('Settings saved')
     }
     setSaving(false)
