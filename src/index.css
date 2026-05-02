@@ -121,6 +121,27 @@
   );
 }
 
+/* Mirror the theme backdrop onto html when PublicLayout has set
+   `data-theme` on the root element. This ensures mobile overscroll and any
+   gap below short pages still shows the active theme rather than the
+   body's baseline cream. */
+html[data-theme] body {
+  background-color: var(--color-cream);
+}
+html[data-theme="theme2"] {
+  background-color: #B7CEC2;
+  background-image: repeating-linear-gradient(
+    90deg,
+    transparent 0,
+    transparent 56px,
+    #F1ECE2 56px,
+    #F1ECE2 112px
+  );
+}
+html[data-theme="theme2"] body {
+  background-color: transparent;
+}
+
 /* Heavier display feel for headings in theme 2 */
 [data-theme="theme2"] h1,
 [data-theme="theme2"] h2,
@@ -174,6 +195,16 @@
    gradient bleeds through behind them. */
 [data-theme="theme3"] .page-bg {
   background: transparent;
+}
+
+/* When theme 3 is active globally, paint the gradient on html so it covers
+   the whole viewport (including overscroll). The PublicLayout wrapper is
+   transparent in this theme so the html-level paint shows through. */
+html[data-theme="theme3"] {
+  background-color: #1A1530;
+}
+html[data-theme="theme3"] body {
+  background-color: transparent;
 }
 
 /* Page backdrop: SVG fractal-noise grain layered over a stack of radial

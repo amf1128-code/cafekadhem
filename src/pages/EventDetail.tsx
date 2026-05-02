@@ -108,7 +108,7 @@ export function EventDetail() {
 
         {/* Header */}
         <p className="text-xs tracking-[0.25em] uppercase text-ink-muted mb-2">
-          Cafe Kadhem
+          {event.event_type || 'Cafe Kadhem'}
         </p>
         <h1 className="font-serif text-3xl md:text-4xl text-forest-dark italic mb-6 pr-8">
           {event.title}

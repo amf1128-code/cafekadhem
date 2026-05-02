@@ -61,19 +61,24 @@ export function Home() {
   if (loading) return <PageLoader />
 
   return (
-    <div className="max-w-3xl mx-auto px-6 py-12">
-      {/* Title area */}
-      <div className="text-center mb-16">
-        {/* "Cafe Kadhem" with Arabic behind at half opacity */}
-        <div className="relative inline-block mb-4">
-          <span className="absolute inset-0 flex items-center justify-center font-arabic text-6xl md:text-7xl text-forest/20 select-none pointer-events-none whitespace-nowrap" aria-hidden="true">
+    <div className="max-w-3xl mx-auto px-6 pt-6 pb-12 md:pt-10">
+      {/* Title area — Arabic wordmark sized to span ~75% of the card with
+          the English brand layered in front. This is the only place we
+          render the Cafe Kadhem lockup; the header is intentionally
+          chrome-light to avoid duplicating it. */}
+      <div className="text-center mb-6 md:mb-8">
+        <div className="relative inline-block leading-none">
+          <span
+            className="block font-arabic text-forest/25 select-none pointer-events-none whitespace-nowrap leading-none text-[14vw] md:text-[7rem]"
+            aria-hidden="true"
+          >
             &#1603;&#1575;&#1601;&#1610;&#1607; &#1603;&#1575;&#1592;&#1605;
           </span>
-          <h1 className="relative font-serif text-2xl md:text-3xl text-forest px-8 py-4">
+          <h1 className="absolute inset-0 flex items-center justify-center font-serif text-forest text-3xl sm:text-4xl md:text-6xl">
             Cafe Kadhem
           </h1>
         </div>
-        <p className="font-serif text-lg text-ink-muted italic max-w-md mx-auto leading-relaxed">
+        <p className="font-serif text-base md:text-lg text-ink-muted italic mx-auto leading-snug whitespace-normal md:whitespace-nowrap mt-3 md:mt-4">
           Curating Arab-inspired treats in NYC. There's always room for one more at our table.
         </p>
       </div>
@@ -106,7 +111,7 @@ export function Home() {
                 <div className="flex items-start justify-between mb-6">
                   <div>
                     <p className="text-xs tracking-[0.2em] uppercase text-ink-muted mb-1">
-                      Cafe Kadhem
+                      {event.event_type || 'Cafe Kadhem'}
                     </p>
                     <h2 className="font-serif text-2xl md:text-3xl text-forest-dark italic">
                       {event.title}
@@ -141,8 +146,9 @@ export function Home() {
                   </div>
                 )}
 
-                {/* Info row with thin dividers */}
-                <div className="border-t border-b border-warm py-4 grid grid-cols-3 text-center">
+                {/* Info row with thin dividers — items-center keeps the
+                    RSVP label vertically aligned with the date/seats columns. */}
+                <div className="border-t border-b border-warm py-4 grid grid-cols-3 items-center text-center">
                   <div className="border-r border-warm">
                     <div className="hidden sm:block">
                       {event.location_name && (
@@ -181,7 +187,7 @@ export function Home() {
                   </div>
                   <div>
                     <p className="text-xs tracking-[0.15em] uppercase text-ink-muted">
-                      RSVP Required
+                      {event.rsvp_required ? 'RSVP Required' : 'RSVP Requested'}
                     </p>
                   </div>
                 </div>

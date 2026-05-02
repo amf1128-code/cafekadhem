@@ -22,6 +22,8 @@ export interface Event {
   capacity: number | null
   donation_info: string | null
   gathering_number: string | null
+  event_type: string | null
+  rsvp_required: boolean
   is_published: boolean
   ticketing_enabled: boolean
   ticket_price: number | null
