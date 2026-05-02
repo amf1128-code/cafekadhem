@@ -1,5 +1,8 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
-import QRCode from 'https://esm.sh/qrcode@1.5.3'
+// qrcode-generator is pure JS with no Node-specific deps, so it loads cleanly
+// under Deno via esm.sh (unlike the npm 'qrcode' package which depends on
+// pngjs / Buffer and fails silently here).
+import qrcodeGenerator from 'https://esm.sh/qrcode-generator@1.4.4'
 
 const TELNYX_API_KEY = Deno.env.get('TELNYX_API_KEY') || ''
 const TELNYX_MESSAGING_PROFILE_ID = Deno.env.get('TELNYX_MESSAGING_PROFILE_ID') || ''
@@ -45,29 +48,38 @@ async function getSiteUrl(): Promise<string> {
   return (data?.site_url || 'https://cafekadhem.com').replace(/\/$/, '')
 }
 
+// Generate a QR PNG-equivalent (GIF) for the ticket URL and upload it to
+// the public 'tickets' Supabase Storage bucket. The email <img> points at
+// the storage public URL; the image is served from our own infra. Returns
+// the public URL on success, or null on failure (caller falls back to the
+// plain ticket-page link in the email).
 async function generateAndUploadQr(token: string, encodedUrl: string): Promise<string | null> {
   try {
-    const dataUrl: string = await QRCode.toDataURL(encodedUrl, {
-      width: 600,
-      margin: 2,
-      errorCorrectionLevel: 'M',
-      color: { dark: '#1a2e1f', light: '#fdfaf3' },
-    })
+    const qr = qrcodeGenerator(0, 'M')
+    qr.addData(encodedUrl)
+    qr.make()
+    // createDataURL returns "data:image/gif;base64,...". GIF is universally
+    // rendered by email clients in <img> tags — no advantage to PNG here.
+    const dataUrl: string = qr.createDataURL(8, 4)
     const base64 = dataUrl.split(',')[1]
+    if (!base64) {
+      console.error('QR generation: empty data URL')
+      return null
+    }
     const bytes = Uint8Array.from(atob(base64), (c) => c.charCodeAt(0))
 
-    const { error } = await supabase.storage
+    const { error: uploadError } = await supabase.storage
       .from('tickets')
-      .upload(`${token}.png`, bytes, {
-        contentType: 'image/png',
+      .upload(`${token}.gif`, bytes, {
+        contentType: 'image/gif',
         upsert: true,
       })
-    if (error) {
-      console.error('QR upload failed:', error.message)
+    if (uploadError) {
+      console.error('QR upload failed:', uploadError.message)
       return null
     }
 
-    const { data } = supabase.storage.from('tickets').getPublicUrl(`${token}.png`)
+    const { data } = supabase.storage.from('tickets').getPublicUrl(`${token}.gif`)
     return data.publicUrl
   } catch (err) {
     console.error('QR generation failed:', err)
@@ -267,10 +279,18 @@ Deno.serve(async (req: Request) => {
 
     // Server-side URL building. Single source of truth = admin_settings.site_url,
     // so links in emails always reflect whatever the admin has set as the
-    // canonical domain (regardless of where the admin happened to click from).
-    if (type === 'ticket_issued' && data.ticket_token) {
+    // canonical domain. Callers MUST pass ticket_token for ticket_issued and
+    // we reject the request otherwise — silent fallbacks would let a
+    // misbehaving caller send a broken email without anyone noticing.
+    if (type === 'ticket_issued') {
+      const token = data.ticket_token as string | undefined
+      if (!token) {
+        return new Response(
+          JSON.stringify({ success: false, error: 'ticket_token is required for ticket_issued' }),
+          { status: 400, headers: jsonHeaders }
+        )
+      }
       const siteUrl = await getSiteUrl()
-      const token = data.ticket_token as string
       data.ticket_url = `${siteUrl}/ticket/${token}`
       const qrImageUrl = await generateAndUploadQr(token, data.ticket_url)
       if (qrImageUrl) data.qr_image_url = qrImageUrl
