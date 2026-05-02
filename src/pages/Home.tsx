@@ -128,9 +128,16 @@ export function Home() {
                 {/* Info row with thin dividers */}
                 <div className="border-t border-b border-warm py-4 grid grid-cols-3 text-center">
                   <div className="border-r border-warm">
-                    <p className="text-xs tracking-[0.15em] uppercase text-ink-muted hidden sm:block">
-                      {event.location_name || event.location}
-                    </p>
+                    <div className="hidden sm:block">
+                      {event.location_name && (
+                        <p className="text-xs tracking-[0.15em] uppercase text-ink">
+                          {event.location_name}
+                        </p>
+                      )}
+                      <p className={`text-xs tracking-[0.15em] uppercase text-ink-muted ${event.location_name ? 'mt-0.5' : ''}`}>
+                        {event.location}
+                      </p>
+                    </div>
                     <p className="text-[10px] tracking-[0.2em] uppercase text-ink-muted mb-1 sm:hidden">Date</p>
                     <p className="font-serif text-ink sm:hidden">{formatDate(event.date)}</p>
                   </div>
