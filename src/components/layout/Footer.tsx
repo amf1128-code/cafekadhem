@@ -1,4 +1,8 @@
+import { Link } from 'react-router-dom'
+import { getGuestToken } from '../../lib/utils/guest-token'
+
 export function Footer() {
+  const ticketsHref = getGuestToken() ? '/my-tickets' : '/find-tickets'
   return (
     <footer className="page-bg mt-auto">
       <div className="max-w-3xl mx-auto px-6 py-12 text-center">
@@ -8,19 +12,27 @@ export function Footer() {
         <p className="text-xs tracking-[0.2em] uppercase text-ink-muted mb-5">
           A little sweet, a little home
         </p>
-        <a
-          href="https://instagram.com/cafekadhem"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="inline-flex items-center gap-2 text-sm text-ink-muted hover:text-forest transition-colors"
-        >
-          <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-            <rect x="2" y="2" width="20" height="20" rx="5" />
-            <circle cx="12" cy="12" r="5" />
-            <circle cx="17.5" cy="6.5" r="1" fill="currentColor" stroke="none" />
-          </svg>
-          @cafekadhem
-        </a>
+        <div className="flex flex-col items-center gap-3">
+          <a
+            href="https://instagram.com/cafekadhem"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-2 text-sm text-ink-muted hover:text-forest transition-colors"
+          >
+            <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="2" y="2" width="20" height="20" rx="5" />
+              <circle cx="12" cy="12" r="5" />
+              <circle cx="17.5" cy="6.5" r="1" fill="currentColor" stroke="none" />
+            </svg>
+            @cafekadhem
+          </a>
+          <Link
+            to={ticketsHref}
+            className="text-xs tracking-[0.2em] uppercase text-ink-muted hover:text-forest transition-colors"
+          >
+            Find my tickets
+          </Link>
+        </div>
       </div>
     </footer>
   )
