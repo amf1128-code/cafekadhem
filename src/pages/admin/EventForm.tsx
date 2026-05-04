@@ -378,7 +378,7 @@ export function AdminEventForm() {
           <p className="text-xs text-ink-muted mb-2">Shown in full on the event detail page.</p>
           {flyerUrl && !flyerFile && (
             <div className="mb-2">
-              <img src={flyerUrl} alt="Current flyer" className="w-32 h-auto rounded border border-warm" />
+              <img src={flyerUrl} alt="Current flyer" loading="lazy" decoding="async" className="w-32 h-auto rounded border border-warm" />
             </div>
           )}
           <label className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border-2 border-forest text-forest cursor-pointer hover:bg-forest hover:text-cream transition-colors duration-200 text-sm font-medium">
@@ -402,7 +402,7 @@ export function AdminEventForm() {
           <p className="text-xs text-ink-muted mb-2">Shown on the home page card at the image's natural aspect ratio. Falls back to the flyer above if left empty.</p>
           {homeFlyerUrl && !homeFlyerFile && (
             <div className="mb-2">
-              <img src={homeFlyerUrl} alt="Current home image" className="w-32 h-auto rounded border border-warm" />
+              <img src={homeFlyerUrl} alt="Current home image" loading="lazy" decoding="async" className="w-32 h-auto rounded border border-warm" />
             </div>
           )}
           <label className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border-2 border-forest text-forest cursor-pointer hover:bg-forest hover:text-cream transition-colors duration-200 text-sm font-medium">

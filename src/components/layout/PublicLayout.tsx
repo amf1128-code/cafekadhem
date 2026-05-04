@@ -1,7 +1,8 @@
-import { useEffect } from 'react'
+import { Suspense, useEffect } from 'react'
 import { Outlet } from 'react-router-dom'
 import { Header } from './Header'
 import { Footer } from './Footer'
+import { PageLoader } from '../ui/LoadingSpinner'
 import { useTheme } from '../../lib/theme/themes'
 
 export function PublicLayout() {
@@ -24,7 +25,9 @@ export function PublicLayout() {
     <div data-theme={activeTheme} className="min-h-dvh page-bg flex flex-col">
       <Header />
       <main className="flex-1">
-        <Outlet />
+        <Suspense fallback={<PageLoader />}>
+          <Outlet />
+        </Suspense>
       </main>
       <Footer />
     </div>

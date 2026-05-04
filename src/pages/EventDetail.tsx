@@ -159,6 +159,8 @@ export function EventDetail() {
               <img
                 src={event.flyer_url}
                 alt={event.title}
+                loading="lazy"
+                decoding="async"
                 className="w-full aspect-[3/4] object-cover"
               />
             </div>

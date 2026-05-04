@@ -140,6 +140,8 @@ export function Home() {
                       <img
                         src={event.home_flyer_url || event.flyer_url!}
                         alt={event.title}
+                        loading="lazy"
+                        decoding="async"
                         className="w-full h-auto block"
                       />
                     </div>
@@ -233,6 +235,8 @@ export function Home() {
                         <img
                           src={event.home_flyer_url || event.flyer_url!}
                           alt={event.title}
+                          loading="lazy"
+                          decoding="async"
                           className="w-16 h-16 object-cover"
                         />
                       </div>
