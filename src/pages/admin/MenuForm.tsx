@@ -12,6 +12,7 @@ interface ItemDraft {
   name: string
   description: string
   price: string
+  unit_cost: string
   category: string
   sort_order: number
   is_available: boolean
@@ -21,6 +22,7 @@ const emptyItem: ItemDraft = {
   name: '',
   description: '',
   price: '',
+  unit_cost: '',
   category: '',
   sort_order: 0,
   is_available: true,
@@ -62,6 +64,7 @@ export function AdminMenuForm() {
           name: item.name,
           description: item.description || '',
           price: item.price != null ? String(item.price) : '',
+          unit_cost: item.unit_cost != null ? String(item.unit_cost) : '',
           category: item.category || '',
           sort_order: item.sort_order,
           is_available: item.is_available,
@@ -137,6 +140,7 @@ export function AdminMenuForm() {
             name: item.name.trim(),
             description: item.description.trim() || null,
             price: item.price ? parseFloat(item.price) : null,
+            unit_cost: item.unit_cost ? parseFloat(item.unit_cost) : null,
             category: item.category.trim() || null,
             sort_order: index,
             is_available: item.is_available,
@@ -200,7 +204,7 @@ export function AdminMenuForm() {
                     <button type="button" onClick={() => removeItem(index)} className="text-red-500 hover:text-red-700 text-sm px-1">Remove</button>
                   </div>
                 </div>
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-3 gap-3">
                   <Input
                     label="Name"
                     value={item.name}
@@ -215,6 +219,15 @@ export function AdminMenuForm() {
                     value={item.price}
                     onChange={e => updateItem(index, 'price', e.target.value)}
                     placeholder="Optional"
+                  />
+                  <Input
+                    label="Unit cost"
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={item.unit_cost}
+                    onChange={e => updateItem(index, 'unit_cost', e.target.value)}
+                    placeholder="Internal"
                   />
                 </div>
                 <Input

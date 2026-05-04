@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
-import type { PickupConfig, PickupSlot, Menu } from '../../lib/types'
+import type { PickupConfig, PickupSlot, Menu, MenuItem } from '../../lib/types'
 import { Button } from '../../components/ui/Button'
 import { useToast } from '../../components/ui/Toast'
 import { PageLoader } from '../../components/ui/LoadingSpinner'
@@ -28,6 +28,11 @@ export function AdminPickupConfig() {
   const [menuId, setMenuId] = useState('')
   const [isActive, setIsActive] = useState(false)
 
+  // Per-item quantity limits for the active pickup config. Keyed by menu_item_id.
+  const [menuItemsForLimits, setMenuItemsForLimits] = useState<MenuItem[]>([])
+  const [limits, setLimits] = useState<Record<string, string>>({})
+  const [savingLimits, setSavingLimits] = useState(false)
+
   // New slot form
   const [newSlot, setNewSlot] = useState<SlotForm>({
     day_of_week: 1,
@@ -40,6 +45,28 @@ export function AdminPickupConfig() {
     loadData()
   }, [])
 
+  // When the selected menu changes (or after the config first loads with one),
+  // pull the menu's items so we can render the per-item limit inputs.
+  useEffect(() => {
+    let cancelled = false
+    async function run() {
+      if (!menuId) {
+        setMenuItemsForLimits([])
+        return
+      }
+      const { data } = await supabase
+        .from('menu_items')
+        .select('*')
+        .eq('menu_id', menuId)
+        .order('sort_order')
+      if (!cancelled && data) setMenuItemsForLimits(data)
+    }
+    run()
+    return () => {
+      cancelled = true
+    }
+  }, [menuId])
+
   async function loadData() {
     const [configResult, menusResult] = await Promise.all([
       supabase.from('pickup_config').select('*').limit(1).single(),
@@ -51,13 +78,24 @@ export function AdminPickupConfig() {
       setMenuId(configResult.data.menu_id || '')
       setIsActive(configResult.data.is_active)
 
-      const { data: slotsData } = await supabase
-        .from('pickup_slots')
-        .select('*')
-        .eq('pickup_config_id', configResult.data.id)
-        .order('day_of_week')
-        .order('start_time')
+      const [{ data: slotsData }, { data: limitRows }] = await Promise.all([
+        supabase
+          .from('pickup_slots')
+          .select('*')
+          .eq('pickup_config_id', configResult.data.id)
+          .order('day_of_week')
+          .order('start_time'),
+        supabase
+          .from('pickup_menu_item_limits')
+          .select('menu_item_id, max_quantity')
+          .eq('pickup_config_id', configResult.data.id),
+      ])
       if (slotsData) setSlots(slotsData)
+      if (limitRows) {
+        const map: Record<string, string> = {}
+        for (const row of limitRows) map[row.menu_item_id] = String(row.max_quantity)
+        setLimits(map)
+      }
     }
 
     if (menusResult.data) setMenus(menusResult.data)
@@ -67,6 +105,8 @@ export function AdminPickupConfig() {
   async function handleSaveConfig() {
     setSaving(true)
     try {
+      let configId = config?.id
+      const previousMenuId = config?.menu_id || ''
       if (config) {
         const { error } = await supabase
           .from('pickup_config')
@@ -87,12 +127,71 @@ export function AdminPickupConfig() {
           .single()
         if (error) throw error
         setConfig(data)
+        configId = data.id
+      }
+
+      // Switching the active menu triggers a server-side wipe of existing
+      // limits (so re-using a menu later starts fresh). Drop any local state
+      // tied to the previous menu so the UI doesn't try to upsert stale rows.
+      if (configId && previousMenuId && previousMenuId !== menuId) {
+        setLimits({})
+      } else if (configId && menuId) {
+        await persistLimits(configId)
       }
       addToast('Pickup config saved')
     } catch {
       addToast('Failed to save config', 'error')
     }
     setSaving(false)
+  }
+
+  async function persistLimits(configId: string) {
+    if (!menuId) return
+    setSavingLimits(true)
+    try {
+      const upsertRows: { pickup_config_id: string; menu_item_id: string; max_quantity: number }[] = []
+      const clearedItemIds: string[] = []
+      for (const item of menuItemsForLimits) {
+        const raw = (limits[item.id] || '').trim()
+        if (raw === '') {
+          clearedItemIds.push(item.id)
+          continue
+        }
+        const parsed = parseInt(raw, 10)
+        if (Number.isFinite(parsed) && parsed >= 0) {
+          upsertRows.push({
+            pickup_config_id: configId,
+            menu_item_id: item.id,
+            max_quantity: parsed,
+          })
+        }
+      }
+      if (upsertRows.length > 0) {
+        const { error } = await supabase
+          .from('pickup_menu_item_limits')
+          .upsert(upsertRows, { onConflict: 'pickup_config_id,menu_item_id' })
+        if (error) console.error('[Pickup Limits] upsert failed:', error)
+      }
+      if (clearedItemIds.length > 0) {
+        const { error } = await supabase
+          .from('pickup_menu_item_limits')
+          .delete()
+          .eq('pickup_config_id', configId)
+          .in('menu_item_id', clearedItemIds)
+        if (error) console.error('[Pickup Limits] delete failed:', error)
+      }
+    } finally {
+      setSavingLimits(false)
+    }
+  }
+
+  async function handleSaveLimits() {
+    if (!config?.id) {
+      addToast('Save the config first', 'error')
+      return
+    }
+    await persistLimits(config.id)
+    addToast('Limits saved')
   }
 
   async function handleAddSlot() {
@@ -192,6 +291,35 @@ export function AdminPickupConfig() {
           <Button onClick={handleSaveConfig} loading={saving}>Save Config</Button>
         </div>
       </div>
+
+      {/* Per-item limits */}
+      {config?.id && menuId && menuItemsForLimits.length > 0 && (
+        <div className="bg-white border border-warm rounded-lg p-6 mb-6">
+          <h2 className="font-serif text-lg text-forest-dark mb-1">Per-item Limits</h2>
+          <p className="text-xs text-ink-muted mb-4">
+            Cap how many of each item can be ordered for the current pickup session.
+            Leave blank for no limit. Switching menus resets all limits.
+          </p>
+          <div className="space-y-2 mb-4">
+            {menuItemsForLimits.map(item => (
+              <div key={item.id} className="flex items-center gap-3">
+                <span className="flex-1 text-sm text-ink">{item.name}</span>
+                <input
+                  type="number"
+                  min="0"
+                  value={limits[item.id] || ''}
+                  onChange={e =>
+                    setLimits(prev => ({ ...prev, [item.id]: e.target.value }))
+                  }
+                  placeholder="No limit"
+                  className="w-24 rounded-lg border border-warm bg-white px-3 py-2 text-sm text-ink focus:border-forest outline-none"
+                />
+              </div>
+            ))}
+          </div>
+          <Button size="sm" onClick={handleSaveLimits} loading={savingLimits}>Save Limits</Button>
+        </div>
+      )}
 
       {/* Slots */}
       <div className="bg-white border border-warm rounded-lg p-6 mb-6">

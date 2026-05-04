@@ -1,7 +1,7 @@
 import { useState, useEffect, type FormEvent } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
-import type { Menu } from '../../lib/types'
+import type { Menu, MenuItem } from '../../lib/types'
 import { Button } from '../../components/ui/Button'
 import { Input, Textarea } from '../../components/ui/Input'
 import { Select } from '../../components/ui/Select'
@@ -45,15 +45,53 @@ export function AdminEventForm() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
 
+  // Per-event quantity limits, keyed by menu_item_id. Empty string means
+  // "no limit". Loaded from event_menu_item_limits and reconciled on save.
+  const [menuItemsForLimits, setMenuItemsForLimits] = useState<MenuItem[]>([])
+  const [limits, setLimits] = useState<Record<string, string>>({})
+
   useEffect(() => {
     loadData()
   }, [id])
+
+  // Whenever the selected menu changes, load its items so we can render the
+  // inline per-item limit inputs. Items without an explicit limit row are
+  // shown with an empty input (no cap).
+  useEffect(() => {
+    let cancelled = false
+    async function run() {
+      if (!menuId) {
+        setMenuItemsForLimits([])
+        return
+      }
+      const { data } = await supabase
+        .from('menu_items')
+        .select('*')
+        .eq('menu_id', menuId)
+        .order('sort_order')
+      if (!cancelled && data) setMenuItemsForLimits(data)
+    }
+    run()
+    return () => {
+      cancelled = true
+    }
+  }, [menuId])
 
   async function loadData() {
     const { data: menuData } = await supabase.from('menus').select('*').order('name')
     if (menuData) setMenus(menuData)
 
     if (id) {
+      const { data: limitRows } = await supabase
+        .from('event_menu_item_limits')
+        .select('menu_item_id, max_quantity')
+        .eq('event_id', id)
+      if (limitRows) {
+        const map: Record<string, string> = {}
+        for (const row of limitRows) map[row.menu_item_id] = String(row.max_quantity)
+        setLimits(map)
+      }
+
       const { data: event } = await supabase.from('events').select('*').eq('id', id).single()
       if (event) {
         setTitle(event.title)
@@ -146,6 +184,7 @@ export function AdminEventForm() {
         theme,
       }
 
+      let savedEventId = id
       if (isEdit) {
         console.log('[Event Update] Saving event data:', eventData)
         const { error } = await supabase.from('events').update(eventData).eq('id', id!)
@@ -156,12 +195,54 @@ export function AdminEventForm() {
         addToast('Event updated')
       } else {
         console.log('[Event Create] Saving event data:', eventData)
-        const { error } = await supabase.from('events').insert(eventData)
+        const { data: created, error } = await supabase
+          .from('events')
+          .insert(eventData)
+          .select('id')
+          .single()
         if (error) {
           console.error('[Event Create] Failed:', error.message, error.details, error.hint, error)
           throw new Error(`Failed to create event: ${error.message}`)
         }
+        savedEventId = created?.id
         addToast('Event created')
+      }
+
+      if (savedEventId && menuId) {
+        // Reconcile event_menu_item_limits: upsert non-empty rows, delete
+        // any item whose input was cleared. Items with no row at all stay
+        // uncapped.
+        const upsertRows: { event_id: string; menu_item_id: string; max_quantity: number }[] = []
+        const clearedItemIds: string[] = []
+        for (const item of menuItemsForLimits) {
+          const raw = (limits[item.id] || '').trim()
+          if (raw === '') {
+            clearedItemIds.push(item.id)
+            continue
+          }
+          const parsed = parseInt(raw, 10)
+          if (Number.isFinite(parsed) && parsed >= 0) {
+            upsertRows.push({
+              event_id: savedEventId,
+              menu_item_id: item.id,
+              max_quantity: parsed,
+            })
+          }
+        }
+        if (upsertRows.length > 0) {
+          const { error: upErr } = await supabase
+            .from('event_menu_item_limits')
+            .upsert(upsertRows, { onConflict: 'event_id,menu_item_id' })
+          if (upErr) console.error('[Event Limits] upsert failed:', upErr)
+        }
+        if (clearedItemIds.length > 0) {
+          const { error: delErr } = await supabase
+            .from('event_menu_item_limits')
+            .delete()
+            .eq('event_id', savedEventId)
+            .in('menu_item_id', clearedItemIds)
+          if (delErr) console.error('[Event Limits] delete failed:', delErr)
+        }
       }
 
       navigate('/admin')
@@ -250,6 +331,33 @@ export function AdminEventForm() {
           options={menus.map(m => ({ value: m.id, label: m.name }))}
           placeholder="No menu"
         />
+
+        {menuId && menuItemsForLimits.length > 0 && (
+          <div className="border border-warm rounded-lg p-4 bg-warm/10">
+            <p className="text-sm font-medium text-ink mb-1">Per-item limits (optional)</p>
+            <p className="text-xs text-ink-muted mb-3">
+              Cap how many of each item can be ordered for this event. Leave blank for no limit.
+              Limits are scoped to this event — re-using the menu later starts fresh.
+            </p>
+            <div className="space-y-2">
+              {menuItemsForLimits.map(item => (
+                <div key={item.id} className="flex items-center gap-3">
+                  <span className="flex-1 text-sm text-ink">{item.name}</span>
+                  <input
+                    type="number"
+                    min="0"
+                    value={limits[item.id] || ''}
+                    onChange={e =>
+                      setLimits(prev => ({ ...prev, [item.id]: e.target.value }))
+                    }
+                    placeholder="No limit"
+                    className="w-24 rounded-lg border border-warm bg-white px-3 py-2 text-sm text-ink focus:border-forest outline-none"
+                  />
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         <div>
           <Select

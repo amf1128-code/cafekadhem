@@ -52,11 +52,32 @@ export interface MenuItem {
   name: string
   description: string | null
   price: number | null
+  // Internal-only cost basis used for margin reporting; never returned to
+  // the public menu view. Will be undefined on objects loaded as anon.
+  unit_cost?: number | null
   category: string | null
   sort_order: number
   image_url: string | null
   is_available: boolean
   created_at: string
+}
+
+export interface MenuItemAvailability {
+  menu_item_id: string
+  max_quantity: number
+  sold_quantity: number
+}
+
+export interface EventMenuItemLimit {
+  event_id: string
+  menu_item_id: string
+  max_quantity: number
+}
+
+export interface PickupMenuItemLimit {
+  pickup_config_id: string
+  menu_item_id: string
+  max_quantity: number
 }
 
 export interface Guest {
@@ -144,6 +165,7 @@ export interface OrderItem {
   menu_item_id: string
   quantity: number
   unit_price: number | null
+  unit_cost: number | null
   // Joined
   menu_item?: MenuItem
 }
@@ -180,6 +202,7 @@ export interface PickupConfig {
   id: string
   menu_id: string | null
   is_active: boolean
+  limits_reset_at: string
   created_at: string
   updated_at: string
   // Joined
@@ -222,6 +245,7 @@ export interface PickupOrderItem {
   menu_item_id: string
   quantity: number
   unit_price: number | null
+  unit_cost: number | null
   // Joined
   menu_item?: MenuItem
 }
