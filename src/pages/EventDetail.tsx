@@ -51,7 +51,7 @@ export function EventDetail() {
     if (eventData.menu_id) {
       const [menuResult, itemsResult] = await Promise.all([
         supabase.from('menus').select('*').eq('id', eventData.menu_id).single(),
-        supabase.from('menu_items').select('*').eq('menu_id', eventData.menu_id).order('sort_order'),
+        supabase.from('public_menu_items').select('*').eq('menu_id', eventData.menu_id).order('sort_order'),
       ])
       if (menuResult.data) setMenu(menuResult.data)
       if (itemsResult.data) setMenuItems(itemsResult.data)

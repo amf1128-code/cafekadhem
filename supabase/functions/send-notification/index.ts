@@ -39,6 +39,17 @@ function escapeHtml(s: string): string {
     .replace(/'/g, '&#39;')
 }
 
+function randomTokenHex(byteCount: number): string {
+  const bytes = new Uint8Array(byteCount)
+  crypto.getRandomValues(bytes)
+  return Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('')
+}
+
+async function sha256Hex(input: string): Promise<string> {
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(input))
+  return Array.from(new Uint8Array(buf), (b) => b.toString(16).padStart(2, '0')).join('')
+}
+
 async function getSiteUrl(): Promise<string> {
   const { data } = await supabase
     .from('admin_settings')
@@ -106,10 +117,21 @@ const messageTemplates: Record<string, (data: Record<string, string>) => { subje
       body: `Thanks for your RSVP! You're ${data.status === 'yes' ? 'going' : 'on the maybe list'} for ${data.event_title || 'our event'}. We look forward to seeing you!`,
     }
   },
-  order_confirmation: (data) => ({
-    subject: `Order Confirmed - ${data.event_title || 'Cafe Kadhem'}`,
-    body: `Your pre-order for ${data.event_title || 'our event'} has been submitted. Your host will confirm payment once received via Venmo.`,
-  }),
+  order_confirmation: (data) => {
+    const link = data.history_url ? `\n\nView your order: ${data.history_url}` : ''
+    return {
+      subject: `Order Confirmed - ${data.event_title || 'Cafe Kadhem'}`,
+      body: `Your pre-order for ${data.event_title || 'our event'} has been submitted. Your host will confirm payment once received via Venmo.${link}`,
+    }
+  },
+  pickup_order_confirmation: (data) => {
+    const when = data.pickup_when ? ` for ${data.pickup_when}` : ''
+    const link = data.history_url ? `\n\nView your order: ${data.history_url}` : ''
+    return {
+      subject: `Pick-Up Order Confirmed - Cafe Kadhem`,
+      body: `Your pick-up order${when} has been submitted. Your host will confirm payment once received via Venmo.${link}`,
+    }
+  },
   event_update: (data) => ({
     subject: `Event Update - ${data.event_title || 'Cafe Kadhem'}`,
     body: `There's been an update to ${data.event_title || 'an event'} you RSVP'd to. Check the event page for the latest details.`,
@@ -294,6 +316,26 @@ Deno.serve(async (req: Request) => {
     if (type === 'waitlist_promoted' && eventId) {
       const siteUrl = await getSiteUrl()
       data.event_url = `${siteUrl}/events/${eventId}`
+    }
+    if (type === 'order_confirmation' || type === 'pickup_order_confirmation') {
+      // Mint a one-time magic link to /my-tickets so the guest lands on a
+      // page showing this order alongside any other history they have.
+      const token = randomTokenHex(24)
+      const tokenHash = await sha256Hex(token)
+      const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
+      const channel: 'sms' | 'email' = (guest.notification_preference === 'sms' && guest.phone) ? 'sms' : 'email'
+      const { error: linkErr } = await supabase.from('magic_links').insert({
+        guest_id: guestId,
+        token_hash: tokenHash,
+        channel,
+        expires_at: expiresAt,
+      })
+      if (!linkErr) {
+        const siteUrl = await getSiteUrl()
+        data.history_url = `${siteUrl}/my-tickets?t=${token}`
+      } else {
+        console.error('order_confirmation magic link insert failed:', linkErr.message)
+      }
     }
 
     const template = messageTemplates[type]

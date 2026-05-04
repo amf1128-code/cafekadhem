@@ -1,9 +1,10 @@
 export interface NotificationPayload {
   guestId: string
-  eventId: string
+  eventId?: string
   type:
     | 'rsvp_confirmation'
     | 'order_confirmation'
+    | 'pickup_order_confirmation'
     | 'event_update'
     | 'event_reminder'
     | 'invite'

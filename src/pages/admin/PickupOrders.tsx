@@ -93,6 +93,10 @@ export function AdminPickupOrders() {
     }
   }
 
+  function orderCost(o: OrderWithDetails): number {
+    return o.items.reduce((sum, i) => sum + (i.unit_cost ?? 0) * i.quantity, 0)
+  }
+
   function handleExport() {
     const rows = filteredOrders.map(o => ({
       guest_name: `${o.guest.first_name} ${o.guest.last_name || ''}`.trim(),
@@ -102,6 +106,8 @@ export function AdminPickupOrders() {
       pickup_time: o.pickup_time,
       items: o.items.map(i => `${i.menu_item?.name || 'Unknown'} x${i.quantity}`).join('; '),
       total: o.total || 0,
+      cost: orderCost(o).toFixed(2),
+      margin: ((o.total || 0) - orderCost(o)).toFixed(2),
       status: o.status,
       notes: o.notes || '',
       created: o.created_at,
@@ -117,8 +123,11 @@ export function AdminPickupOrders() {
   })
 
   const pendingCount = orders.filter(o => o.status === 'pending' || o.status === 'confirmed' || o.status === 'paid').length
-  const totalRevenue = orders.reduce((sum, o) => sum + (o.total || 0), 0)
+  const billable = orders.filter(o => o.status !== 'cancelled')
+  const totalRevenue = billable.reduce((sum, o) => sum + (o.total || 0), 0)
   const paidRevenue = orders.filter(o => o.status === 'paid' || o.status === 'picked_up').reduce((sum, o) => sum + (o.total || 0), 0)
+  const totalCost = billable.reduce((sum, o) => sum + orderCost(o), 0)
+  const margin = totalRevenue - totalCost
 
   if (loading) return <PageLoader />
 
@@ -138,18 +147,26 @@ export function AdminPickupOrders() {
       </div>
 
       {/* Summary */}
-      <div className="grid grid-cols-3 gap-4 mb-6">
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
         <div className="bg-white border border-warm rounded-lg p-4 text-center">
           <p className="text-2xl font-serif text-forest-dark">{pendingCount}</p>
           <p className="text-sm text-ink/60">Active Tickets</p>
         </div>
         <div className="bg-white border border-warm rounded-lg p-4 text-center">
           <p className="text-2xl font-serif text-forest-dark">${totalRevenue.toFixed(2)}</p>
-          <p className="text-sm text-ink/60">Total Revenue</p>
+          <p className="text-sm text-ink/60">Revenue</p>
         </div>
         <div className="bg-white border border-warm rounded-lg p-4 text-center">
           <p className="text-2xl font-serif text-forest-dark">${paidRevenue.toFixed(2)}</p>
           <p className="text-sm text-ink/60">Paid / Picked Up</p>
+        </div>
+        <div className="bg-white border border-warm rounded-lg p-4 text-center">
+          <p className="text-2xl font-serif text-forest-dark">${totalCost.toFixed(2)}</p>
+          <p className="text-sm text-ink/60">Cost</p>
+        </div>
+        <div className="bg-white border border-warm rounded-lg p-4 text-center">
+          <p className="text-2xl font-serif text-forest-dark">${margin.toFixed(2)}</p>
+          <p className="text-sm text-ink/60">Margin</p>
         </div>
       </div>
 

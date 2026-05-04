@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
-import type { Event, MenuItem, AdminSettings, CartItem } from '../lib/types'
+import type { Event, MenuItem, AdminSettings, CartItem, MenuItemAvailability } from '../lib/types'
 import { getGuestToken, setGuestToken } from '../lib/utils/guest-token'
 import { normalizePhone } from '../lib/utils/phone'
 import { getPaymentProvider } from '../lib/payment'
@@ -15,6 +15,7 @@ export function Order() {
   const { addToast } = useToast()
   const [event, setEvent] = useState<Event | null>(null)
   const [menuItems, setMenuItems] = useState<MenuItem[]>([])
+  const [availability, setAvailability] = useState<Record<string, { max: number; sold: number }>>({})
   const [cart, setCart] = useState<CartItem[]>([])
   const [settings, setSettings] = useState<AdminSettings | null>(null)
   const [loading, setLoading] = useState(true)
@@ -41,13 +42,23 @@ export function Order() {
     if (eventResult.data) {
       setEvent(eventResult.data)
       if (eventResult.data.menu_id) {
-        const { data: items } = await supabase
-          .from('menu_items')
-          .select('*')
-          .eq('menu_id', eventResult.data.menu_id)
-          .eq('is_available', true)
-          .order('sort_order')
+        const [{ data: items }, { data: avail }] = await Promise.all([
+          supabase
+            .from('public_menu_items')
+            .select('*')
+            .eq('menu_id', eventResult.data.menu_id)
+            .eq('is_available', true)
+            .order('sort_order'),
+          supabase.rpc('event_menu_item_availability', { p_event_id: id! }),
+        ])
         if (items) setMenuItems(items)
+        if (avail) {
+          const map: Record<string, { max: number; sold: number }> = {}
+          for (const row of avail as MenuItemAvailability[]) {
+            map[row.menu_item_id] = { max: row.max_quantity, sold: row.sold_quantity }
+          }
+          setAvailability(map)
+        }
       }
     }
 
@@ -71,6 +82,12 @@ export function Order() {
     setLoading(false)
   }
 
+  function remainingFor(itemId: string): number | null {
+    const a = availability[itemId]
+    if (!a) return null
+    return Math.max(a.max - a.sold, 0)
+  }
+
   function updateCart(item: MenuItem, delta: number) {
     setCart(prev => {
       const existing = prev.find(c => c.menuItem.id === item.id)
@@ -79,11 +96,21 @@ export function Order() {
         if (newQty <= 0) {
           return prev.filter(c => c.menuItem.id !== item.id)
         }
+        const remaining = remainingFor(item.id)
+        if (delta > 0 && remaining !== null && newQty > remaining) {
+          addToast(`Only ${remaining} of ${item.name} left`, 'error')
+          return prev
+        }
         return prev.map(c =>
           c.menuItem.id === item.id ? { ...c, quantity: newQty } : c
         )
       }
       if (delta > 0) {
+        const remaining = remainingFor(item.id)
+        if (remaining !== null && remaining < 1) {
+          addToast(`${item.name} is sold out`, 'error')
+          return prev
+        }
         return [...prev, { menuItem: item, quantity: 1 }]
       }
       return prev
@@ -140,31 +167,30 @@ export function Order() {
 
       const venmoNote = `${firstName.trim()} - ${event!.title}`
 
-      // Create order
-      const { data: order } = await supabase
-        .from('orders')
-        .insert({
-          event_id: id!,
-          guest_id: guestId,
-          total,
-          venmo_note: venmoNote,
-          status: 'pending',
-          payment_method: 'venmo',
-        })
-        .select('*')
-        .single()
-
-      if (!order) throw new Error('Failed to create order')
-
-      // Create order items
-      await supabase.from('order_items').insert(
-        cart.map(item => ({
-          order_id: order.id,
+      // Place the order through the safe RPC so per-item caps are checked
+      // atomically against current sold counts. Server raises OUT_OF_STOCK
+      // if anyone else just claimed the last piece.
+      const { data: order, error: orderErr } = await supabase.rpc('safe_create_order', {
+        p_event_id: id!,
+        p_guest_id: guestId,
+        p_total: total,
+        p_venmo_note: venmoNote,
+        p_payment_method: 'venmo',
+        p_items: cart.map(item => ({
           menu_item_id: item.menuItem.id,
           quantity: item.quantity,
           unit_price: item.menuItem.price,
-        }))
-      )
+        })),
+      })
+
+      if (orderErr) {
+        const msg = orderErr.message || ''
+        if (msg.includes('OUT_OF_STOCK')) {
+          throw new Error(msg.replace(/.*OUT_OF_STOCK:\s*/, ''))
+        }
+        throw orderErr
+      }
+      if (!order) throw new Error('Failed to create order')
 
       // Generate payment link
       if (!settings?.venmo_handle) throw new Error('Venmo handle not configured — please set it in admin settings')
@@ -243,6 +269,10 @@ export function Order() {
                   .filter(i => (i.category || 'Other') === cat)
                   .map(item => {
                     const inCart = cart.find(c => c.menuItem.id === item.id)
+                    const remaining = remainingFor(item.id)
+                    const cartQty = inCart?.quantity || 0
+                    const atCap = remaining !== null && cartQty >= remaining
+                    const soldOut = remaining !== null && remaining <= 0
                     return (
                       <div key={item.id} className="flex items-center justify-between gap-4 border-b border-warm/50 pb-4">
                         <div className="flex-1 min-w-0">
@@ -253,21 +283,29 @@ export function Order() {
                           {item.price != null && (
                             <p className="text-sm text-ink mt-1">${item.price.toFixed(2)}</p>
                           )}
+                          {soldOut ? (
+                            <p className="text-xs uppercase tracking-[0.2em] text-red-700 mt-1">Sold out</p>
+                          ) : remaining !== null && remaining <= 3 ? (
+                            <p className="text-xs uppercase tracking-[0.2em] text-ink-muted mt-1">
+                              Only {remaining} left
+                            </p>
+                          ) : null}
                         </div>
                         <div className="flex items-center gap-3">
                           <button
                             onClick={() => updateCart(item, -1)}
-                            className="w-8 h-8 border border-warm text-ink-muted hover:border-ink hover:text-ink flex items-center justify-center transition-colors text-lg"
+                            className="w-8 h-8 border border-warm text-ink-muted hover:border-ink hover:text-ink flex items-center justify-center transition-colors text-lg disabled:opacity-30"
                             disabled={!inCart}
                           >
                             &minus;
                           </button>
                           <span className="w-6 text-center font-serif text-lg text-ink">
-                            {inCart?.quantity || 0}
+                            {cartQty}
                           </span>
                           <button
                             onClick={() => updateCart(item, 1)}
-                            className="w-8 h-8 border border-warm text-ink-muted hover:border-ink hover:text-ink flex items-center justify-center transition-colors text-lg"
+                            className="w-8 h-8 border border-warm text-ink-muted hover:border-ink hover:text-ink flex items-center justify-center transition-colors text-lg disabled:opacity-30"
+                            disabled={atCap || soldOut}
                           >
                             +
                           </button>
