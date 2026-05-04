@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import type { PickupConfig, PickupSlot, MenuItem, AdminSettings, CartItem, MenuItemAvailability } from '../lib/types'
 import { getGuestToken, setGuestToken } from '../lib/utils/guest-token'
@@ -13,6 +13,7 @@ import { usePageTheme } from '../lib/theme/themes'
 
 export function Pickup() {
   const { addToast } = useToast()
+  const navigate = useNavigate()
   // Pickup isn't tied to an event — keep it on the editorial archival theme
   // regardless of which event-driven theme the home page just rendered in.
   usePageTheme('theme1')
@@ -24,7 +25,6 @@ export function Pickup() {
   const [settings, setSettings] = useState<AdminSettings | null>(null)
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
-  const [submitted, setSubmitted] = useState(false)
 
   // Guest info
   const [firstName, setFirstName] = useState('')
@@ -261,18 +261,22 @@ export function Pickup() {
 
       window.open(paymentLink.url, '_blank')
 
-      // Fire-and-forget confirmation: emails/texts a magic-link to MyTickets
-      // so the guest can revisit the order details whenever.
+      // Fire-and-forget confirmation: emails/texts the per-order pickup
+      // ticket URL (with QR) plus a magic-link to MyTickets for history.
       sendNotification({
         guestId,
         type: 'pickup_order_confirmation',
         data: {
           pickup_when: `${new Date(selectedDate + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })} at ${formatTime(selectedTime)}`,
+          pickup_token: order.pickup_token,
         },
       })
 
-      setSubmitted(true)
       addToast('Order submitted!')
+      // Drop the guest on their pickup ticket page — same page the email
+      // link points to, so they can show the QR at handoff.
+      navigate(`/pickup/${order.pickup_token}`)
+      return
     } catch (err) {
       addToast(err instanceof Error ? err.message : 'Failed to submit order', 'error')
     } finally {
@@ -292,30 +296,6 @@ export function Pickup() {
         <Link
           to="/"
           className="inline-block mt-6 border border-warm px-8 py-3 text-xs tracking-[0.2em] uppercase text-ink-muted hover:border-ink hover:text-ink transition-colors"
-        >
-          [ Back to Home ]
-        </Link>
-      </div>
-    )
-  }
-
-  if (submitted) {
-    return (
-      <div className="max-w-3xl mx-auto px-6 py-16 text-center">
-        <p className="text-xs tracking-[0.25em] uppercase text-ink-muted mb-4">Order Confirmed</p>
-        <h1 className="font-serif text-4xl text-ink italic mb-4">Thank You</h1>
-        <p className="font-serif text-lg text-ink-muted italic mb-2">
-          Your pick-up order has been submitted.
-        </p>
-        <p className="text-sm text-ink-muted mb-2">
-          Pick up on <strong>{new Date(selectedDate + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}</strong> at <strong>{formatTime(selectedTime)}</strong>
-        </p>
-        <p className="text-sm text-ink-muted mb-8">
-          Payment status will be confirmed by the host.
-        </p>
-        <Link
-          to="/"
-          className="inline-block border border-warm px-8 py-3 text-xs tracking-[0.2em] uppercase text-ink-muted hover:border-ink hover:text-ink transition-colors"
         >
           [ Back to Home ]
         </Link>
