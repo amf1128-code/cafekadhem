@@ -61,6 +61,8 @@ export function AdminPickupOrders() {
   }
 
   async function toggleStatus(orderId: string, currentStatus: string) {
+    // Don't let the badge cycle out of cancelled — that's what Restore is for.
+    if (currentStatus === 'cancelled') return
     const nextStatus = statusCycle[currentStatus] || 'pending'
     const { error } = await supabase
       .from('pickup_orders')
@@ -75,6 +77,30 @@ export function AdminPickupOrders() {
       )
       addToast(`Status: ${statusLabels[nextStatus] || nextStatus}`)
     }
+  }
+
+  async function setStatus(orderId: string, nextStatus: PickupOrder['status'], successMsg: string) {
+    const { error } = await supabase
+      .from('pickup_orders')
+      .update({ status: nextStatus })
+      .eq('id', orderId)
+    if (error) {
+      addToast('Failed to update status', 'error')
+      return
+    }
+    setOrders(prev =>
+      prev.map(o => (o.id === orderId ? { ...o, status: nextStatus } : o))
+    )
+    addToast(successMsg)
+  }
+
+  function cancelOrder(orderId: string) {
+    if (!confirm('Cancel this pickup order? It will be excluded from totals and free up any limited inventory.')) return
+    setStatus(orderId, 'cancelled', 'Order cancelled')
+  }
+
+  function restoreOrder(orderId: string) {
+    setStatus(orderId, 'pending', 'Order restored')
   }
 
   async function markPickedUp(orderId: string) {
@@ -231,14 +257,31 @@ export function AdminPickupOrders() {
                     </button>
                   </td>
                   <td className="px-4 py-3">
-                    {order.status !== 'picked_up' && order.status !== 'cancelled' && (
-                      <button
-                        onClick={() => markPickedUp(order.id)}
-                        className="text-xs text-forest hover:text-forest-dark font-medium transition-colors"
-                      >
-                        Mark Picked Up
-                      </button>
-                    )}
+                    <div className="flex flex-col gap-1 items-start">
+                      {order.status !== 'picked_up' && order.status !== 'cancelled' && (
+                        <button
+                          onClick={() => markPickedUp(order.id)}
+                          className="text-xs text-forest hover:text-forest-dark font-medium transition-colors"
+                        >
+                          Mark Picked Up
+                        </button>
+                      )}
+                      {order.status === 'cancelled' ? (
+                        <button
+                          onClick={() => restoreOrder(order.id)}
+                          className="text-xs text-forest hover:text-forest-dark font-medium transition-colors"
+                        >
+                          Restore
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => cancelOrder(order.id)}
+                          className="text-xs text-red-600 hover:text-red-800 font-medium transition-colors"
+                        >
+                          Cancel
+                        </button>
+                      )}
+                    </div>
                   </td>
                 </tr>
               ))}
