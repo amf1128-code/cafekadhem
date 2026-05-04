@@ -285,7 +285,7 @@ export function Order() {
                           )}
                           {soldOut ? (
                             <p className="text-xs uppercase tracking-[0.2em] text-red-700 mt-1">Sold out</p>
-                          ) : remaining !== null && remaining < 3 ? (
+                          ) : remaining !== null && remaining <= 3 ? (
                             <p className="text-xs uppercase tracking-[0.2em] text-ink-muted mt-1">
                               Only {remaining} left
                             </p>
