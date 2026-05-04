@@ -27,6 +27,12 @@ import { MyTickets } from './pages/MyTickets'
 import { AdminEventTickets } from './pages/admin/EventTickets'
 import { AdminEventCheckIn } from './pages/admin/EventCheckIn'
 import { AdminEventBulkInvite } from './pages/admin/EventBulkInvite'
+import { DesignPreviewIndex } from './pages/admin/design-preview'
+import { Option1BirthdayPoster } from './pages/admin/design-preview/Option1BirthdayPoster'
+import { Option2AlAroussa } from './pages/admin/design-preview/Option2AlAroussa'
+import { Option3MagasinGeneral } from './pages/admin/design-preview/Option3MagasinGeneral'
+import { Option4GroovyShowroom } from './pages/admin/design-preview/Option4GroovyShowroom'
+import { Option5SoukMaximalism } from './pages/admin/design-preview/Option5SoukMaximalism'
 
 export const router = createBrowserRouter([
   {
@@ -74,6 +80,12 @@ export const router = createBrowserRouter([
       { path: 'pickup', element: <AdminPickupConfig /> },
       { path: 'pickup/orders', element: <AdminPickupOrders /> },
       { path: 'settings', element: <AdminSettings /> },
+      { path: 'design-preview', element: <DesignPreviewIndex /> },
+      { path: 'design-preview/option-1', element: <Option1BirthdayPoster /> },
+      { path: 'design-preview/option-2', element: <Option2AlAroussa /> },
+      { path: 'design-preview/option-3', element: <Option3MagasinGeneral /> },
+      { path: 'design-preview/option-4', element: <Option4GroovyShowroom /> },
+      { path: 'design-preview/option-5', element: <Option5SoukMaximalism /> },
     ],
   },
 ])
