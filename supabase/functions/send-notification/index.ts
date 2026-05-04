@@ -126,11 +126,44 @@ const messageTemplates: Record<string, (data: Record<string, string>) => { subje
   },
   pickup_order_confirmation: (data) => {
     const when = data.pickup_when ? ` for ${data.pickup_when}` : ''
-    const link = data.history_url ? `\n\nView your order: ${data.history_url}` : ''
-    return {
-      subject: `Pick-Up Order Confirmed - Cafe Kadhem`,
-      body: `Your pick-up order${when} has been submitted. Your host will confirm payment once received via Venmo.${link}`,
+    const ticketLink = data.pickup_url ? `\n\nShow this at pickup: ${data.pickup_url}` : ''
+    const historyLink = data.history_url ? `\n\nAll your orders: ${data.history_url}` : ''
+    const text = `Your pick-up order${when} has been submitted. Your host will confirm payment once received via Venmo.${ticketLink}${historyLink}`
+    if (!data.pickup_url) {
+      return { subject: 'Pick-Up Order Confirmed - Cafe Kadhem', body: text }
     }
+    const qrImg = data.qr_image_url
+      ? `<tr><td align="center" style="padding:16px 0;">
+           <img src="${escapeHtml(data.qr_image_url)}" alt="Pickup QR code" width="240" height="240" style="display:block;border:1px solid #e7e0cf;background:#fdfaf3;" />
+         </td></tr>`
+      : ''
+    const html = `<!doctype html>
+<html><body style="margin:0;padding:0;background:#fdfaf3;font-family:Georgia,'Times New Roman',serif;color:#1a2e1f;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#fdfaf3;padding:32px 16px;">
+    <tr><td align="center">
+      <table width="480" cellpadding="0" cellspacing="0" style="max-width:480px;background:#ffffff;border:1px solid #e7e0cf;padding:32px;">
+        <tr><td align="center" style="padding-bottom:8px;">
+          <p style="margin:0;letter-spacing:0.25em;text-transform:uppercase;font-size:11px;color:#6b6452;">Cafe Kadhem</p>
+        </td></tr>
+        <tr><td align="center" style="padding-bottom:24px;">
+          <h1 style="margin:8px 0 0;font-style:italic;font-weight:400;font-size:24px;color:#1a2e1f;">Pick-Up Order</h1>
+          ${data.pickup_when ? `<p style="margin:8px 0 0;font-size:14px;color:#3a3a3a;">${escapeHtml(data.pickup_when)}</p>` : ''}
+        </td></tr>
+        <tr><td align="center" style="padding:16px 0 8px;border-top:1px solid #e7e0cf;">
+          <p style="margin:0;font-size:14px;color:#3a3a3a;">Show this QR at pickup:</p>
+        </td></tr>
+        ${qrImg}
+        <tr><td align="center" style="padding:16px 0 8px;">
+          <a href="${escapeHtml(data.pickup_url)}" style="display:inline-block;background:#1a2e1f;color:#fdfaf3;text-decoration:none;padding:14px 28px;letter-spacing:0.2em;text-transform:uppercase;font-size:12px;">View Your Order</a>
+        </td></tr>
+        ${data.history_url ? `<tr><td align="center" style="padding:8px 0;">
+          <a href="${escapeHtml(data.history_url)}" style="font-size:12px;color:#6b6452;">All your orders</a>
+        </td></tr>` : ''}
+      </table>
+    </td></tr>
+  </table>
+</body></html>`
+    return { subject: 'Pick-Up Order Confirmed - Cafe Kadhem', body: text, html }
   },
   event_update: (data) => ({
     subject: `Event Update - ${data.event_title || 'Cafe Kadhem'}`,
@@ -330,11 +363,19 @@ Deno.serve(async (req: Request) => {
         channel,
         expires_at: expiresAt,
       })
+      const siteUrl = await getSiteUrl()
       if (!linkErr) {
-        const siteUrl = await getSiteUrl()
         data.history_url = `${siteUrl}/my-tickets?t=${token}`
       } else {
         console.error('order_confirmation magic link insert failed:', linkErr.message)
+      }
+      // Pickup orders also get a per-order page with a scannable QR so the
+      // host can verify the order on the spot. The token comes from the
+      // caller — pickup_orders.pickup_token, returned by safe_create_pickup_order.
+      if (type === 'pickup_order_confirmation' && data.pickup_token) {
+        data.pickup_url = `${siteUrl}/pickup/${data.pickup_token}`
+        const qrImageUrl = await generateAndUploadQr(data.pickup_token, data.pickup_url)
+        if (qrImageUrl) data.qr_image_url = qrImageUrl
       }
     }
 

@@ -53,6 +53,8 @@ export function AdminEventOrders() {
   }
 
   async function toggleStatus(orderId: string, currentStatus: string) {
+    // Don't let the badge cycle out of cancelled — that's what Restore is for.
+    if (currentStatus === 'cancelled') return
     const nextStatus = statusCycle[currentStatus] || 'pending'
     const { error } = await supabase
       .from('orders')
@@ -67,6 +69,30 @@ export function AdminEventOrders() {
       )
       addToast(`Status: ${nextStatus}`)
     }
+  }
+
+  async function setStatus(orderId: string, nextStatus: Order['status'], successMsg: string) {
+    const { error } = await supabase
+      .from('orders')
+      .update({ status: nextStatus })
+      .eq('id', orderId)
+    if (error) {
+      addToast('Failed to update status', 'error')
+      return
+    }
+    setOrders(prev =>
+      prev.map(o => (o.id === orderId ? { ...o, status: nextStatus } : o))
+    )
+    addToast(successMsg)
+  }
+
+  function cancelOrder(orderId: string) {
+    if (!confirm('Cancel this order? It will be excluded from totals and free up any limited inventory.')) return
+    setStatus(orderId, 'cancelled', 'Order cancelled')
+  }
+
+  function restoreOrder(orderId: string) {
+    setStatus(orderId, 'pending', 'Order restored')
   }
 
   function orderCost(o: OrderWithDetails): number {
@@ -153,6 +179,7 @@ export function AdminEventOrders() {
                 <th className="text-left px-4 py-2 font-medium text-ink/70">Total</th>
                 <th className="text-left px-4 py-2 font-medium text-ink/70">Status</th>
                 <th className="text-left px-4 py-2 font-medium text-ink/70">Date</th>
+                <th className="text-left px-4 py-2 font-medium text-ink/70">Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -178,6 +205,23 @@ export function AdminEventOrders() {
                   </td>
                   <td className="px-4 py-3 text-ink/60">
                     {new Date(order.created_at).toLocaleDateString()}
+                  </td>
+                  <td className="px-4 py-3">
+                    {order.status === 'cancelled' ? (
+                      <button
+                        onClick={() => restoreOrder(order.id)}
+                        className="text-xs text-forest hover:text-forest-dark font-medium transition-colors"
+                      >
+                        Restore
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => cancelOrder(order.id)}
+                        className="text-xs text-red-600 hover:text-red-800 font-medium transition-colors"
+                      >
+                        Cancel
+                      </button>
+                    )}
                   </td>
                 </tr>
               ))}

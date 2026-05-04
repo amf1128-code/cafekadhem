@@ -38,6 +38,10 @@ export function AdminMenuForm() {
   const [description, setDescription] = useState('')
   const [isTemplate, setIsTemplate] = useState(false)
   const [items, setItems] = useState<ItemDraft[]>([{ ...emptyItem }])
+  // IDs that came back from the DB on load — anything in this set that is no
+  // longer in `items` should be DELETEd; anything still present should be
+  // UPDATEd in place so its UUID (and any FKs that reference it) survives.
+  const [originalItemIds, setOriginalItemIds] = useState<string[]>([])
   const [loading, setLoading] = useState(isEdit)
   const [saving, setSaving] = useState(false)
 
@@ -58,6 +62,7 @@ export function AdminMenuForm() {
     }
 
     if (itemsResult.data && itemsResult.data.length > 0) {
+      setOriginalItemIds(itemsResult.data.map((item: MenuItem) => item.id))
       setItems(
         itemsResult.data.map((item: MenuItem) => ({
           id: item.id,
@@ -126,16 +131,55 @@ export function AdminMenuForm() {
         menuId = data.id
       }
 
-      // Delete existing items if editing
-      if (isEdit) {
-        await supabase.from('menu_items').delete().eq('menu_id', menuId!)
+      // Reconcile items with a diff. Existing rows are UPDATEd in place so
+      // their UUID (and any orders / limits referencing them) survive.
+      // Newly added rows are INSERTed. Rows the admin removed from the form
+      // are DELETEd — that will fail if there are orders against them, in
+      // which case we surface a clear message.
+      const validItems = items.filter(item => item.name.trim())
+
+      const keptIds = new Set(
+        validItems.map(i => i.id).filter((v): v is string => !!v)
+      )
+      const toDelete = originalItemIds.filter(origId => !keptIds.has(origId))
+
+      if (toDelete.length > 0) {
+        const { error: delErr } = await supabase
+          .from('menu_items')
+          .delete()
+          .in('id', toDelete)
+        if (delErr) {
+          throw new Error(
+            'Some removed items have orders attached. Cancel those orders first, or mark the items unavailable instead of removing them.'
+          )
+        }
       }
 
-      // Insert all items
-      const validItems = items.filter(item => item.name.trim())
-      if (validItems.length > 0) {
-        await supabase.from('menu_items').insert(
-          validItems.map((item, index) => ({
+      const updates = validItems
+        .map((item, index) => ({ item, index }))
+        .filter(({ item }) => item.id && originalItemIds.includes(item.id))
+      for (const { item, index } of updates) {
+        const { error: upErr } = await supabase
+          .from('menu_items')
+          .update({
+            name: item.name.trim(),
+            description: item.description.trim() || null,
+            price: item.price ? parseFloat(item.price) : null,
+            unit_cost: item.unit_cost ? parseFloat(item.unit_cost) : null,
+            category: item.category.trim() || null,
+            sort_order: index,
+            is_available: item.is_available,
+          })
+          .eq('id', item.id!)
+        if (upErr) throw new Error(`Failed to update item: ${upErr.message}`)
+      }
+
+      const inserts = validItems
+        .map((item, index) => ({ item, index }))
+        .filter(({ item }) => !item.id || !originalItemIds.includes(item.id))
+      if (inserts.length > 0) {
+        const { error: insErr } = await supabase.from('menu_items').insert(
+          inserts.map(({ item, index }) => ({
             menu_id: menuId!,
             name: item.name.trim(),
             description: item.description.trim() || null,
@@ -146,6 +190,7 @@ export function AdminMenuForm() {
             is_available: item.is_available,
           }))
         )
+        if (insErr) throw new Error(`Failed to add new items: ${insErr.message}`)
       }
 
       addToast(isEdit ? 'Menu updated' : 'Menu created')

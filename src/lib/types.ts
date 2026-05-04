@@ -232,6 +232,7 @@ export interface PickupOrder {
   total: number | null
   venmo_note: string | null
   notes: string | null
+  pickup_token: string
   created_at: string
   updated_at: string
   // Joined
