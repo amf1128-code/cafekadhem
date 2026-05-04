@@ -18,6 +18,8 @@ const FALLBACK_EVENT: Event = {
   capacity: 80,
   donation_info: 'Pay-what-you-can at the door. No one turned away.',
   gathering_number: null,
+  event_type: null,
+  rsvp_required: true,
   is_published: true,
   ticketing_enabled: true,
   ticket_price: 1500,
