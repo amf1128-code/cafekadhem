@@ -8,7 +8,13 @@ export function downloadCSV(data: Record<string, unknown>[], filename: string): 
   const rows = data.map(row =>
     headers.map(h => {
       const val = row[h]
-      const str = val == null ? '' : String(val)
+      let str = val == null ? '' : String(val)
+      // CSV injection guard: cells starting with =, +, -, @, tab, or CR
+      // are interpreted as formulas by Excel/Sheets. Prefix with a single
+      // quote so they render as literal text.
+      if (/^[=+\-@\t\r]/.test(str)) {
+        str = `'${str}`
+      }
       // Escape quotes and wrap in quotes if contains comma/newline/quote
       if (str.includes(',') || str.includes('\n') || str.includes('"')) {
         return `"${str.replace(/"/g, '""')}"`
