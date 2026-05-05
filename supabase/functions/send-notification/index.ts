@@ -59,6 +59,41 @@ async function getSiteUrl(): Promise<string> {
   return (data?.site_url || 'https://cafekadhem.com').replace(/\/$/, '')
 }
 
+// The DB stores events as DATE + TIME without a timezone. The cafe is in
+// NYC, so we render every guest-facing date string in America/New_York.
+// We avoid `new Date(\`${date}T${time}\`)` (which interprets in the runtime
+// TZ — typically UTC on Deno Edge — and would shift the displayed hour)
+// by formatting the time parts directly.
+function formatEventTime(t: string): string {
+  const [hRaw, mRaw] = t.split(':')
+  const h = Number(hRaw)
+  const m = Number(mRaw)
+  const hour12 = h % 12 === 0 ? 12 : h % 12
+  const meridiem = h < 12 ? 'AM' : 'PM'
+  return m === 0
+    ? `${hour12} ${meridiem}`
+    : `${hour12}:${String(m).padStart(2, '0')} ${meridiem}`
+}
+
+function formatEventWhen(date: string, startTime: string, endTime: string | null): string {
+  // Anchor the day in ET noon so DST rollovers can never flip the
+  // weekday. Only the date components are read out; time comes from
+  // formatEventTime above, which never goes through Date math.
+  const dayDate = new Date(`${date}T12:00:00-05:00`)
+  const dateStr = new Intl.DateTimeFormat('en-US', {
+    weekday: 'long',
+    month: 'long',
+    day: 'numeric',
+    year: 'numeric',
+    timeZone: 'America/New_York',
+  }).format(dayDate)
+  const start = formatEventTime(startTime)
+  if (endTime) {
+    return `${dateStr} from ${start} to ${formatEventTime(endTime)}`
+  }
+  return `${dateStr} at ${start}`
+}
+
 // Generate a QR PNG-equivalent (GIF) for the ticket URL and upload it to
 // the public 'tickets' Supabase Storage bucket. The email <img> points at
 // the storage public URL; the image is served from our own infra. Returns
@@ -100,22 +135,93 @@ async function generateAndUploadQr(token: string, encodedUrl: string): Promise<s
 
 const messageTemplates: Record<string, (data: Record<string, string>) => { subject: string; body: string; html?: string }> = {
   rsvp_confirmation: (data) => {
+    const title = data.event_title || 'Cafe Kadhem'
+    const greeting = data.first_name ? `Hi ${data.first_name},` : 'Hi,'
+    const ticketed = data.is_ticketed === 'true'
+
+    // Per-status copy. `lead` is the opening sentence; `tail` is the
+    // outro that follows the event details block. Both are reused in
+    // the plain-text body and the HTML body so the two stay in sync.
+    let subject: string
+    let lead: string
+    let tail: string
     if (data.status === 'waitlisted') {
-      return {
-        subject: `You're on the waitlist - ${data.event_title || 'Cafe Kadhem'}`,
-        body: `Thanks for joining the waitlist! We'll follow up soon if a spot opens up!`,
-      }
+      subject = `You're on the waitlist - ${title}`
+      lead = `You're on the waitlist for ${title}.`
+      tail = `We'll follow up if a spot opens up.`
+    } else if (ticketed && data.status === 'yes') {
+      subject = `We got your RSVP - ${title}`
+      lead = `We got your RSVP for ${title}.`
+      tail = `Make sure your Venmo went through — we'll send your ticket within 48 hours once payment is confirmed.`
+    } else if (data.status === 'yes') {
+      subject = `RSVP Confirmed - ${title}`
+      lead = `You're going to ${title}.`
+      tail = `Looking forward to seeing you!`
+    } else {
+      // status === 'maybe'
+      subject = `RSVP Received - ${title}`
+      lead = `You're on the maybe list for ${title}.`
+      tail = `Hope you can make it.`
     }
-    if (data.is_ticketed === 'true' && data.status === 'yes') {
-      return {
-        subject: `We got your RSVP - ${data.event_title || 'Cafe Kadhem'}`,
-        body: `We got your RSVP! Make sure your ticket payment went through, and you'll receive a follow up with your ticket within 48 hours!`,
-      }
-    }
-    return {
-      subject: `RSVP Confirmed - ${data.event_title || 'Cafe Kadhem'}`,
-      body: `Thanks for your RSVP! You're ${data.status === 'yes' ? 'going' : 'on the maybe list'} for ${data.event_title || 'our event'}. We look forward to seeing you!`,
-    }
+
+    // Plain-text body: greeting + lead + the event details + tail + link.
+    // SMS recipients see this verbatim, so it has to read well as one
+    // continuous message. Email clients fall back to it when HTML is
+    // disabled.
+    const detailLines: string[] = []
+    if (data.event_when) detailLines.push(`When: ${data.event_when}`)
+    if (data.event_where) detailLines.push(`Where: ${data.event_where}`)
+    const details = detailLines.length ? `\n\n${detailLines.join('\n')}` : ''
+    const link = data.event_url ? `\n\nDetails: ${data.event_url}` : ''
+    const body = `${greeting}\n\n${lead} ${tail}${details}${link}`
+
+    // HTML body: same content, styled to match the existing
+    // ticket_issued / pickup_order_confirmation emails.
+    const detailRow = (label: string, value: string) => `
+        <tr><td align="center" style="padding:6px 0;">
+          <p style="margin:0;letter-spacing:0.18em;text-transform:uppercase;font-size:10px;color:#6b6452;">${label}</p>
+          <p style="margin:4px 0 0;font-size:14px;color:#1a2e1f;">${escapeHtml(value)}</p>
+        </td></tr>`
+    const detailsBlock = (data.event_when || data.event_where)
+      ? `<tr><td align="center" style="padding:16px 0 8px;border-top:1px solid #e7e0cf;border-bottom:1px solid #e7e0cf;">
+          <table cellpadding="0" cellspacing="0" width="100%">
+            ${data.event_when ? detailRow('Date', data.event_when) : ''}
+            ${data.event_where ? detailRow('Location', data.event_where) : ''}
+          </table>
+        </td></tr>`
+      : ''
+    const button = data.event_url
+      ? `<tr><td align="center" style="padding:24px 0 8px;">
+          <a href="${escapeHtml(data.event_url)}" style="display:inline-block;background:#1a2e1f;color:#fdfaf3;text-decoration:none;padding:14px 28px;letter-spacing:0.2em;text-transform:uppercase;font-size:12px;">View Event</a>
+        </td></tr>`
+      : ''
+    const html = `<!doctype html>
+<html><body style="margin:0;padding:0;background:#fdfaf3;font-family:Georgia,'Times New Roman',serif;color:#1a2e1f;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#fdfaf3;padding:32px 16px;">
+    <tr><td align="center">
+      <table width="480" cellpadding="0" cellspacing="0" style="max-width:480px;background:#ffffff;border:1px solid #e7e0cf;padding:32px;">
+        <tr><td align="center" style="padding-bottom:8px;">
+          <p style="margin:0;letter-spacing:0.25em;text-transform:uppercase;font-size:11px;color:#6b6452;">Cafe Kadhem</p>
+        </td></tr>
+        <tr><td align="center" style="padding-bottom:8px;">
+          <h1 style="margin:8px 0 0;font-style:italic;font-weight:400;font-size:24px;color:#1a2e1f;">${escapeHtml(title)}</h1>
+          ${data.event_type ? `<p style="margin:6px 0 0;font-size:12px;letter-spacing:0.18em;text-transform:uppercase;color:#6b6452;">${escapeHtml(data.event_type)}</p>` : ''}
+        </td></tr>
+        <tr><td align="center" style="padding:16px 0 8px;">
+          <p style="margin:0;font-size:15px;line-height:1.5;color:#3a3a3a;">${escapeHtml(greeting)}</p>
+          <p style="margin:8px 0 0;font-size:15px;line-height:1.5;color:#3a3a3a;">${escapeHtml(lead)}</p>
+        </td></tr>
+        ${detailsBlock}
+        <tr><td align="center" style="padding:16px 0 0;">
+          <p style="margin:0;font-size:14px;line-height:1.5;color:#3a3a3a;font-style:italic;">${escapeHtml(tail)}</p>
+        </td></tr>
+        ${button}
+      </table>
+    </td></tr>
+  </table>
+</body></html>`
+
+    return { subject, body, html }
   },
   order_confirmation: (data) => {
     const link = data.history_url ? `\n\nView your order: ${data.history_url}` : ''
@@ -318,14 +424,28 @@ Deno.serve(async (req: Request) => {
       })
     }
 
-    // Get event info for message templates
+    // Make the recipient's first name available to every template.
+    if (guest.first_name) data.first_name = guest.first_name
+
+    // Get event info for message templates. Pulled in one shot so any
+    // template can render title / when / where / link without each one
+    // having to query the events row again.
     if (eventId) {
       const { data: event } = await supabase
         .from('events')
-        .select('title')
+        .select('title, date, start_time, end_time, location, location_name, event_type')
         .eq('id', eventId)
         .single()
-      if (event) data.event_title = event.title
+      if (event) {
+        data.event_title = event.title
+        if (event.event_type) data.event_type = event.event_type
+        data.event_when = formatEventWhen(event.date, event.start_time, event.end_time)
+        data.event_where = event.location_name
+          ? `${event.location_name} (${event.location})`
+          : event.location
+        const siteUrl = await getSiteUrl()
+        data.event_url = `${siteUrl}/events/${eventId}`
+      }
     }
 
     // Server-side URL building. Single source of truth = admin_settings.site_url,
@@ -345,10 +465,6 @@ Deno.serve(async (req: Request) => {
       data.ticket_url = `${siteUrl}/ticket/${token}`
       const qrImageUrl = await generateAndUploadQr(token, data.ticket_url)
       if (qrImageUrl) data.qr_image_url = qrImageUrl
-    }
-    if (type === 'waitlist_promoted' && eventId) {
-      const siteUrl = await getSiteUrl()
-      data.event_url = `${siteUrl}/events/${eventId}`
     }
     if (type === 'order_confirmation' || type === 'pickup_order_confirmation') {
       // Mint a one-time magic link to /my-tickets so the guest lands on a
