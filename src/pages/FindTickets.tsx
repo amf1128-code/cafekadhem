@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react'
+import { useEffect, useState, type FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { normalizePhone, isValidPhone } from '../lib/utils/phone'
@@ -11,8 +11,26 @@ export function FindTickets() {
   const [contact, setContact] = useState('')
   const [sending, setSending] = useState(false)
   const [sent, setSent] = useState(false)
+  // Default off so the phone path is never accepted while admin_settings
+  // is still loading.
+  const [smsEnabled, setSmsEnabled] = useState(false)
 
   const alreadyKnown = !!getGuestToken()
+
+  useEffect(() => {
+    let cancelled = false
+    supabase
+      .from('admin_settings')
+      .select('sms_enabled')
+      .limit(1)
+      .single()
+      .then(({ data }) => {
+        if (!cancelled && data) setSmsEnabled(!!data.sms_enabled)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
@@ -20,9 +38,14 @@ export function FindTickets() {
     if (!trimmed) return
 
     const isEmail = trimmed.includes('@')
-    const isPhone = !isEmail && isValidPhone(trimmed)
+    const isPhone = !isEmail && smsEnabled && isValidPhone(trimmed)
     if (!isEmail && !isPhone) {
-      addToast('Enter a valid email or phone number', 'error')
+      addToast(
+        smsEnabled
+          ? 'Enter a valid email or phone number'
+          : 'Enter a valid email address',
+        'error',
+      )
       return
     }
 
@@ -74,17 +97,19 @@ export function FindTickets() {
         ) : (
           <form onSubmit={handleSubmit} className="space-y-5">
             <p className="text-sm text-ink-muted text-center">
-              Enter the email or phone you used when you RSVP'd. If you used both, just one is enough —
-              we'll send the link there.
+              {smsEnabled
+                ? "Enter the email or phone you used when you RSVP'd. If you used both, just one is enough — we'll send the link there."
+                : "Enter the email you used when you RSVP'd, and we'll send the link there."}
             </p>
             <div>
               <label className="block text-[10px] tracking-[0.2em] uppercase text-ink-muted mb-2">
-                Email or phone
+                {smsEnabled ? 'Email or phone' : 'Email'}
               </label>
               <input
+                type={smsEnabled ? 'text' : 'email'}
                 value={contact}
                 onChange={e => setContact(e.target.value)}
-                placeholder="you@example.com or (555) 555-5555"
+                placeholder={smsEnabled ? 'you@example.com or (555) 555-5555' : 'you@example.com'}
                 className="w-full border-0 border-b border-warm bg-transparent py-2 font-script text-lg text-ink italic placeholder:text-stone-dark placeholder:italic outline-none focus:border-ink transition-colors"
                 autoFocus
               />

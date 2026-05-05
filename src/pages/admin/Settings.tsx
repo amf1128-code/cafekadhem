@@ -35,6 +35,7 @@ export function AdminSettings() {
   const [contactEmail, setContactEmail] = useState('')
   const [siteUrl, setSiteUrl] = useState('')
   const [theme, setTheme] = useState<SiteThemeChoice>('default')
+  const [smsEnabled, setSmsEnabled] = useState(false)
 
   useEffect(() => {
     loadSettings()
@@ -48,6 +49,7 @@ export function AdminSettings() {
       setContactEmail(data.contact_email || '')
       setSiteUrl(data.site_url || '')
       setTheme(isValidSiteTheme(data.theme) ? data.theme : 'default')
+      setSmsEnabled(!!data.sms_enabled)
     }
     setLoading(false)
   }
@@ -61,6 +63,7 @@ export function AdminSettings() {
       contact_email: contactEmail.trim() || null,
       site_url: siteUrl.trim().replace(/\/$/, '') || 'https://cafekadhem.com',
       theme,
+      sms_enabled: smsEnabled,
     }
 
     console.log('[Settings Save] Payload:', payload, 'existing settings row:', settings)
@@ -144,6 +147,25 @@ export function AdminSettings() {
             into that theme regardless of upcoming events. Each event's detail
             page always uses its own theme (set in the event editor).
           </p>
+        </div>
+        <div>
+          <label className="flex items-start gap-3 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={smsEnabled}
+              onChange={e => setSmsEnabled(e.target.checked)}
+              className="mt-1 h-4 w-4"
+            />
+            <span>
+              <span className="block text-sm font-medium text-ink">Enable SMS notifications</span>
+              <span className="block text-xs text-ink-muted mt-1">
+                While off, every public form hides the phone input and the SMS
+                notification option, and lookup/invite flows accept email only.
+                Turn this on once your 10DLC campaign is approved so the site
+                does not send any SMS in the meantime.
+              </span>
+            </span>
+          </label>
         </div>
         <Button type="submit" loading={saving}>Save Settings</Button>
       </form>

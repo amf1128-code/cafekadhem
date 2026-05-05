@@ -119,8 +119,16 @@ export function Order() {
 
   async function handleSubmit() {
     if (cart.length === 0) return
-    if (!firstName.trim() || (!email.trim() && !phone.trim())) {
-      addToast('Please provide your name and email or phone.', 'error')
+    if (!firstName.trim()) {
+      addToast('Please provide your name.', 'error')
+      return
+    }
+    const smsEnabled = !!settings?.sms_enabled
+    if (smsEnabled ? (!email.trim() && !phone.trim()) : !email.trim()) {
+      addToast(
+        smsEnabled ? 'Please provide an email or phone.' : 'Please provide an email address.',
+        'error',
+      )
       return
     }
 
@@ -131,13 +139,18 @@ export function Order() {
       // updates by id when we already have a localStorage token. Order
       // only collects first/email/phone, so we send only those three —
       // last_name / instagram / notification_preference stay whatever
-      // the guest set on a prior form.
+      // the guest set on a prior form. Phone is omitted entirely while
+      // SMS is disabled so a returning guest's stored number is left
+      // intact rather than being cleared by the missing field.
+      const fields: Record<string, unknown> = {
+        first_name: firstName.trim(),
+        email: email.trim() || null,
+      }
+      if (smsEnabled) {
+        fields.phone = phone.trim() ? normalizePhone(phone.trim()) : null
+      }
       const { data: guest, error: guestErr } = await supabase.rpc('upsert_guest', {
-        p_fields: {
-          first_name: firstName.trim(),
-          email: email.trim() || null,
-          phone: phone.trim() ? normalizePhone(phone.trim()) : null,
-        },
+        p_fields: fields,
         p_guest_id: getGuestToken(),
       })
       if (guestErr) throw guestErr
@@ -339,16 +352,18 @@ export function Order() {
             className="flex-1 border-0 border-b border-warm bg-transparent py-2 font-script text-lg text-ink italic placeholder:text-stone-dark placeholder:italic outline-none focus:border-ink transition-colors"
           />
         </div>
-        <div className="flex items-baseline gap-4">
-          <label className="text-[10px] tracking-[0.2em] uppercase text-ink-muted whitespace-nowrap min-w-[80px]">Phone</label>
-          <input
-            type="tel"
-            value={phone}
-            onChange={e => setPhone(e.target.value)}
-            placeholder="Or provide phone"
-            className="flex-1 border-0 border-b border-warm bg-transparent py-2 font-script text-lg text-ink italic placeholder:text-stone-dark placeholder:italic outline-none focus:border-ink transition-colors"
-          />
-        </div>
+        {settings?.sms_enabled && (
+          <div className="flex items-baseline gap-4">
+            <label className="text-[10px] tracking-[0.2em] uppercase text-ink-muted whitespace-nowrap min-w-[80px]">Phone</label>
+            <input
+              type="tel"
+              value={phone}
+              onChange={e => setPhone(e.target.value)}
+              placeholder="Or provide phone"
+              className="flex-1 border-0 border-b border-warm bg-transparent py-2 font-script text-lg text-ink italic placeholder:text-stone-dark placeholder:italic outline-none focus:border-ink transition-colors"
+            />
+          </div>
+        )}
       </div>
 
       {/* Submit */}

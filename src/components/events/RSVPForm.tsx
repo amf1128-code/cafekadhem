@@ -43,16 +43,24 @@ export function RSVPForm({ eventId, event, existingRsvp, isFull, onRsvpComplete 
   const [loading, setLoading] = useState(false)
   const [showForm, setShowForm] = useState(!existingRsvp)
   const [venmoHandle, setVenmoHandle] = useState<string>('')
+  // Default to "SMS off" so the phone input never flashes visible while
+  // the admin_settings fetch is in flight. Flips on only if the saved
+  // setting says so.
+  const [smsEnabled, setSmsEnabled] = useState(false)
   const [markingPaid, setMarkingPaid] = useState(false)
 
   useEffect(() => {
     supabase
       .from('admin_settings')
-      .select('venmo_handle')
+      .select('venmo_handle, sms_enabled')
       .limit(1)
       .single()
       .then(({ data }) => {
-        if (data) setVenmoHandle((data as Pick<AdminSettings, 'venmo_handle'>).venmo_handle)
+        if (data) {
+          const row = data as Pick<AdminSettings, 'venmo_handle' | 'sms_enabled'>
+          setVenmoHandle(row.venmo_handle)
+          setSmsEnabled(!!row.sms_enabled)
+        }
       })
   }, [])
 
@@ -91,25 +99,40 @@ export function RSVPForm({ eventId, event, existingRsvp, isFull, onRsvpComplete 
     }
   }, [])
 
+  // Force any stale 'sms' preference to 'email' as soon as we know SMS
+  // is disabled (covers both fresh loads with smsEnabled=false and the
+  // case where the admin flips SMS off mid-session).
+  useEffect(() => {
+    if (!smsEnabled && notifPref === 'sms') setNotifPref('email')
+  }, [smsEnabled, notifPref])
+
   async function handleRSVP(status: 'yes' | 'maybe' | 'no') {
     if (!firstName.trim()) {
       addToast('Please enter your first name.', 'error')
       return
     }
-    if (!email.trim() && !phone.trim()) {
-      addToast('Please provide an email or phone number.', 'error')
-      return
+    if (smsEnabled) {
+      if (!email.trim() && !phone.trim()) {
+        addToast('Please provide an email or phone number.', 'error')
+        return
+      }
+      if (notifPref === 'sms' && !phone.trim()) {
+        addToast('Please provide a phone number to be notified by SMS.', 'error')
+        return
+      }
+      if (phone.trim() && !isValidPhone(phone.trim())) {
+        addToast('Please enter a valid US phone number.', 'error')
+        return
+      }
+    } else {
+      // Phone input is hidden while SMS is disabled; require email.
+      if (!email.trim()) {
+        addToast('Please provide an email address.', 'error')
+        return
+      }
     }
     if (notifPref === 'email' && !email.trim()) {
       addToast('Please provide an email address to be notified by email.', 'error')
-      return
-    }
-    if (notifPref === 'sms' && !phone.trim()) {
-      addToast('Please provide a phone number to be notified by SMS.', 'error')
-      return
-    }
-    if (phone.trim() && !isValidPhone(phone.trim())) {
-      addToast('Please enter a valid US phone number.', 'error')
       return
     }
     if (instagram && !isValidInstagram(instagram)) {
@@ -121,17 +144,23 @@ export function RSVPForm({ eventId, event, existingRsvp, isFull, onRsvpComplete 
 
     try {
       // Single round-trip upsert: dedups by email/phone server-side or
-      // updates by id when we already have a localStorage token. The
-      // form covers all six guest fields, so we send all six.
+      // updates by id when we already have a localStorage token.
+      // While SMS is disabled the phone input is hidden — we deliberately
+      // OMIT the `phone` key from p_fields rather than sending null, so
+      // a returning guest's stored number is preserved untouched (it
+      // becomes editable again whenever the admin flips SMS back on).
+      const fields: Record<string, unknown> = {
+        first_name: firstName.trim(),
+        last_name: lastName.trim() || null,
+        email: email.trim() || null,
+        instagram: instagram.trim() ? normalizeInstagram(instagram.trim()) : null,
+        notification_preference: notifPref,
+      }
+      if (smsEnabled) {
+        fields.phone = phone.trim() ? normalizePhone(phone.trim()) : null
+      }
       const { data: guest, error: guestErr } = await supabase.rpc('upsert_guest', {
-        p_fields: {
-          first_name: firstName.trim(),
-          last_name: lastName.trim() || null,
-          email: email.trim() || null,
-          phone: phone.trim() ? normalizePhone(phone.trim()) : null,
-          instagram: instagram.trim() ? normalizeInstagram(instagram.trim()) : null,
-          notification_preference: notifPref,
-        },
+        p_fields: fields,
         p_guest_id: getGuestToken(),
       })
       if (guestErr) throw guestErr
@@ -314,13 +343,15 @@ export function RSVPForm({ eventId, event, existingRsvp, isFull, onRsvpComplete 
         onChange={e => setEmail(e.target.value)}
         placeholder="email@address.com"
       />
-      <UnderlineInput
-        label="Phone"
-        type="tel"
-        value={phone}
-        onChange={e => setPhone(e.target.value)}
-        placeholder="Required if no email"
-      />
+      {smsEnabled && (
+        <UnderlineInput
+          label="Phone"
+          type="tel"
+          value={phone}
+          onChange={e => setPhone(e.target.value)}
+          placeholder="Required if no email"
+        />
+      )}
       <UnderlineInput
         label="Instagram"
         value={instagram}
@@ -339,7 +370,7 @@ export function RSVPForm({ eventId, event, existingRsvp, isFull, onRsvpComplete 
           className="flex-1 border-0 border-b border-warm bg-transparent py-2 font-script text-lg text-ink italic outline-none focus:border-ink transition-colors appearance-none cursor-pointer"
         >
           <option value="email">Email</option>
-          <option value="sms">SMS</option>
+          {smsEnabled && <option value="sms">SMS</option>}
           <option value="none">None</option>
         </select>
       </div>

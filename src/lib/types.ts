@@ -4,6 +4,11 @@ export interface AdminSettings {
   contact_email: string | null
   site_url: string
   theme: 'default' | 'theme1' | 'theme2' | 'theme3'
+  // Master switch for outbound SMS. While off, every public form hides
+  // the phone input and the "SMS" notification option, and lookup/invite
+  // flows only accept email. Defaults to false until the operator's
+  // 10DLC campaign is approved.
+  sms_enabled: boolean
   updated_at: string
 }
 

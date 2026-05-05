@@ -32,6 +32,7 @@ export function AdminEventBulkInvite() {
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [sending, setSending] = useState(false)
   const [progress, setProgress] = useState<{ done: number; total: number } | null>(null)
+  const [smsEnabled, setSmsEnabled] = useState(false)
 
   useEffect(() => {
     if (id) loadData()
@@ -41,16 +42,18 @@ export function AdminEventBulkInvite() {
   async function loadData() {
     setLoading(true)
 
-    const [eventRes, eventsRes, guestsRes, rsvpsRes, invitesRes] = await Promise.all([
+    const [eventRes, eventsRes, guestsRes, rsvpsRes, invitesRes, settingsRes] = await Promise.all([
       supabase.from('events').select('*').eq('id', id!).single(),
       supabase.from('events').select('*').neq('id', id!).order('date', { ascending: false }),
       supabase.from('guests').select('*').order('first_name'),
       supabase.from('rsvps').select('event_id, guest_id'),
       supabase.from('invites').select('invited_email, invited_phone').eq('event_id', id!),
+      supabase.from('admin_settings').select('sms_enabled').limit(1).single(),
     ])
 
     setEvent(eventRes.data)
     setPastEvents(eventsRes.data || [])
+    setSmsEnabled(!!settingsRes.data?.sms_enabled)
 
     const rsvpCount = new Map<string, number>()
     const byEvent = new Map<string, Set<string>>()
@@ -103,7 +106,10 @@ export function AdminEventBulkInvite() {
   }, [mode, pastEventId, search, guests, eventGuestIds])
 
   function isContactable(g: GuestRow): boolean {
-    return !!(g.email || g.phone)
+    // While SMS is disabled, phone-only guests have no reachable channel
+    // and are treated as non-contactable so the admin can't accidentally
+    // queue an invite that would silently get dropped.
+    return !!g.email || (smsEnabled && !!g.phone)
   }
 
   function wasInvited(g: GuestRow): boolean {
@@ -150,15 +156,17 @@ export function AdminEventBulkInvite() {
 
     for (const guest of targets) {
       try {
-        // Pick email if available, else phone, matching their preference if set.
+        // Pick email if available, else phone, matching their preference if
+        // set. While SMS is disabled the phone branch is suppressed so an
+        // invite never goes to a phone-only guest.
         const useEmail = guest.notification_preference === 'email'
           ? !!guest.email
           : guest.notification_preference === 'sms'
-          ? false
+          ? !smsEnabled && !!guest.email
           : !!guest.email
         const contactInfo = useEmail
           ? { email: guest.email! }
-          : guest.phone
+          : smsEnabled && guest.phone
           ? { phone: guest.phone }
           : guest.email
           ? { email: guest.email }
