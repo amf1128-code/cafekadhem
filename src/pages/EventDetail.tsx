@@ -94,6 +94,10 @@ export function EventDetail() {
   const yesCount = rsvps.filter(r => r.status === 'yes').length
   const waitlistCount = rsvps.filter(r => r.status === 'waitlisted').length
   const isFull = event.capacity ? yesCount >= event.capacity : false
+  // Find the host's existing +1 row (if any) so the RSVP form can let
+  // them edit / rename / remove it instead of being locked out after
+  // the initial RSVP.
+  const myPlusOne = myRsvp ? rsvps.find(r => r.plus_one_of === myRsvp.id) ?? null : null
 
   return (
     <div className="max-w-3xl mx-auto px-6 py-8">
@@ -218,6 +222,7 @@ export function EventDetail() {
           eventId={event.id}
           event={event}
           existingRsvp={myRsvp}
+          existingPlusOne={myPlusOne}
           isFull={isFull}
           onRsvpComplete={() => loadEvent()}
         />
