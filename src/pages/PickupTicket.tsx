@@ -34,11 +34,12 @@ export function PickupTicket() {
       setLoading(false)
       return
     }
+    // Public lookup goes through a SECURITY DEFINER RPC instead of a
+    // direct anon SELECT on pickup_orders, so the only way to reach a
+    // row is via its pickup_token. The RPC also strips the admin-only
+    // unit_cost field from the embedded items / menu_item rows.
     supabase
-      .from('pickup_orders')
-      .select('*, items:pickup_order_items(*, menu_item:menu_items(*))')
-      .eq('pickup_token', token)
-      .single()
+      .rpc('get_pickup_order', { p_token: token })
       .then(({ data, error }) => {
         if (cancelled) return
         if (error || !data) {
