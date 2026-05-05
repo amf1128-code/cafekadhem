@@ -1,8 +1,10 @@
 import type { RSVP, PublicGuestProfile } from '../../lib/types'
 import { instagramUrl } from '../../lib/utils/instagram'
 
+type RSVPRow = RSVP & { guest: PublicGuestProfile }
+
 interface RSVPListProps {
-  rsvps: (RSVP & { guest: PublicGuestProfile })[]
+  rsvps: RSVPRow[]
 }
 
 export function RSVPList({ rsvps }: RSVPListProps) {
@@ -14,6 +16,17 @@ export function RSVPList({ rsvps }: RSVPListProps) {
     return null
   }
 
+  // Build a lookup so each +1 row can resolve its host's display name. The
+  // map covers every visible status (yes / maybe / waitlisted) so a +1
+  // whose host fell off the going list (e.g. host moved to maybe) still
+  // resolves to a name rather than a blank annotation.
+  const rsvpById = new Map<string, RSVPRow>()
+  for (const r of rsvps) rsvpById.set(r.id, r)
+  function hostNameFor(rsvp: RSVPRow): string | null {
+    if (!rsvp.plus_one_of) return null
+    return rsvpById.get(rsvp.plus_one_of)?.guest?.first_name ?? null
+  }
+
   return (
     <div className="space-y-6">
       {going.length > 0 && (
@@ -23,7 +36,7 @@ export function RSVPList({ rsvps }: RSVPListProps) {
           </p>
           <div className="flex flex-wrap gap-x-6 gap-y-2">
             {going.map(rsvp => (
-              <GuestName key={rsvp.id} guest={rsvp.guest} />
+              <GuestName key={rsvp.id} rsvp={rsvp} hostName={hostNameFor(rsvp)} />
             ))}
           </div>
         </div>
@@ -36,7 +49,7 @@ export function RSVPList({ rsvps }: RSVPListProps) {
           </p>
           <div className="flex flex-wrap gap-x-6 gap-y-2">
             {maybe.map(rsvp => (
-              <GuestName key={rsvp.id} guest={rsvp.guest} />
+              <GuestName key={rsvp.id} rsvp={rsvp} hostName={hostNameFor(rsvp)} />
             ))}
           </div>
         </div>
@@ -49,7 +62,7 @@ export function RSVPList({ rsvps }: RSVPListProps) {
           </p>
           <div className="flex flex-wrap gap-x-6 gap-y-2">
             {waitlisted.map(rsvp => (
-              <GuestName key={rsvp.id} guest={rsvp.guest} />
+              <GuestName key={rsvp.id} rsvp={rsvp} hostName={hostNameFor(rsvp)} />
             ))}
           </div>
         </div>
@@ -58,10 +71,14 @@ export function RSVPList({ rsvps }: RSVPListProps) {
   )
 }
 
-function GuestName({ guest }: { guest: PublicGuestProfile }) {
+function GuestName({ rsvp, hostName }: { rsvp: RSVPRow; hostName: string | null }) {
+  const guest = rsvp.guest
   return (
     <span className="inline-flex items-center gap-1.5 font-serif text-ink">
       {guest.first_name}
+      {hostName && (
+        <span className="text-xs italic text-ink-muted">(+1 of {hostName})</span>
+      )}
       {guest.instagram && (
         <a
           href={instagramUrl(guest.instagram)}

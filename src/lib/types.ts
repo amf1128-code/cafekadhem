@@ -4,6 +4,11 @@ export interface AdminSettings {
   contact_email: string | null
   site_url: string
   theme: 'default' | 'theme1' | 'theme2' | 'theme3'
+  // Master switch for outbound SMS. While off, every public form hides
+  // the phone input and the "SMS" notification option, and lookup/invite
+  // flows only accept email. Defaults to false until the operator's
+  // 10DLC campaign is approved.
+  sms_enabled: boolean
   updated_at: string
 }
 
@@ -109,6 +114,9 @@ export interface RSVP {
   ticket_token: string | null
   paid_at: string | null
   checked_in_at: string | null
+  // When set, this row represents a plus-one and points back to the
+  // host's RSVP. The host RSVP has plus_one_of = null.
+  plus_one_of: string | null
   created_at: string
   updated_at: string
   // Joined

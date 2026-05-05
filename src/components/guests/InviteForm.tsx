@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react'
+import { useEffect, useState, type FormEvent } from 'react'
 import { supabase } from '../../lib/supabase'
 import { normalizePhone, isValidPhone } from '../../lib/utils/phone'
 import { getGuestToken } from '../../lib/utils/guest-token'
@@ -13,6 +13,22 @@ export function InviteForm({ eventId }: InviteFormProps) {
   const { addToast } = useToast()
   const [contact, setContact] = useState('')
   const [sending, setSending] = useState(false)
+  const [smsEnabled, setSmsEnabled] = useState(false)
+
+  useEffect(() => {
+    let cancelled = false
+    supabase
+      .from('admin_settings')
+      .select('sms_enabled')
+      .limit(1)
+      .single()
+      .then(({ data }) => {
+        if (!cancelled && data) setSmsEnabled(!!data.sms_enabled)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   async function handleSend(e: FormEvent) {
     e.preventDefault()
@@ -22,10 +38,15 @@ export function InviteForm({ eventId }: InviteFormProps) {
 
     try {
       const isEmail = contact.includes('@')
-      const isPhone = !isEmail && isValidPhone(contact)
+      const isPhone = !isEmail && smsEnabled && isValidPhone(contact)
 
       if (!isEmail && !isPhone) {
-        addToast('Please enter a valid email or phone number', 'error')
+        addToast(
+          smsEnabled
+            ? 'Please enter a valid email or phone number'
+            : 'Please enter a valid email address',
+          'error',
+        )
         setSending(false)
         return
       }
@@ -80,9 +101,10 @@ export function InviteForm({ eventId }: InviteFormProps) {
           Contact
         </label>
         <input
+          type={smsEnabled ? 'text' : 'email'}
           value={contact}
           onChange={e => setContact(e.target.value)}
-          placeholder="Friend's email or phone"
+          placeholder={smsEnabled ? "Friend's email or phone" : "Friend's email"}
           className="flex-1 border-0 border-b border-warm bg-transparent py-2 font-script text-lg text-ink italic placeholder:text-stone-dark placeholder:italic outline-none focus:border-ink transition-colors"
         />
       </div>
