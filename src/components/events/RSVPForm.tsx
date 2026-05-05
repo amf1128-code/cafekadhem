@@ -1,16 +1,19 @@
 import { useState, useEffect, type FormEvent } from 'react'
 import { supabase } from '../../lib/supabase'
-import type { RSVP, Event, AdminSettings } from '../../lib/types'
+import type { RSVP, Event, AdminSettings, PublicGuestProfile } from '../../lib/types'
 import { getGuestToken, setGuestToken } from '../../lib/utils/guest-token'
 import { normalizePhone, isValidPhone } from '../../lib/utils/phone'
 import { normalizeInstagram, isValidInstagram } from '../../lib/utils/instagram'
 import { sendNotification } from '../../lib/notifications'
 import { useToast } from '../ui/Toast'
 
+type RSVPWithGuest = RSVP & { guest: PublicGuestProfile }
+
 interface RSVPFormProps {
   eventId: string
   event?: Event | null
   existingRsvp: RSVP | null
+  existingPlusOne: RSVPWithGuest | null
   isFull: boolean
   onRsvpComplete: () => void
 }
@@ -32,7 +35,7 @@ function UnderlineInput({
   )
 }
 
-export function RSVPForm({ eventId, event, existingRsvp, isFull, onRsvpComplete }: RSVPFormProps) {
+export function RSVPForm({ eventId, event, existingRsvp, existingPlusOne, isFull, onRsvpComplete }: RSVPFormProps) {
   const { addToast } = useToast()
   const [firstName, setFirstName] = useState('')
   const [lastName, setLastName] = useState('')
@@ -48,12 +51,22 @@ export function RSVPForm({ eventId, event, existingRsvp, isFull, onRsvpComplete 
   // setting says so.
   const [smsEnabled, setSmsEnabled] = useState(false)
   const [markingPaid, setMarkingPaid] = useState(false)
-  // Plus-one state. Available on first-time RSVPs to non-ticketed events
-  // (ticketed events would require collecting a second payment, which
-  // is out of scope for the +1 flow).
-  const [plusOne, setPlusOne] = useState(false)
-  const [plusOneName, setPlusOneName] = useState('')
-  const showPlusOneToggle = !existingRsvp && !event?.ticketing_enabled
+  // Plus-one state. The toggle is shown on every non-ticketed event,
+  // including the edit flow — when the host already has a +1 the toggle
+  // is prefilled on with their name, so they can rename, replace, or
+  // remove the +1 from the same form.
+  // Ticketed events stay opted out for now: a +1 there would require a
+  // second seat purchase, which the current Venmo flow doesn't model.
+  const [plusOne, setPlusOne] = useState(!!existingPlusOne)
+  const [plusOneName, setPlusOneName] = useState(existingPlusOne?.guest?.first_name || '')
+  const showPlusOneToggle = !event?.ticketing_enabled
+
+  // Resync local plus-one state when the parent re-fetches and hands us
+  // a fresh existingPlusOne (e.g. after a successful submit).
+  useEffect(() => {
+    setPlusOne(!!existingPlusOne)
+    setPlusOneName(existingPlusOne?.guest?.first_name || '')
+  }, [existingPlusOne])
 
   useEffect(() => {
     supabase
@@ -145,12 +158,12 @@ export function RSVPForm({ eventId, event, existingRsvp, isFull, onRsvpComplete 
       addToast('Invalid Instagram handle format.', 'error')
       return
     }
-    // Plus-one is only attempted alongside an actual reservation, and
-    // only when the toggle is on. If the user toggled it but left the
-    // name blank, ask before submitting (rather than silently dropping
-    // their +1 intent).
-    const wantPlusOne = showPlusOneToggle && plusOne && status === 'yes'
-    if (wantPlusOne && !plusOneName.trim()) {
+    // Plus-one is only attempted alongside an actual reservation. If
+    // the user toggled it on but left the name blank, ask before
+    // submitting (rather than silently dropping their +1 intent).
+    // 'maybe'/'no' submits ignore the toggle — a +1 there will get
+    // cleaned up below if one existed.
+    if (showPlusOneToggle && plusOne && status === 'yes' && !plusOneName.trim()) {
       addToast("Please enter your plus-one's first name, or turn the +1 off.", 'error')
       return
     }
@@ -192,22 +205,78 @@ export function RSVPForm({ eventId, event, existingRsvp, isFull, onRsvpComplete 
 
       if (rsvpError) throw rsvpError
 
-      // Plus-one: chained after the host's RSVP so we have its id to link
-      // against. If the +1 ends up waitlisted (capacity exhausted by the
-      // host's seat) we just surface that in the toast — the row is still
-      // created, admin can promote later.
-      let plusOneRsvp: { status?: string; waitlist_position?: number } | null = null
-      if (wantPlusOne && rsvpResult?.id) {
-        const { data: poData, error: poError } = await supabase.rpc('add_plus_one', {
-          p_parent_rsvp_id: rsvpResult.id,
-          p_first_name: plusOneName.trim(),
-        })
-        if (poError) {
-          // Host RSVP succeeded; surface the +1 failure but don't unwind.
-          addToast(`RSVP saved, but couldn't add your +1: ${poError.message}`, 'error')
-        } else {
-          plusOneRsvp = poData
+      // Plus-one reconciliation. Four shapes to consider, run after the
+      // host's RSVP has been upserted:
+      //   - status is 'no'/'maybe' and a +1 existed -> remove (a +1 only
+      //     makes sense alongside an actual reservation).
+      //   - status is 'yes'/'waitlisted' and the toggle changed/diverged
+      //     from existingPlusOne -> add / rename / remove.
+      // `plusOneOutcome` carries the resulting state so the toast can
+      // describe what happened.
+      let plusOneOutcome:
+        | { kind: 'added'; status?: string; name: string }
+        | { kind: 'renamed'; name: string }
+        | { kind: 'removed'; name: string }
+        | { kind: 'cleared'; name: string }
+        | null = null
+      const wantPlusOneNow = showPlusOneToggle && plusOne && (status === 'yes' || status === 'maybe')
+      // Only 'yes' actually attempts to seat the +1; 'maybe' clears any
+      // existing +1 because a +1 isn't a thing without a reservation.
+      // 'no' obviously also clears.
+      if (status === 'no' || status === 'maybe') {
+        if (existingPlusOne) {
+          const { error: rmErr } = await supabase.rpc('remove_plus_one', {
+            p_plus_one_rsvp_id: existingPlusOne.id,
+          })
+          if (rmErr) {
+            addToast(`RSVP saved, but couldn't remove your +1: ${rmErr.message}`, 'error')
+          } else {
+            plusOneOutcome = { kind: 'cleared', name: existingPlusOne.guest.first_name }
+          }
         }
+      } else if (rsvpResult?.id) {
+        // status is 'yes' or 'waitlisted'
+        const trimmedName = plusOneName.trim()
+        if (existingPlusOne && !wantPlusOneNow) {
+          // Toggle was turned off
+          const { error: rmErr } = await supabase.rpc('remove_plus_one', {
+            p_plus_one_rsvp_id: existingPlusOne.id,
+          })
+          if (rmErr) {
+            addToast(`RSVP saved, but couldn't remove your +1: ${rmErr.message}`, 'error')
+          } else {
+            plusOneOutcome = { kind: 'removed', name: existingPlusOne.guest.first_name }
+          }
+        } else if (existingPlusOne && wantPlusOneNow) {
+          // Same +1, possibly renamed
+          if (trimmedName && trimmedName !== existingPlusOne.guest.first_name) {
+            const { error: rnErr } = await supabase.rpc('rename_plus_one', {
+              p_plus_one_rsvp_id: existingPlusOne.id,
+              p_first_name: trimmedName,
+            })
+            if (rnErr) {
+              addToast(`RSVP saved, but couldn't rename your +1: ${rnErr.message}`, 'error')
+            } else {
+              plusOneOutcome = { kind: 'renamed', name: trimmedName }
+            }
+          }
+        } else if (!existingPlusOne && wantPlusOneNow) {
+          // Net-new +1
+          const { data: poData, error: poError } = await supabase.rpc('add_plus_one', {
+            p_parent_rsvp_id: rsvpResult.id,
+            p_first_name: trimmedName,
+          })
+          if (poError) {
+            addToast(`RSVP saved, but couldn't add your +1: ${poError.message}`, 'error')
+          } else {
+            plusOneOutcome = {
+              kind: 'added',
+              status: poData?.status,
+              name: trimmedName,
+            }
+          }
+        }
+        // else: no existing +1, toggle off — nothing to do
       }
 
       // Send notification
@@ -225,11 +294,20 @@ export function RSVPForm({ eventId, event, existingRsvp, isFull, onRsvpComplete 
       }
 
       const returnedStatus = rsvpResult?.status
-      const plusOneSuffix = plusOneRsvp
-        ? plusOneRsvp.status === 'waitlisted'
-          ? ` Your +1 ${plusOneName.trim()} is on the waitlist — capacity was hit on this seat.`
-          : ` ${plusOneName.trim()} is in too.`
-        : ''
+      let plusOneSuffix = ''
+      if (plusOneOutcome) {
+        if (plusOneOutcome.kind === 'added') {
+          plusOneSuffix = plusOneOutcome.status === 'waitlisted'
+            ? ` Your +1 ${plusOneOutcome.name} is on the waitlist — capacity was hit on this seat.`
+            : ` ${plusOneOutcome.name} is in too.`
+        } else if (plusOneOutcome.kind === 'renamed') {
+          plusOneSuffix = ` Your +1 is now ${plusOneOutcome.name}.`
+        } else if (plusOneOutcome.kind === 'removed') {
+          plusOneSuffix = ` ${plusOneOutcome.name} was removed from your reservation.`
+        } else if (plusOneOutcome.kind === 'cleared') {
+          plusOneSuffix = ` ${plusOneOutcome.name} was removed (a +1 only applies when you're going).`
+        }
+      }
       if (returnedStatus === 'waitlisted') {
         const pos = rsvpResult?.waitlist_position
         addToast(`You're on the waitlist${pos ? ` (position #${pos})` : ''}!${plusOneSuffix}`)
@@ -285,6 +363,11 @@ export function RSVPForm({ eventId, event, existingRsvp, isFull, onRsvpComplete 
         </p>
         {isWaitlisted && existingRsvp.waitlist_position && (
           <p className="text-sm text-ink-muted mb-3">Position #{existingRsvp.waitlist_position} on the waitlist</p>
+        )}
+        {existingPlusOne && (
+          <p className="text-sm text-ink-muted mb-3">
+            Bringing a +1: <span className="text-ink">{existingPlusOne.guest.first_name}</span>
+          </p>
         )}
 
         {showPaymentFlow && (

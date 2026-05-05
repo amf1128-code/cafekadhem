@@ -73,12 +73,20 @@ export function RSVPList({ rsvps }: RSVPListProps) {
 
 function GuestName({ rsvp, hostName }: { rsvp: RSVPRow; hostName: string | null }) {
   const guest = rsvp.guest
+  // Plus-one rows render as "[host] +1" rather than the +1's own name.
+  // The captured +1 first name still lives on the guest row (visible to
+  // the host in their RSVP edit view and to admins) — it just isn't
+  // surfaced in the public guest list.
+  if (rsvp.plus_one_of && hostName) {
+    return (
+      <span className="inline-flex items-center gap-1.5 font-serif text-ink">
+        {hostName} <span className="text-ink-muted">+1</span>
+      </span>
+    )
+  }
   return (
     <span className="inline-flex items-center gap-1.5 font-serif text-ink">
       {guest.first_name}
-      {hostName && (
-        <span className="text-xs italic text-ink-muted">(+1 of {hostName})</span>
-      )}
       {guest.instagram && (
         <a
           href={instagramUrl(guest.instagram)}
