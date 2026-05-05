@@ -70,7 +70,188 @@ Already implemented in `028_restore_upsert_guest.sql`:
 
 - After any successful `upsert_guest`, the page writes `localStorage.guest_id = id`.
 - All subsequent RPCs in the session pass `p_guest_id` so step 1 of §3.2 fires — this prevents a guest who edits their email mid-session from being silently merged into a stranger's row.
-- `localStorage.guest_id` is cleared by `/find-tickets` magic-link redemption (which sets it to the redeemed guest), and by an explicit "Not me" link on EventDetail (to be added) so a shared device can re-identify.
+- `localStorage.guest_id` is cleared by `/find-tickets` magic-link redemption (which sets it to the redeemed guest), and by an explicit "Not me" link on EventDetail so a shared device can re-identify.
+
+---
+
+## 3a. Recognition (no accounts)
+
+> **Design stance.** No signup, no password, no profile screen, no "sign in" language anywhere in the public app. The guest record is a side-effect of doing something (RSVPing, ordering, being invited). Recognition is ambient: when we know who you are, we just use your name; when we don't, we ask once and remember.
+
+### 3a.1 Three identity sources, in precedence
+
+When any public page loads, it resolves `guest_id` in this order. The first hit wins:
+
+1. **URL token** (strongest). Any of these tokens, present in the URL, identify the guest server-side:
+   - `/invite/:token` → owner is `invites.invited_by`'s invitee record (or null until they RSVP).
+   - `/ticket/:token` → owner is the RSVP's `guest_id`.
+   - `/pickup/:token` → owner is `pickup_orders.guest_id`.
+   - `/my-tickets?token=…` → magic-link redemption (`013_magic_links.sql`).
+   - **Any transactional notification link** carries `?as=<short_magic_token>` appended automatically by `send-notification` (NEW, see §11). Clicking the email/SMS we sent you re-establishes identity — this is the dominant return path.
+2. **`localStorage.guest_id`** (cache). Set on every successful `upsert_guest` and on every URL-token resolution. Read on every page load.
+3. **Explicit identification form** (fallback). Email and/or phone fields on the page itself (the existing RSVP/Order forms). Submitting calls `upsert_guest` and writes localStorage.
+
+### 3a.2 Magic links *are* identity
+
+There is no separate auth system. A magic link is just a token row that maps to a `guest_id`. Two flavors:
+
+| Token kind | Lifetime | Single-use? | Issued by |
+|---|---|---|---|
+| **Recovery magic link** (`/my-tickets?token=…`) | 30 min | yes | `/find-tickets` form, `find_guest_by_contact` edge fn |
+| **Ambient identity token** (`?as=<token>` on any notification link) | 90 days | no, but rotates per send | `send-notification` edge fn |
+
+The ambient token is a low-stakes recognition cookie disguised as a query param: it's enough to say "this is Lina, prefill her stuff" but it does NOT grant ticket access on its own (ticket access requires the `ticket_token`, which is a separate value). Even if a notification email is forwarded, the worst case is the new recipient is *recognized as Lina* until they identify themselves — they can't see her tickets without the ticket token, and they can't change her RSVP status because every mutation is also gated by RPC checks. (Practically, forwarded notifications are rare; this is the same trust model Partiful uses.)
+
+### 3a.3 Recovery flow (`/find-tickets`)
+
+The only place a returning guest types contact info to re-establish identity. Promoted from a hidden feature to a first-class button labeled **"I've been here before"** in the header on Home and EventDetail.
+
+1. Guest enters email or phone.
+2. `find_guest_by_contact` edge fn: looks up by §3.2 precedence; if no match, says "we don't have you yet — just RSVP and we'll remember you" (no error, no account-creation friction).
+3. If matched: send a **recovery magic link** to the channel that matched (email or SMS). Body: "Tap to pick up where you left off."
+4. Guest taps. `/my-tickets?token=…` redeems via `redeem_magic_link`, sets `localStorage.guest_id`, lands on a personalized "Your stuff" view (upcoming RSVPs, tickets, pickup orders, history).
+5. From there, every subsequent page on this device is silently authenticated.
+
+**No 6-digit code path.** The link click is the verification. If the guest is on the same device that received the SMS/email, the round-trip is one tap.
+
+### 3a.4 The "Not me" affordance
+
+When a guest is recognized (we have a `guest_id` and a `first_name` for them), every public page header shows: **"Hi, Lina · not you?"**. Clicking *not you?*:
+
+1. Clears `localStorage.guest_id`.
+2. Strips any `?as=` from the URL.
+3. Reloads the page in anonymous mode.
+
+This is the only "log out" surface. There is no log-in surface; identification re-happens organically on the next form submit or notification click.
+
+### 3a.5 Local persistence rules
+
+- `localStorage.guest_id`: long-lived, never expires unless explicitly cleared. Survives across sessions, browser restarts, app updates.
+- No other PII in localStorage. We re-derive `first_name` and contact prefill from the server on each load via `get_my_guest()` (already exists).
+- **Multiple guests on one device** (household): the "Not me" link handles this. The first person RSVPs and is cached; the second person clicks "not you?", types their own contact, and the cache flips. We do not try to support concurrent identities on one device.
+
+### 3a.6 Channel choice: SMS vs. email
+
+Both channels carry magic links and notifications. The choice is per-guest (`notification_preference`) and per-event-type:
+
+- **Default channel for transactional sends** (RSVP confirm, order confirm, ticket issued, recovery): whichever the guest provided. If they gave both, follow `notification_preference`; if `'sms'` and SMS is globally disabled, fall back to email (§7.1 already covers this).
+- **SMS is reserved for time-sensitive sends** once 10DLC clears: day-of reminders, doors-open nudges, "we're starting" pings. Everything else defaults to email even for SMS-preferring guests, to control cost and STOP-rate. (Implement as a per-`type` channel override table in `send-notification`.)
+- **Email-only is fine.** The system never requires a phone number. The only flows that *need* SMS are the day-of reminders, and those degrade gracefully to email.
+
+### 3a.7 Use-case walkthroughs
+
+Each row is one realistic guest journey. "Recognized" means a `guest_id` was resolved by §3a.1; "anon" means none of the three sources hit and the guest sees blank fields.
+
+#### A. First-time guest, direct event link (no invite)
+
+> Lina sees the event posted on Instagram, taps the link.
+
+1. Lands on `/events/:id`. No URL token, no localStorage → **anon**.
+2. Sees event flyer, "Reserve a Seat" button.
+3. Taps RSVP → form expands with empty fields.
+4. Fills name + email, taps yes.
+5. `upsert_guest` (insert) → `guest_id`. `safe_create_rsvp` → status `yes` (or waitlisted). `localStorage.guest_id` set.
+6. Confirmation shows "Hi Lina, you're in. We'll email you reminders."
+7. Confirmation email goes out with `?as=<token>` on every link inside it.
+8. Done.
+
+#### B. First-time guest, invited by a friend
+
+> Omar texts Lina an invite link from his RSVP page.
+
+1. Lina taps the SMS link → `/invite/:token`.
+2. `InviteLanding` resolves the invite token server-side, gets `event_id` and `invited_by` (Omar's first_name).
+3. Redirects to `/events/:id` with router state. The page also caches a **provisional** identity: it knows the invite was sent to `lina@…` (or her phone), so it pre-fills that field. **No `guest_id` yet** — we don't auto-create the guest until she actually submits, because she might decline.
+4. Banner: "Omar invited you. Reserve a seat?"
+5. She taps yes. `upsert_guest` matches her existing email if she's been here before, else inserts. `safe_create_rsvp` runs.
+6. `invites.consumed_by_guest_id` is set to Lina's `guest_id` (attribution).
+7. From here identical to A.
+
+#### C. Returning guest, same device
+
+> Lina comes back two weeks later, taps a new event link from Instagram.
+
+1. `/events/:id` loads. No URL token, but **localStorage.guest_id** is set from her last visit → **recognized**.
+2. Page calls `get_my_guest()` → returns `{ first_name: 'Lina', email, phone, notification_preference }`.
+3. Header shows "Hi, Lina · not you?".
+4. RSVP form is collapsed by default; the visible state is "Reserve a Seat" with one tap.
+5. She taps. The form is already pre-filled from step 2 — she just confirms status (yes/maybe/no) and submits. One tap RSVP, two if she changes her mind about plus-one.
+6. Done.
+
+#### D. Returning guest, new device (or cleared cookies)
+
+> Lina got a new phone. Taps an Instagram event link.
+
+1. `/events/:id`, no token, no localStorage → **anon**, same as A.
+2. Header shows a small "I've been here before" link.
+3. She taps it → `/find-tickets`.
+4. Enters her email. `find_guest_by_contact` finds her. Magic link sent.
+5. She switches to her email, taps the link → `/my-tickets?token=…`.
+6. `redeem_magic_link` runs, `localStorage.guest_id` set.
+7. Lands on "Your stuff" — sees upcoming events she's RSVP'd to, past tickets.
+8. Taps the new event → `/events/:id` is now in **recognized** mode (path C).
+
+#### E. Returning guest, taps the email/SMS link directly
+
+> Lina got a "doors open in 30 min" reminder text. Taps the link.
+
+1. URL is `/events/:id?as=<short_magic_token>`.
+2. Page resolves the `as` token server-side → `guest_id`. Sets localStorage. Strips the param from the URL (history.replaceState).
+3. Recognized, same as C — but she didn't have to do anything.
+4. This is the dominant return path for engaged guests; D is the fallback.
+
+#### F. Lost ticket the morning of the event
+
+> Lina deleted the email. Needs the QR code at the door.
+
+1. She lands on `/find-tickets` (link in event detail page footer, also in any prior email she has).
+2. Enters phone or email → magic link sent.
+3. Taps → `/my-tickets?token=…` → sees her ticket → taps it → `/ticket/:ticket_token` → QR.
+4. Could also be done by admin at the door: scan a backup QR she shows from her email confirmation.
+
+#### G. Mass-invited (admin sends bulk invite)
+
+> Admin uploads 80 contacts to invite to next month's event.
+
+1. For each recipient, admin's bulk-invite job calls `upsert_guest` (creates a guest row if new — they don't have to RSVP for the row to exist) and inserts an `invites` row.
+2. Each invite SMS/email contains `/invite/:token` plus `?as=<their_ambient_token>`.
+3. When the invitee clicks: `as` token recognizes them (so the form is pre-filled), AND the invite token attributes Omar→Lina-style (so the banner says "Cafe Kadhem invited you"). Two tokens on one URL is fine — they answer different questions.
+4. Same path as B from there.
+
+#### H. Household / shared device
+
+> Lina RSVP'd from the family iPad. Now her partner Noor wants to RSVP from the same iPad.
+
+1. Page loads, recognizes Lina (header: "Hi, Lina · not you?").
+2. Noor taps "not you?". localStorage cleared → **anon**.
+3. Form is empty. Noor enters his name + email, RSVPs. localStorage now holds Noor's `guest_id`.
+4. Next visit on this iPad recognizes Noor by default. Lina taps "not you?" when it's her turn.
+5. **Limitation:** there is no "switch between Lina and Noor" UI. Always-anonymous → identify is the only state transition. Acceptable per Partiful conventions; if it becomes painful, we add a "recently used" picker later.
+
+#### I. Plus-one (no separate identity)
+
+> Lina is bringing her brother Sami.
+
+1. Lina RSVPs yes, ticks "+1", types "Sami" as the plus-one name.
+2. `add_plus_one` creates a stub guest row (no email/phone), linked to Lina's RSVP.
+3. Sami has no notifications, no recognition, no recovery — he's just a name attached to Lina. If he later wants his own identity (e.g. to RSVP separately for a future event), he goes through path A and gets his own row. The plus-one stub is never reconciled with that row; they're separate records by design.
+
+#### J. Returning guest who used phone last time, now types email-only
+
+> Lina RSVP'd by phone last summer. Today she types her email on a new device.
+
+1. `/events/:id`, anon. She types her email and RSVPs.
+2. `upsert_guest` email lookup misses (her existing row has phone but no email). Phone lookup also misses (she didn't type one). Inserts a **new row**.
+3. Identity splits silently. (See §3.2.) She's now two records.
+4. **Mitigation:** the recovery flow (path D) prevents this from happening to engaged guests, because returning guests who use Find Tickets get magic-linked back into their original row. The split only happens to guests who skip that and re-identify via the form. Acceptable for now; admin manual merge in Guest Directory if it matters.
+
+#### K. Anonymous spectator (no action)
+
+> A friend forwards an event link. The recipient looks but doesn't RSVP.
+
+1. `/events/:id`, anon. Sees event, flyer, public attendee list (first names + Instagram handles only, per `public_guest_profiles`).
+2. Closes tab. No record created.
+3. This is the only path that produces no guest row, and that's correct — we don't want passive viewers cluttering the directory.
 
 ---
 
@@ -144,7 +325,7 @@ paid ──[scanner: check_in_ticket]──▶ paid + checked_in_at (idempotent)
 ### 4.4 Invite (single)
 
 **Create** (`InviteForm.tsx`):
-- Inviter must be a known guest in `localStorage`. If not, force them through an "Identify yourself" mini-form first.
+- Inviter must be a recognized guest (per §3a.1). If anon, the inline "I've been here before" link or a one-field identification step runs first — no separate "sign in" page.
 - Insert `invites(event_id, invited_by, invited_email|invited_phone, token)`. Token auto-generated.
 - Fire `send-invite` edge function with the new token.
 - **Rule:** at most one outstanding invite per `(event_id, invited_email|invited_phone, invited_by)`. If a duplicate is attempted, **reuse the existing token** and re-send the notification (idempotent from the inviter's perspective). Add a partial unique index:
@@ -416,6 +597,11 @@ Tracked here so future work has a checklist; not all are blocking.
 10. Admin UI: bulk_invite_jobs table + page that supports preview/confirm/resume (§8).
 11. Admin UI: mass notification composer with audience selectors (§9).
 12. Webhook handlers for SMS `STOP` and email unsubscribe → set `notification_preference='none'`.
+13. Migration: `ambient_tokens` table (or extend `magic_links` with `kind` column) — `(token, guest_id, expires_at, kind)`. Long-lived (90 days), rotated per send.
+14. `send-notification` edge fn: append `?as=<ambient_token>` to every link in the rendered email/SMS body. Token lookup endpoint resolves to `guest_id` and sets localStorage on page load.
+15. Add `get_my_guest()` consumer logic to `PublicLayout` so every page header reflects recognition state ("Hi, Lina · not you?").
+16. Promote `/find-tickets` UX: add "I've been here before" link to Home and EventDetail headers, rename page copy away from "Find tickets" to "Pick up where you left off" (the page already does more than tickets).
+17. EventDetail: when invited via `/invite/:token`, prefill the contact field that matches `invited_email` or `invited_phone` (provisional identity, no `guest_id` written until RSVP submit).
 
 ---
 
