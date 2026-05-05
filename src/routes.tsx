@@ -85,6 +85,9 @@ const AdminEventCheckIn = lazy(() =>
 const AdminEventBulkInvite = lazy(() =>
   import('./pages/admin/EventBulkInvite').then(m => ({ default: m.AdminEventBulkInvite }))
 )
+const AdminEventBlast = lazy(() =>
+  import('./pages/admin/EventBlast').then(m => ({ default: m.AdminEventBlast }))
+)
 const DesignPreviewIndex = lazy(() =>
   import('./pages/admin/design-preview').then(m => ({ default: m.DesignPreviewIndex }))
 )
@@ -153,6 +156,7 @@ export const router = createBrowserRouter([
       { path: 'events/:id/tickets', element: <AdminEventTickets /> },
       { path: 'events/:id/checkin', element: <AdminEventCheckIn /> },
       { path: 'events/:id/invite', element: <AdminEventBulkInvite /> },
+      { path: 'events/:id/blast', element: <AdminEventBlast /> },
       { path: 'events/:id/waitlist', element: <AdminEventWaitlist /> },
       { path: 'menus', element: <AdminMenuList /> },
       { path: 'menus/new', element: <AdminMenuForm /> },

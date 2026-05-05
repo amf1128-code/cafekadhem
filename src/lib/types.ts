@@ -199,6 +199,20 @@ export interface NotificationLog {
   error: string | null
 }
 
+export interface NotificationBlast {
+  id: string
+  event_id: string
+  audience: 'yes_only' | 'yes_and_maybe' | 'all_invited'
+  email_subject: string
+  email_body: string
+  sms_body: string
+  status: 'pending' | 'sending' | 'sent' | 'failed'
+  sent_count: number
+  failed_count: number
+  sent_at: string | null
+  created_at: string
+}
+
 // Cart types for pre-order flow
 export interface CartItem {
   menuItem: MenuItem
