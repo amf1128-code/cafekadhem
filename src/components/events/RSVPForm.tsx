@@ -77,10 +77,7 @@ export function RSVPForm({ eventId, event, existingRsvp, isFull, onRsvpComplete 
     const guestToken = getGuestToken()
     if (guestToken) {
       supabase
-        .from('guests')
-        .select('*')
-        .eq('id', guestToken)
-        .single()
+        .rpc('get_my_guest', { p_guest_id: guestToken })
         .then(({ data }) => {
           if (data) {
             setFirstName(data.first_name)
@@ -123,56 +120,23 @@ export function RSVPForm({ eventId, event, existingRsvp, isFull, onRsvpComplete 
     setLoading(true)
 
     try {
-      let guestId = getGuestToken()
-
-      const guestData = {
-        first_name: firstName.trim(),
-        last_name: lastName.trim() || null,
-        email: email.trim() || null,
-        phone: phone.trim() ? normalizePhone(phone.trim()) : null,
-        instagram: instagram.trim() ? normalizeInstagram(instagram.trim()) : null,
-        notification_preference: notifPref,
-      }
-
-      if (guestId) {
-        // Update existing guest
-        await supabase.from('guests').update(guestData).eq('id', guestId)
-      } else {
-        // Check for dedup by email or phone
-        let existing = null
-        if (guestData.email) {
-          const { data } = await supabase
-            .from('guests')
-            .select('id')
-            .eq('email', guestData.email)
-            .limit(1)
-            .single()
-          existing = data
-        }
-        if (!existing && guestData.phone) {
-          const { data } = await supabase
-            .from('guests')
-            .select('id')
-            .eq('phone', guestData.phone)
-            .limit(1)
-            .single()
-          existing = data
-        }
-
-        if (existing) {
-          guestId = existing.id
-          await supabase.from('guests').update(guestData).eq('id', guestId)
-        } else {
-          const { data: newGuest } = await supabase
-            .from('guests')
-            .insert(guestData)
-            .select('id')
-            .single()
-          if (newGuest) guestId = newGuest.id
-        }
-      }
-
-      if (!guestId) throw new Error('Failed to create guest record')
+      // Single round-trip upsert: dedups by email/phone server-side or
+      // updates by id when we already have a localStorage token. The
+      // form covers all six guest fields, so we send all six.
+      const { data: guest, error: guestErr } = await supabase.rpc('upsert_guest', {
+        p_fields: {
+          first_name: firstName.trim(),
+          last_name: lastName.trim() || null,
+          email: email.trim() || null,
+          phone: phone.trim() ? normalizePhone(phone.trim()) : null,
+          instagram: instagram.trim() ? normalizeInstagram(instagram.trim()) : null,
+          notification_preference: notifPref,
+        },
+        p_guest_id: getGuestToken(),
+      })
+      if (guestErr) throw guestErr
+      if (!guest) throw new Error('Failed to create guest record')
+      const guestId = guest.id
       setGuestToken(guestId)
 
       // Use safe_create_rsvp function for capacity enforcement

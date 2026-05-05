@@ -91,11 +91,9 @@ export function Pickup() {
     // Pre-fill guest info
     const guestToken = getGuestToken()
     if (guestToken) {
-      const { data: guest } = await supabase
-        .from('guests')
-        .select('*')
-        .eq('id', guestToken)
-        .single()
+      const { data: guest } = await supabase.rpc('get_my_guest', {
+        p_guest_id: guestToken,
+      })
       if (guest) {
         setFirstName(guest.first_name)
         if (guest.email) setEmail(guest.email)
@@ -183,39 +181,22 @@ export function Pickup() {
     setSubmitting(true)
 
     try {
-      // Upsert guest
-      let guestId = getGuestToken()
-      const guestData = {
-        first_name: firstName.trim(),
-        email: email.trim() || null,
-        phone: phone.trim() ? normalizePhone(phone.trim()) : null,
-      }
-
-      if (guestId) {
-        await supabase.from('guests').update(guestData).eq('id', guestId)
-      } else {
-        let existingQuery = supabase.from('guests').select('id')
-        if (guestData.email) {
-          existingQuery = existingQuery.eq('email', guestData.email)
-        } else if (guestData.phone) {
-          existingQuery = existingQuery.eq('phone', guestData.phone)
-        }
-        const { data: existing } = await existingQuery.limit(1).single()
-
-        if (existing) {
-          guestId = existing.id
-          await supabase.from('guests').update(guestData).eq('id', guestId)
-        } else {
-          const { data: newGuest } = await supabase
-            .from('guests')
-            .insert(guestData)
-            .select('id')
-            .single()
-          if (newGuest) guestId = newGuest.id
-        }
-      }
-
-      if (!guestId) throw new Error('Failed to create guest')
+      // Single round-trip upsert: dedups by email/phone server-side or
+      // updates by id when we already have a localStorage token. Pickup
+      // only collects first/email/phone, so we send only those three —
+      // last_name / instagram / notification_preference stay whatever
+      // the guest set on a prior form.
+      const { data: guest, error: guestErr } = await supabase.rpc('upsert_guest', {
+        p_fields: {
+          first_name: firstName.trim(),
+          email: email.trim() || null,
+          phone: phone.trim() ? normalizePhone(phone.trim()) : null,
+        },
+        p_guest_id: getGuestToken(),
+      })
+      if (guestErr) throw guestErr
+      if (!guest) throw new Error('Failed to create guest')
+      const guestId = guest.id
       setGuestToken(guestId)
 
       const venmoNote = `${firstName.trim()} - Pickup ${selectedDate}`
@@ -250,11 +231,11 @@ export function Pickup() {
       // Generate payment link
       if (!settings?.venmo_handle) throw new Error('Venmo handle not configured')
       const provider = getPaymentProvider('venmo')
-      const guest = { id: guestId, first_name: firstName.trim() } as any
+      const paymentGuest = { id: guestId, first_name: firstName.trim() } as any
       const fakeEvent = { title: `Pickup ${selectedDate}` } as any
       const paymentLink = provider.generatePaymentLink(
         { ...order, total } as any,
-        guest,
+        paymentGuest,
         fakeEvent,
         settings.venmo_handle
       )
