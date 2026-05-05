@@ -188,18 +188,12 @@ export function RSVPForm({ eventId, event, existingRsvp, existingPlusOne, isFull
         fields.phone = phone.trim() ? normalizePhone(phone.trim()) : null
       }
 
-      const localToken = getGuestToken()
-      const guestIdHint = existingRsvp?.guest_id ?? localToken
-      // When editing an existing RSVP, use the guest_id from the DB record
-      // rather than the localStorage token. The token can be stale (e.g. after
-      // the form unmounts/remounts during loadEvent), which causes upsert_guest
-      // to fall through to the INSERT path and create a duplicate guest + RSVP.
-      console.group('[RSVP] handleRSVP', status)
-      console.log('existingRsvp id  :', existingRsvp?.id ?? null)
-      console.log('existingRsvp gid :', existingRsvp?.guest_id ?? null)
-      console.log('localStorage token:', localToken)
-      console.log('hint sent to upsert_guest:', guestIdHint)
-      console.log('token === existingRsvp.guest_id:', localToken === existingRsvp?.guest_id)
+      // When editing an existing RSVP, prefer the DB-authoritative guest_id
+      // from the RSVP row over the localStorage token. The token can be stale
+      // (e.g. after the form unmounts/remounts during loadEvent), which would
+      // make upsert_guest fall through to the dedup/insert path and risk
+      // returning a different guest than the one the RSVP belongs to.
+      const guestIdHint = existingRsvp?.guest_id ?? getGuestToken()
 
       const { data: guest, error: guestErr } = await supabase.rpc('upsert_guest', {
         p_fields: fields,
@@ -208,8 +202,6 @@ export function RSVPForm({ eventId, event, existingRsvp, existingPlusOne, isFull
       if (guestErr) throw guestErr
       if (!guest) throw new Error('Failed to create guest record')
       const guestId = guest.id
-      console.log('upsert_guest returned id:', guestId)
-      console.log('guest id changed?', guestId !== guestIdHint, { was: guestIdHint, now: guestId })
       setGuestToken(guestId)
 
       // Use safe_create_rsvp function for capacity enforcement
@@ -220,9 +212,6 @@ export function RSVPForm({ eventId, event, existingRsvp, existingPlusOne, isFull
       })
 
       if (rsvpError) throw rsvpError
-      console.log('safe_create_rsvp returned:', { id: rsvpResult?.id, status: rsvpResult?.status })
-      console.log('rsvp id matches existing?', rsvpResult?.id === existingRsvp?.id, { existing: existingRsvp?.id, returned: rsvpResult?.id })
-      console.groupEnd()
 
       // Plus-one reconciliation. Four shapes to consider, run after the
       // host's RSVP has been upserted:
@@ -343,8 +332,6 @@ export function RSVPForm({ eventId, event, existingRsvp, existingPlusOne, isFull
       setShowForm(false)
       onRsvpComplete()
     } catch (err) {
-      console.error('[RSVP] handleRSVP error:', err)
-      console.groupEnd()
       addToast(err instanceof Error ? err.message : 'Failed to RSVP', 'error')
     } finally {
       setLoading(false)
