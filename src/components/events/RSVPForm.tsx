@@ -187,9 +187,13 @@ export function RSVPForm({ eventId, event, existingRsvp, existingPlusOne, isFull
       if (smsEnabled) {
         fields.phone = phone.trim() ? normalizePhone(phone.trim()) : null
       }
+      // When editing an existing RSVP, use the guest_id from the DB record
+      // rather than the localStorage token. The token can be stale (e.g. after
+      // the form unmounts/remounts during loadEvent), which causes upsert_guest
+      // to fall through to the INSERT path and create a duplicate guest + RSVP.
       const { data: guest, error: guestErr } = await supabase.rpc('upsert_guest', {
         p_fields: fields,
-        p_guest_id: getGuestToken(),
+        p_guest_id: existingRsvp?.guest_id ?? getGuestToken(),
       })
       if (guestErr) throw guestErr
       if (!guest) throw new Error('Failed to create guest record')
