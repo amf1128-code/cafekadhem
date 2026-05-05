@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { useParams, Link, useSearchParams } from 'react-router-dom'
+import { useParams, Link, useLocation } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import type { Event, Menu, MenuItem, RSVP, PublicGuestProfile } from '../lib/types'
 import { formatDate, formatTime } from '../lib/utils/date'
@@ -14,8 +14,8 @@ import { usePageTheme } from '../lib/theme/themes'
 
 export function EventDetail() {
   const { id } = useParams<{ id: string }>()
-  const [searchParams] = useSearchParams()
-  const invitedBy = searchParams.get('invited_by')
+  const location = useLocation()
+  const invitedBy = (location.state as { invitedBy?: string } | null)?.invitedBy ?? null
   const [event, setEvent] = useState<Event | null>(null)
   const [menu, setMenu] = useState<Menu | null>(null)
   const [menuItems, setMenuItems] = useState<MenuItem[]>([])
@@ -159,6 +159,8 @@ export function EventDetail() {
               <img
                 src={event.flyer_url}
                 alt={event.title}
+                loading="lazy"
+                decoding="async"
                 className="w-full aspect-[3/4] object-cover"
               />
             </div>

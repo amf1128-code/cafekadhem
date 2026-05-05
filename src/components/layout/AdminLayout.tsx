@@ -1,5 +1,7 @@
+import { Suspense } from 'react'
 import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
+import { PageLoader } from '../ui/LoadingSpinner'
 
 const navItems = [
   { path: '/admin', label: 'Dashboard' },
@@ -52,7 +54,9 @@ export function AdminLayout() {
       </nav>
 
       <main className="max-w-6xl mx-auto px-4 py-6">
-        <Outlet />
+        <Suspense fallback={<PageLoader />}>
+          <Outlet />
+        </Suspense>
       </main>
     </div>
   )

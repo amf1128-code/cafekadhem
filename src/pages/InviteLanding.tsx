@@ -45,9 +45,14 @@ export function InviteLanding() {
     )
   }
 
-  // Redirect to event page with invite context
-  const searchParams = new URLSearchParams()
-  if (inviterName) searchParams.set('invited_by', inviterName)
-
-  return <Navigate to={`/events/${invite.event_id}?${searchParams.toString()}`} replace />
+  // Redirect to event page with invite context. The inviter's first name
+  // is passed via router state (not querystring) so it doesn't leak into
+  // browser history, referrer headers, or shared/forwarded links.
+  return (
+    <Navigate
+      to={`/events/${invite.event_id}`}
+      state={inviterName ? { invitedBy: inviterName } : undefined}
+      replace
+    />
+  )
 }
