@@ -114,6 +114,9 @@ export interface RSVP {
   ticket_token: string | null
   paid_at: string | null
   checked_in_at: string | null
+  // When set, this row represents a plus-one and points back to the
+  // host's RSVP. The host RSVP has plus_one_of = null.
+  plus_one_of: string | null
   created_at: string
   updated_at: string
   // Joined

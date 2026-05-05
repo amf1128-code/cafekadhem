@@ -48,6 +48,12 @@ export function RSVPForm({ eventId, event, existingRsvp, isFull, onRsvpComplete 
   // setting says so.
   const [smsEnabled, setSmsEnabled] = useState(false)
   const [markingPaid, setMarkingPaid] = useState(false)
+  // Plus-one state. Available on first-time RSVPs to non-ticketed events
+  // (ticketed events would require collecting a second payment, which
+  // is out of scope for the +1 flow).
+  const [plusOne, setPlusOne] = useState(false)
+  const [plusOneName, setPlusOneName] = useState('')
+  const showPlusOneToggle = !existingRsvp && !event?.ticketing_enabled
 
   useEffect(() => {
     supabase
@@ -139,6 +145,15 @@ export function RSVPForm({ eventId, event, existingRsvp, isFull, onRsvpComplete 
       addToast('Invalid Instagram handle format.', 'error')
       return
     }
+    // Plus-one is only attempted alongside an actual reservation, and
+    // only when the toggle is on. If the user toggled it but left the
+    // name blank, ask before submitting (rather than silently dropping
+    // their +1 intent).
+    const wantPlusOne = showPlusOneToggle && plusOne && status === 'yes'
+    if (wantPlusOne && !plusOneName.trim()) {
+      addToast("Please enter your plus-one's first name, or turn the +1 off.", 'error')
+      return
+    }
 
     setLoading(true)
 
@@ -177,6 +192,24 @@ export function RSVPForm({ eventId, event, existingRsvp, isFull, onRsvpComplete 
 
       if (rsvpError) throw rsvpError
 
+      // Plus-one: chained after the host's RSVP so we have its id to link
+      // against. If the +1 ends up waitlisted (capacity exhausted by the
+      // host's seat) we just surface that in the toast — the row is still
+      // created, admin can promote later.
+      let plusOneRsvp: { status?: string; waitlist_position?: number } | null = null
+      if (wantPlusOne && rsvpResult?.id) {
+        const { data: poData, error: poError } = await supabase.rpc('add_plus_one', {
+          p_parent_rsvp_id: rsvpResult.id,
+          p_first_name: plusOneName.trim(),
+        })
+        if (poError) {
+          // Host RSVP succeeded; surface the +1 failure but don't unwind.
+          addToast(`RSVP saved, but couldn't add your +1: ${poError.message}`, 'error')
+        } else {
+          plusOneRsvp = poData
+        }
+      }
+
       // Send notification
       if (status !== 'no') {
         const finalStatus = rsvpResult?.status || status
@@ -192,16 +225,21 @@ export function RSVPForm({ eventId, event, existingRsvp, isFull, onRsvpComplete 
       }
 
       const returnedStatus = rsvpResult?.status
+      const plusOneSuffix = plusOneRsvp
+        ? plusOneRsvp.status === 'waitlisted'
+          ? ` Your +1 ${plusOneName.trim()} is on the waitlist — capacity was hit on this seat.`
+          : ` ${plusOneName.trim()} is in too.`
+        : ''
       if (returnedStatus === 'waitlisted') {
         const pos = rsvpResult?.waitlist_position
-        addToast(`You're on the waitlist${pos ? ` (position #${pos})` : ''}!`)
+        addToast(`You're on the waitlist${pos ? ` (position #${pos})` : ''}!${plusOneSuffix}`)
       } else {
         addToast(
-          status === 'yes'
+          (status === 'yes'
             ? "You're going!"
             : status === 'maybe'
             ? 'Marked as maybe.'
-            : 'RSVP updated.'
+            : 'RSVP updated.') + plusOneSuffix
         )
       }
 
@@ -374,6 +412,32 @@ export function RSVPForm({ eventId, event, existingRsvp, isFull, onRsvpComplete 
           <option value="none">None</option>
         </select>
       </div>
+
+      {/* Plus-one toggle. Only shown for first-time RSVPs to non-ticketed
+          events; the +1 is created when the user clicks Reserve a Seat. */}
+      {showPlusOneToggle && (
+        <div className="space-y-3 pt-1">
+          <label className="flex items-center gap-3 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={plusOne}
+              onChange={e => setPlusOne(e.target.checked)}
+              className="h-4 w-4"
+            />
+            <span className="text-[10px] tracking-[0.2em] uppercase text-ink-muted">
+              Bringing a +1?
+            </span>
+          </label>
+          {plusOne && (
+            <UnderlineInput
+              label="+1 Name"
+              value={plusOneName}
+              onChange={e => setPlusOneName(e.target.value)}
+              placeholder="Their first name"
+            />
+          )}
+        </div>
+      )}
 
       {/* RSVP buttons — bracket style */}
       <div className="flex justify-center pt-4">
