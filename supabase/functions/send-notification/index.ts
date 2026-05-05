@@ -94,6 +94,101 @@ function formatEventWhen(date: string, startTime: string, endTime: string | null
   return `${dateStr} at ${start}`
 }
 
+// ICS calendar-attachment helpers. Mail clients (Gmail, Apple Mail,
+// Outlook) detect text/calendar attachments and surface a one-click
+// "Add to Calendar" button.
+
+// Convert an ET wall-clock datetime (the format the events table stores)
+// into a UTC Date instant. Handles EST/EDT correctly: we sample noon UTC
+// on the target date and read back the ET hour to recover the offset
+// for that day.
+function etDateTimeToUtc(date: string, time: string): Date {
+  const sample = new Date(`${date}T12:00:00Z`)
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/New_York',
+    hour12: false,
+    hour: '2-digit',
+  }).formatToParts(sample)
+  const etHour = Number(parts.find((p) => p.type === 'hour')!.value)
+  // 12 UTC -> 7 ET means EST (UTC-5); 8 ET means EDT (UTC-4).
+  const offsetHours = etHour === 7 ? -5 : -4
+  const [y, mo, d] = date.split('-').map(Number)
+  const [h, mi] = time.split(':').map(Number)
+  return new Date(Date.UTC(y, mo - 1, d, h - offsetHours, mi))
+}
+
+function toIcsUtc(d: Date): string {
+  // ICS UTC format: YYYYMMDDTHHMMSSZ (no dashes, no colons, no millis).
+  return d.toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '')
+}
+
+function escapeIcs(s: string): string {
+  // RFC 5545 §3.3.11: escape backslash, semicolon, comma, newline.
+  return s
+    .replace(/\\/g, '\\\\')
+    .replace(/;/g, '\\;')
+    .replace(/,/g, '\\,')
+    .replace(/\r?\n/g, '\\n')
+}
+
+// Base64-encode a UTF-8 string. Plain btoa() only accepts Latin-1, so
+// any Arabic / accented / emoji content in an event title or location
+// would throw InvalidCharacterError. We round-trip through TextEncoder
+// to keep multi-byte chars intact.
+function utf8ToBase64(s: string): string {
+  const bytes = new TextEncoder().encode(s)
+  let binary = ''
+  for (let i = 0; i < bytes.length; i++) {
+    binary += String.fromCharCode(bytes[i])
+  }
+  return btoa(binary)
+}
+
+interface IcsOpts {
+  uid: string
+  summary: string
+  description: string
+  location: string
+  date: string
+  startTime: string
+  endTime: string | null
+  url: string
+  status: 'CONFIRMED' | 'TENTATIVE'
+}
+
+function buildIcs(opts: IcsOpts): string {
+  const start = etDateTimeToUtc(opts.date, opts.startTime)
+  // Default to a 2-hour event when no end_time is set; matches what most
+  // calendar clients show by default for a missing DTEND.
+  const end = opts.endTime
+    ? etDateTimeToUtc(opts.date, opts.endTime)
+    : new Date(start.getTime() + 2 * 60 * 60 * 1000)
+
+  const lines = [
+    'BEGIN:VCALENDAR',
+    'VERSION:2.0',
+    'PRODID:-//Cafe Kadhem//RSVP//EN',
+    'CALSCALE:GREGORIAN',
+    // PUBLISH (vs REQUEST) tells the client this is an event the user
+    // is being told about, not a meeting invitation expecting a response.
+    'METHOD:PUBLISH',
+    'BEGIN:VEVENT',
+    `UID:${opts.uid}`,
+    `DTSTAMP:${toIcsUtc(new Date())}`,
+    `DTSTART:${toIcsUtc(start)}`,
+    `DTEND:${toIcsUtc(end)}`,
+    `SUMMARY:${escapeIcs(opts.summary)}`,
+    `DESCRIPTION:${escapeIcs(opts.description)}`,
+    `LOCATION:${escapeIcs(opts.location)}`,
+    `URL:${opts.url}`,
+    `STATUS:${opts.status}`,
+    'END:VEVENT',
+    'END:VCALENDAR',
+  ]
+  // CRLF line endings are required by RFC 5545.
+  return lines.join('\r\n')
+}
+
 // Generate a QR PNG-equivalent (GIF) for the ticket URL and upload it to
 // the public 'tickets' Supabase Storage bucket. The email <img> points at
 // the storage public URL; the image is served from our own infra. Returns
@@ -352,7 +447,19 @@ async function sendSMS(to: string, body: string): Promise<boolean> {
   return response.ok
 }
 
-async function sendEmail(to: string, subject: string, body: string, html?: string): Promise<boolean> {
+interface EmailAttachment {
+  filename: string
+  content: string // base64
+  contentType: string
+}
+
+async function sendEmail(
+  to: string,
+  subject: string,
+  body: string,
+  html?: string,
+  attachments?: EmailAttachment[],
+): Promise<boolean> {
   if (!RESEND_API_KEY) {
     console.error('RESEND_API_KEY not configured')
     return false
@@ -365,6 +472,7 @@ async function sendEmail(to: string, subject: string, body: string, html?: strin
     text: body,
   }
   if (html) payload.html = html
+  if (attachments && attachments.length > 0) payload.attachments = attachments
 
   const response = await fetch('https://api.resend.com/emails', {
     method: 'POST',
@@ -429,20 +537,32 @@ Deno.serve(async (req: Request) => {
 
     // Get event info for message templates. Pulled in one shot so any
     // template can render title / when / where / link without each one
-    // having to query the events row again.
+    // having to query the events row again. Hoisted to the outer scope
+    // so the calendar-attachment block below can also reach the raw
+    // date/time fields.
+    let eventRow: {
+      title: string
+      date: string
+      start_time: string
+      end_time: string | null
+      location: string
+      location_name: string | null
+      event_type: string | null
+    } | null = null
     if (eventId) {
-      const { data: event } = await supabase
+      const { data: e } = await supabase
         .from('events')
         .select('title, date, start_time, end_time, location, location_name, event_type')
         .eq('id', eventId)
         .single()
-      if (event) {
-        data.event_title = event.title
-        if (event.event_type) data.event_type = event.event_type
-        data.event_when = formatEventWhen(event.date, event.start_time, event.end_time)
-        data.event_where = event.location_name
-          ? `${event.location_name} (${event.location})`
-          : event.location
+      eventRow = e
+      if (eventRow) {
+        data.event_title = eventRow.title
+        if (eventRow.event_type) data.event_type = eventRow.event_type
+        data.event_when = formatEventWhen(eventRow.date, eventRow.start_time, eventRow.end_time)
+        data.event_where = eventRow.location_name
+          ? `${eventRow.location_name} (${eventRow.location})`
+          : eventRow.location
         const siteUrl = await getSiteUrl()
         data.event_url = `${siteUrl}/events/${eventId}`
       }
@@ -508,12 +628,47 @@ Deno.serve(async (req: Request) => {
     let success = false
     let channel: 'sms' | 'email' = 'email'
 
+    // Build the calendar attachment for confirmed/tentative RSVPs so
+    // mail clients can offer one-click "Add to Calendar." Skipped for
+    // waitlisted guests (their attendance is not actually scheduled)
+    // and for non-RSVP message types. UID is stable per (event, guest)
+    // so a re-RSVP updates the same calendar entry instead of creating
+    // a duplicate one.
+    let attachments: EmailAttachment[] | undefined
+    if (
+      type === 'rsvp_confirmation' &&
+      eventRow &&
+      eventId &&
+      (data.status === 'yes' || data.status === 'maybe')
+    ) {
+      const ics = buildIcs({
+        uid: `rsvp-${eventId}-${guestId}@cafekadhem.com`,
+        summary: eventRow.title,
+        description: `Your RSVP for ${eventRow.title}.${data.event_url ? `\n\nDetails: ${data.event_url}` : ''}`,
+        location: eventRow.location_name
+          ? `${eventRow.location_name}, ${eventRow.location}`
+          : eventRow.location,
+        date: eventRow.date,
+        startTime: eventRow.start_time,
+        endTime: eventRow.end_time,
+        url: data.event_url || '',
+        status: data.status === 'yes' ? 'CONFIRMED' : 'TENTATIVE',
+      })
+      attachments = [
+        {
+          filename: 'event.ics',
+          content: utf8ToBase64(ics),
+          contentType: 'text/calendar; method=PUBLISH; charset=UTF-8',
+        },
+      ]
+    }
+
     if (preference === 'sms' && guest.phone) {
       channel = 'sms'
       success = await sendSMS(guest.phone, body)
     } else if (preference === 'email' && guest.email) {
       channel = 'email'
-      success = await sendEmail(guest.email, subject, body, html)
+      success = await sendEmail(guest.email, subject, body, html, attachments)
     } else if (preference === 'none') {
       // Guest opted out
       return new Response(JSON.stringify({ success: true, channel: 'none', skipped: true }), {
@@ -523,7 +678,7 @@ Deno.serve(async (req: Request) => {
       // Fallback: try email first, then SMS
       if (guest.email) {
         channel = 'email'
-        success = await sendEmail(guest.email, subject, body, html)
+        success = await sendEmail(guest.email, subject, body, html, attachments)
       } else if (guest.phone) {
         channel = 'sms'
         success = await sendSMS(guest.phone, body)
