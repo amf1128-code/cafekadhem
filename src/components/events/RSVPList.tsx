@@ -8,61 +8,65 @@ interface RSVPListProps {
 }
 
 export function RSVPList({ rsvps }: RSVPListProps) {
-  const going = rsvps.filter(r => r.status === 'yes')
-  const maybe = rsvps.filter(r => r.status === 'maybe')
-  const waitlisted = rsvps.filter(r => r.status === 'waitlisted')
+  // Section counts include +1 rows so the totals here match the home
+  // card / event-summary seat math (capacity is consumed per row).
+  const goingCount = rsvps.filter(r => r.status === 'yes').length
+  const maybeCount = rsvps.filter(r => r.status === 'maybe').length
+  const waitlistedCount = rsvps.filter(r => r.status === 'waitlisted').length
 
-  if (going.length === 0 && maybe.length === 0 && waitlisted.length === 0) {
+  if (goingCount === 0 && maybeCount === 0 && waitlistedCount === 0) {
     return null
   }
 
-  // Build a lookup so each +1 row can resolve its host's display name. The
-  // map covers every visible status (yes / maybe / waitlisted) so a +1
-  // whose host fell off the going list (e.g. host moved to maybe) still
-  // resolves to a name rather than a blank annotation.
-  const rsvpById = new Map<string, RSVPRow>()
-  for (const r of rsvps) rsvpById.set(r.id, r)
-  function hostNameFor(rsvp: RSVPRow): string | null {
-    if (!rsvp.plus_one_of) return null
-    return rsvpById.get(rsvp.plus_one_of)?.guest?.first_name ?? null
+  // The rendered name list shows hosts only; a +1 surfaces as a badge on
+  // the host's row rather than as its own entry. This avoids the host's
+  // name appearing twice (once for them, once via the +1's annotation).
+  const goingHosts = rsvps.filter(r => r.status === 'yes' && !r.plus_one_of)
+  const maybeHosts = rsvps.filter(r => r.status === 'maybe' && !r.plus_one_of)
+  const waitlistedHosts = rsvps.filter(r => r.status === 'waitlisted' && !r.plus_one_of)
+
+  // host_rsvp_id -> true when that host has an attached +1.
+  const hostHasPlusOne = new Set<string>()
+  for (const r of rsvps) {
+    if (r.plus_one_of) hostHasPlusOne.add(r.plus_one_of)
   }
 
   return (
     <div className="space-y-6">
-      {going.length > 0 && (
+      {goingCount > 0 && (
         <div>
           <p className="text-[10px] tracking-[0.2em] uppercase text-ink-muted mb-3">
-            Going ({going.length})
+            Going ({goingCount})
           </p>
           <div className="flex flex-wrap gap-x-6 gap-y-2">
-            {going.map(rsvp => (
-              <GuestName key={rsvp.id} rsvp={rsvp} hostName={hostNameFor(rsvp)} />
+            {goingHosts.map(rsvp => (
+              <GuestName key={rsvp.id} rsvp={rsvp} hasPlusOne={hostHasPlusOne.has(rsvp.id)} />
             ))}
           </div>
         </div>
       )}
 
-      {maybe.length > 0 && (
+      {maybeCount > 0 && (
         <div>
           <p className="text-[10px] tracking-[0.2em] uppercase text-ink-muted mb-3">
-            Maybe ({maybe.length})
+            Maybe ({maybeCount})
           </p>
           <div className="flex flex-wrap gap-x-6 gap-y-2">
-            {maybe.map(rsvp => (
-              <GuestName key={rsvp.id} rsvp={rsvp} hostName={hostNameFor(rsvp)} />
+            {maybeHosts.map(rsvp => (
+              <GuestName key={rsvp.id} rsvp={rsvp} hasPlusOne={hostHasPlusOne.has(rsvp.id)} />
             ))}
           </div>
         </div>
       )}
 
-      {waitlisted.length > 0 && (
+      {waitlistedCount > 0 && (
         <div>
           <p className="text-[10px] tracking-[0.2em] uppercase text-ink-muted mb-3">
-            Waitlist ({waitlisted.length})
+            Waitlist ({waitlistedCount})
           </p>
           <div className="flex flex-wrap gap-x-6 gap-y-2">
-            {waitlisted.map(rsvp => (
-              <GuestName key={rsvp.id} rsvp={rsvp} hostName={hostNameFor(rsvp)} />
+            {waitlistedHosts.map(rsvp => (
+              <GuestName key={rsvp.id} rsvp={rsvp} hasPlusOne={hostHasPlusOne.has(rsvp.id)} />
             ))}
           </div>
         </div>
@@ -71,22 +75,14 @@ export function RSVPList({ rsvps }: RSVPListProps) {
   )
 }
 
-function GuestName({ rsvp, hostName }: { rsvp: RSVPRow; hostName: string | null }) {
+function GuestName({ rsvp, hasPlusOne }: { rsvp: RSVPRow; hasPlusOne: boolean }) {
   const guest = rsvp.guest
-  // Plus-one rows render as "[host] +1" rather than the +1's own name.
-  // The captured +1 first name still lives on the guest row (visible to
-  // the host in their RSVP edit view and to admins) — it just isn't
-  // surfaced in the public guest list.
-  if (rsvp.plus_one_of && hostName) {
-    return (
-      <span className="inline-flex items-center gap-1.5 font-serif text-ink">
-        {hostName} <span className="text-ink-muted">+1</span>
-      </span>
-    )
-  }
   return (
     <span className="inline-flex items-center gap-1.5 font-serif text-ink">
       {guest.first_name}
+      {hasPlusOne && (
+        <span className="text-xs text-ink-muted tracking-wide">+1</span>
+      )}
       {guest.instagram && (
         <a
           href={instagramUrl(guest.instagram)}
