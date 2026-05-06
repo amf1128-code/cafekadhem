@@ -1,11 +1,10 @@
 import { useEffect, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
-import type { PickupOrder, PickupOrderItem, MenuItem } from '../lib/types'
+import type { MenuItem, PickupOrder, PickupOrderItem } from '../lib/types'
 import { formatDate, formatTime } from '../lib/utils/date'
-import { PageLoader } from '../components/ui/LoadingSpinner'
 import { QRCode } from '../components/tickets/QRCode'
-import { usePageTheme } from '../lib/theme/themes'
+import { CinemaPageLoader } from '../components/cinema/primitives'
 
 type OrderRow = PickupOrder & {
   items: (PickupOrderItem & { menu_item: MenuItem | null })[]
@@ -21,8 +20,6 @@ const STATUS_LABELS: Record<string, string> = {
 
 export function PickupTicket() {
   const { token } = useParams<{ token: string }>()
-  // Pickup isn't tied to an event theme; keep the editorial archival look.
-  usePageTheme('theme1')
   const [order, setOrder] = useState<OrderRow | null>(null)
   const [loading, setLoading] = useState(true)
   const [notFound, setNotFound] = useState(false)
@@ -54,16 +51,24 @@ export function PickupTicket() {
     }
   }, [token])
 
-  if (loading) return <PageLoader />
+  if (loading) return <CinemaPageLoader />
 
   if (notFound || !order) {
     return (
-      <div className="max-w-2xl mx-auto px-6 py-16 text-center">
-        <p className="font-serif text-xl text-ink-muted italic">Order not found.</p>
-        <p className="text-sm text-ink-muted mt-3">
-          The link may be expired or mistyped. Check the email/text we sent for the latest one.
-        </p>
-      </div>
+      <section className="ck-page" style={{ textAlign: 'center', borderBottom: 'none' }}>
+        <div className="ck-narrow">
+          <div className="ck-eyebrow">✦ Hmm</div>
+          <h1 className="ck-h1" style={{ marginTop: 12 }}>
+            ORDER NOT
+            <br />
+            <span className="ck-italic">found</span>
+          </h1>
+          <p className="ck-italic" style={{ fontSize: 18, marginTop: 18 }}>
+            The link may be expired or mistyped. Check the email/text we
+            sent for the latest one.
+          </p>
+        </div>
+      </section>
     )
   }
 
@@ -72,77 +77,150 @@ export function PickupTicket() {
   const cancelled = order.status === 'cancelled'
 
   return (
-    <div className="max-w-2xl mx-auto px-6 py-8">
-      <div className="border border-warm bg-parchment-light p-6 md:p-10">
-        <p className="text-xs tracking-[0.25em] uppercase text-ink-muted mb-2 text-center">
-          Cafe Kadhem
-        </p>
-        <h1 className="font-serif text-2xl md:text-3xl text-forest-dark italic text-center mb-6">
-          Pick-Up Order
-        </h1>
+    <section className="ck-page" style={{ borderBottom: 'none' }}>
+      <div className="ck-narrow">
+        <div className="ck-eyebrow">✦ Pick-up order</div>
+        <div
+          className="ck-section-head-row"
+          style={{ marginTop: 6, alignItems: 'baseline' }}
+        >
+          <h1 className="ck-h1">PICK-UP.</h1>
+          <span
+            style={{
+              fontFamily: 'var(--ck-arabic-display)',
+              fontSize: 'clamp(40px, 5vw, 60px)',
+              direction: 'rtl',
+              color: 'var(--ck-cobalt)',
+              lineHeight: 0.9,
+            }}
+          >
+            استلام
+          </span>
+        </div>
 
-        <div className="border-t border-warm mb-6" />
-
-        <div className="grid grid-cols-2 gap-4 mb-6 text-center">
-          <div>
-            <p className="text-[10px] tracking-[0.2em] uppercase text-ink-muted mb-1">Pick-up</p>
-            <p className="font-serif text-lg text-ink">{formatDate(order.pickup_date)}</p>
-            <p className="text-sm text-ink-muted">{formatTime(order.pickup_time)}</p>
+        <div
+          className="ck-card"
+          style={{
+            marginTop: 28,
+            padding: 0,
+            display: 'grid',
+            gridTemplateColumns: '1fr',
+          }}
+        >
+          {/* QR code panel */}
+          <div
+            style={{
+              background: 'var(--ck-cream)',
+              padding: 32,
+              textAlign: 'center',
+              borderBottom: '2px dashed var(--ck-ink)',
+              opacity: pickedUp || cancelled ? 0.55 : 1,
+            }}
+          >
+            <div
+              style={{
+                display: 'inline-block',
+                border: '2px solid var(--ck-ink)',
+                background: 'var(--ck-cream)',
+                padding: 12,
+              }}
+            >
+              <QRCode value={url} size={240} />
+            </div>
+            <div className="ck-mono" style={{ marginTop: 14, opacity: 0.7 }}>
+              {pickedUp
+                ? 'Already picked up'
+                : cancelled
+                  ? 'Cancelled'
+                  : 'Show this at pickup'}
+            </div>
           </div>
-          <div>
-            <p className="text-[10px] tracking-[0.2em] uppercase text-ink-muted mb-1">Status</p>
-            <p className="font-serif text-lg text-ink">{STATUS_LABELS[order.status] || order.status}</p>
+
+          {/* Order details */}
+          <div style={{ padding: 24 }}>
+            <Row label="Pick-up" value={`${formatDate(order.pickup_date)} · ${formatTime(order.pickup_time)}`} />
+            <Row label="Status" value={STATUS_LABELS[order.status] || order.status} />
             {order.total != null && (
-              <p className="text-sm text-ink-muted">${order.total.toFixed(2)}</p>
+              <Row label="Total" value={`$${order.total.toFixed(2)}`} />
             )}
-          </div>
-        </div>
 
-        <div className="border-t border-warm mb-6" />
-
-        <div className="mb-6">
-          <p className="text-[10px] tracking-[0.2em] uppercase text-ink-muted mb-3 text-center">Items</p>
-          <div className="space-y-1">
-            {order.items.map(i => (
-              <div key={i.id} className="flex justify-between font-serif text-ink">
-                <span>{i.menu_item?.name || 'Unknown'} &times; {i.quantity}</span>
-                {i.unit_price != null && (
-                  <span>${(i.unit_price * i.quantity).toFixed(2)}</span>
-                )}
+            <div
+              style={{
+                marginTop: 14,
+                paddingTop: 14,
+                borderTop: '1px dashed var(--ck-ink)',
+              }}
+            >
+              <div className="ck-label" style={{ marginBottom: 6 }}>
+                Items
               </div>
-            ))}
+              {order.items.map(i => (
+                <div
+                  key={i.id}
+                  style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    padding: '6px 0',
+                    fontFamily: 'var(--ck-serif)',
+                    fontWeight: 700,
+                    fontSize: 16,
+                    borderBottom: '1px dashed rgba(13,13,15,0.15)',
+                  }}
+                >
+                  <span>
+                    {i.menu_item?.name || 'Unknown'}
+                    <span style={{ opacity: 0.55, marginLeft: 8 }}>× {i.quantity}</span>
+                  </span>
+                  {i.unit_price != null && (
+                    <span>${(i.unit_price * i.quantity).toFixed(2)}</span>
+                  )}
+                </div>
+              ))}
+            </div>
           </div>
         </div>
 
-        <div className="border-t border-warm mb-6" />
-
-        <div className="flex flex-col items-center">
-          {pickedUp ? (
-            <div className="text-center mb-4">
-              <p className="text-xs tracking-[0.2em] uppercase text-forest mb-1">Picked Up</p>
-              <p className="text-sm text-ink-muted italic">Thanks for stopping by.</p>
-            </div>
-          ) : cancelled ? (
-            <div className="text-center mb-4">
-              <p className="text-xs tracking-[0.2em] uppercase text-red-700 mb-1">Cancelled</p>
-              <p className="text-sm text-ink-muted italic">
-                This order has been cancelled. Reach out to your host with any questions.
-              </p>
-            </div>
-          ) : (
-            <p className="text-[10px] tracking-[0.2em] uppercase text-ink-muted mb-4">
-              Show this at pickup
-            </p>
-          )}
-          <div className={`p-4 bg-cream border border-warm ${pickedUp || cancelled ? 'opacity-50' : ''}`}>
-            <QRCode value={url} size={240} />
-          </div>
-        </div>
+        <p
+          style={{
+            fontFamily: 'var(--ck-mono)',
+            fontSize: 10,
+            letterSpacing: '0.16em',
+            textTransform: 'uppercase',
+            textAlign: 'center',
+            opacity: 0.6,
+            marginTop: 18,
+          }}
+        >
+          Save this page or screenshot the QR — ready at pickup.
+        </p>
       </div>
+    </section>
+  )
+}
 
-      <p className="text-center text-xs text-ink-muted mt-6">
-        Save this page or screenshot the QR so it's ready when you pick up.
-      </p>
+function Row({ label, value }: { label: string; value: string }) {
+  return (
+    <div
+      style={{
+        display: 'grid',
+        gridTemplateColumns: '90px 1fr',
+        gap: 12,
+        padding: '8px 0',
+        borderBottom: '1px solid rgba(13,13,15,0.1)',
+        alignItems: 'baseline',
+      }}
+    >
+      <span className="ck-label">{label}</span>
+      <span
+        style={{
+          fontFamily: 'var(--ck-serif)',
+          fontWeight: 700,
+          fontSize: 17,
+          lineHeight: 1.3,
+        }}
+      >
+        {value}
+      </span>
     </div>
   )
 }
