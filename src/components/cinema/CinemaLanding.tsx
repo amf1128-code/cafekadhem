@@ -3,7 +3,6 @@ import { Link } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import type { Event, MenuItem } from '../../lib/types'
 import { isUpcoming } from '../../lib/utils/date'
-import { CursorSticker } from './CursorSticker'
 import { Marquee } from './primitives'
 
 interface CinemaEvent {
@@ -236,10 +235,6 @@ export function CinemaLanding() {
 
       {/* STORY */}
       <StorySection />
-
-      {/* Cursor sticker — orange Arabic pill that follows the cursor and
-          cycles phrases on click. Brand "personality moment". */}
-      <CursorSticker />
     </>
   )
 }

@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import type { Event } from '../lib/types'
 import { formatDate, formatTime, isUpcoming } from '../lib/utils/date'
+import { CursorSticker } from '../components/CursorSticker'
 import { PageLoader } from '../components/ui/LoadingSpinner'
 import { useTheme, usePageTheme, type ThemeId } from '../lib/theme/themes'
 
@@ -248,6 +249,10 @@ export function Home() {
           </div>
         </div>
       )}
+
+      {/* Cursor sticker — orange Arabic pill that follows the cursor and
+          cycles phrases on click. Brand "personality moment". */}
+      <CursorSticker />
     </div>
   )
 }
