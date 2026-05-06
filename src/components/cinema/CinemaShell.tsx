@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, NavLink, Outlet, useLocation } from 'react-router-dom'
 import { clearMyGuest, useMyGuest } from '../../lib/identity/useMyGuest'
+import { AmbientTokenHandler } from '../layout/AmbientTokenHandler'
 import { KadhemLockup, Marquee, RegMark } from './primitives'
 
 const NAV_LINKS = [
@@ -63,7 +64,9 @@ export function CinemaShell() {
 
   return (
     <div className="cinema-root" style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
-      {/* TOP STRIP */}
+      {/* Resolves ?as=<token> recognition links and strips the param.
+          USER_FLOWS_SPEC §3a.1. Renders nothing visible. */}
+      <AmbientTokenHandler />      {/* TOP STRIP */}
       <div
         className="ck-strip"
         style={{

@@ -8,9 +8,9 @@ import { setGuestToken } from '../../lib/utils/guest-token'
  * caches it in localStorage, and strips the param from the URL so it
  * doesn't persist in the address bar / browser history.
  *
- * Mounted in PublicLayout so it runs on every public route. Idempotent
- * — re-running with the same param does nothing because the param is
- * stripped on first run.
+ * Mounted at the top of CinemaShell so it runs on every public route.
+ * Idempotent — re-running with the same param does nothing because the
+ * param is stripped on first run.
  *
  * USER_FLOWS_SPEC.md §3a.1 (URL token = highest-precedence identity source).
  */
