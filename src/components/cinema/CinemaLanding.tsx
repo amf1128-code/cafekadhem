@@ -65,8 +65,14 @@ const FALLBACK_AR = ['الكأس', 'عيد ميلاد', 'طرب', 'سينما']
 
 function padNo(n: string | number | null | undefined, fallback: string): string {
   if (n === null || n === undefined || n === '') return fallback
-  const s = String(n)
-  return s.length >= 3 ? s : s.padStart(3, '0')
+  // Admins sometimes type "No. 006" or "no 14" into the gathering_number
+  // field. Strip leading "No." / "Number" / etc. so we don't end up with
+  // "NO. No. 006" once the cinema landing prepends its own "NO." prefix.
+  const cleaned = String(n)
+    .replace(/^\s*(no\.?|number|num\.?|#)\s*/i, '')
+    .trim()
+  if (!cleaned) return fallback
+  return cleaned.length >= 3 ? cleaned : cleaned.padStart(3, '0')
 }
 
 function formatCinemaDate(dateStr: string): string {
@@ -161,27 +167,40 @@ function mapEvent(e: Event, idx: number, items: MenuItem[]): CinemaEvent {
   }
 }
 
+const DEFAULT_MENU_BLURB =
+  'The menu rotates with the night. This one travels with the pop-up — small, snackable, easy to eat one-handed.'
+
 export function CinemaLanding() {
   const [events, setEvents] = useState<CinemaEvent[]>([])
+  const [menuBlurb, setMenuBlurb] = useState<string>(DEFAULT_MENU_BLURB)
   const [loading, setLoading] = useState(true)
   const [navOpen, setNavOpen] = useState(false)
 
   useEffect(() => {
     let cancelled = false
     ;(async () => {
-      const { data } = await supabase
-        .from('events')
-        .select('*, menu:menus(id, name, items:menu_items(*))')
-        .eq('is_published', true)
-        .order('date', { ascending: true })
+      const [eventsResult, settingsResult] = await Promise.all([
+        supabase
+          .from('events')
+          .select('*, menu:menus(id, name, items:menu_items(*))')
+          .eq('is_published', true)
+          .order('date', { ascending: true }),
+        supabase
+          .from('admin_settings')
+          .select('current_menu_blurb')
+          .limit(1)
+          .maybeSingle(),
+      ])
 
       if (cancelled) return
-      const upcoming = (data ?? []).filter(e => isUpcoming(e.date))
+      const upcoming = (eventsResult.data ?? []).filter(e => isUpcoming(e.date))
       const mapped = upcoming.map((e, i) => {
         const items: MenuItem[] = e.menu?.items ?? []
         return mapEvent(e as Event, i, items)
       })
       setEvents(mapped)
+      const blurb = settingsResult.data?.current_menu_blurb?.trim()
+      if (blurb) setMenuBlurb(blurb)
       setLoading(false)
     })()
     return () => {
@@ -383,7 +402,9 @@ export function CinemaLanding() {
       <Marquee items={MARQUEE_ITEMS} />
 
       {/* CURRENT MENU — only render if the next event has menu items */}
-      {next && next.menu.length > 0 && <MenuSection event={next} />}
+      {next && next.menu.length > 0 && (
+        <MenuSection event={next} blurb={menuBlurb} />
+      )}
 
       {/* CALENDAR — small preview of the next 1-2 upcoming events
           AFTER the hero one. Full calendar is its own page (TODO). */}
@@ -520,7 +541,7 @@ function HeroSection({ event }: { event: CinemaEvent }) {
               />
             ) : null}
 
-            {/* Folio top-left */}
+            {/* Tape label top-left (was "FOLIO") */}
             <div
               style={{
                 position: 'absolute',
@@ -537,7 +558,7 @@ function HeroSection({ event }: { event: CinemaEvent }) {
                 zIndex: 2,
               }}
             >
-              FOLIO {event.no}
+              TAPE {event.no}
             </div>
 
             {/* Arabic word top-right */}
@@ -593,23 +614,25 @@ function HeroSection({ event }: { event: CinemaEvent }) {
                 style={{
                   fontFamily: 'var(--ck-serif)',
                   fontWeight: 900,
-                  fontSize: 22,
+                  fontSize: event.price > 0 ? 22 : 28,
                   lineHeight: 1,
-                  marginTop: 2,
+                  marginTop: event.price > 0 ? 2 : 4,
                 }}
               >
                 {event.price > 0 ? `$${event.price}` : 'FREE'}
               </div>
-              <div
-                style={{
-                  fontFamily: 'var(--ck-mono)',
-                  fontSize: 7,
-                  letterSpacing: '0.16em',
-                  marginTop: 2,
-                }}
-              >
-                SEAT
-              </div>
+              {event.price > 0 && (
+                <div
+                  style={{
+                    fontFamily: 'var(--ck-mono)',
+                    fontSize: 7,
+                    letterSpacing: '0.16em',
+                    marginTop: 2,
+                  }}
+                >
+                  SEAT
+                </div>
+              )}
             </div>
 
             {/* Date stamp bottom-left */}
@@ -917,7 +940,7 @@ function HeroEmpty() {
   )
 }
 
-function MenuSection({ event }: { event: CinemaEvent }) {
+function MenuSection({ event, blurb }: { event: CinemaEvent; blurb: string }) {
   return (
     <section
       id="menu"
@@ -994,8 +1017,7 @@ function MenuSection({ event }: { event: CinemaEvent }) {
               lineHeight: 1.4,
             }}
           >
-            The menu rotates with the night. This one travels with the pop-up — small,
-            snackable, easy to eat one-handed.
+            {blurb}
           </p>
         </div>
         <div
@@ -1381,7 +1403,7 @@ function StorySection() {
               fontWeight: 900,
               fontSize: 'clamp(56px, 7vw, 88px)',
               lineHeight: 0.82,
-              margin: '8px 0 22px',
+              margin: '8px 0 14px',
             }}
           >
             FOR KADHEM
@@ -1393,6 +1415,20 @@ function StorySection() {
             </span>
           </h2>
           <div
+            style={{
+              fontFamily: 'var(--ck-arabic-display)',
+              direction: 'rtl',
+              fontSize: 'clamp(36px, 4vw, 56px)',
+              color: 'var(--ck-sun)',
+              textShadow: '2px 2px 0 var(--ck-ink)',
+              lineHeight: 1,
+              marginBottom: 22,
+            }}
+            aria-label="Kadhem Al-Saher in Arabic"
+          >
+            كاظم الساهر
+          </div>
+          <div
             className="ck-story-cols"
             style={{
               columnCount: 2,
@@ -1403,21 +1439,22 @@ function StorySection() {
             }}
           >
             <p style={{ marginTop: 0 }}>
-              Cafe Kadhem is named for Kadhem Al-Saher — the Iraqi singer
-              whose voice plays in every taxi from Baghdad to Brooklyn. The
-              pop-ups are an excuse to put him on loud, cook Iraqi and Arab
-              food, and gather a room full of people who don't have to
-              explain themselves.
+              Cafe Kadhem is named for Kadhem Al-Saher, the Iraqi singer
+              whose voice plays in every taxi in Baghdad and was the
+              soundtrack to my childhood. The pop-ups are an excuse to put
+              him on loud, share the sweets that I bake too many of, and
+              bring community together for a great time.
             </p>
             <p>
-              Each night is its own thing — a watch party, a concert, a long
-              dinner. The constant: too much food, real music, and a table
+              Each night is its own thing — a bakery, a watch party, a DJ
+              set. But it's always too much food, good music, and a table
               everyone gets a seat at.
             </p>
             <p>
               Every dollar from these events goes to charity. So far we've
-              raised for Gaza, Sudan, and the Asiyah Women's Center here in
-              New York. Come hungry, bring a friend, stay for the music.
+              raised for Gaza, Sudan, and the Asiyah Women's Center here
+              in New York. Come hungry, bring a friend, tell them to bring
+              their friends, and stay as long as you want.
             </p>
           </div>
         </div>
