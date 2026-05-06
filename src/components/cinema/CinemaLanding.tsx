@@ -609,7 +609,7 @@ function HeroSection({ event }: { event: CinemaEvent }) {
           )}
 
           <Link
-            to={`/cinema/events/${event.id}`}
+            to={`/events/${event.id}`}
             style={{
               padding: '14px 22px',
               border: '2px solid var(--ck-ink)',
@@ -1016,7 +1016,7 @@ function CalendarSection({
           </div>
         </div>
         <Link
-          to="/cinema/calendar"
+          to="/calendar"
           style={{
             fontFamily: 'var(--ck-mono)',
             fontSize: 11,
@@ -1084,7 +1084,7 @@ function CalendarRow({
   // Whole row is a Link to the event detail page.
   return (
     <Link
-      to={`/cinema/events/${event.id}`}
+      to={`/events/${event.id}`}
       className="ck-cal-row"
       style={{
         display: 'grid',

@@ -6,7 +6,7 @@ import { isUpcoming } from '../../../lib/utils/date'
 import { CinemaPageLoader } from '../primitives'
 
 /**
- * /cinema/calendar — full event list. Two stacks:
+ * /calendar — full event list. Two stacks:
  *  1. Upcoming: every published event with a future date, soonest first.
  *  2. Past: every published event with a past date, most recent first.
  *
@@ -177,7 +177,7 @@ function CalendarFullRow({
 
   return (
     <Link
-      to={`/cinema/events/${event.id}`}
+      to={`/events/${event.id}`}
       className="ck-cal-row"
       style={{
         display: 'grid',

@@ -76,7 +76,7 @@ export function CinemaInviteLanding() {
 
   return (
     <Navigate
-      to={`/cinema/events/${invite.event_id}`}
+      to={`/events/${invite.event_id}`}
       state={inviterName ? { invitedBy: inviterName } : undefined}
       replace
     />

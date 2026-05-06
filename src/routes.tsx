@@ -1,6 +1,5 @@
 import { Suspense, lazy, type ReactNode } from 'react'
 import { createBrowserRouter } from 'react-router-dom'
-import { PublicLayout } from './components/layout/PublicLayout'
 import { AdminGuard } from './components/layout/AdminGuard'
 import { PageLoader } from './components/ui/LoadingSpinner'
 
@@ -17,32 +16,9 @@ function Lazy({ children }: { children: ReactNode }) {
 // Pages use named exports, so each lazy() call rewrites the resolved
 // module to expose its component as `default` (what React.lazy expects).
 
-const Home = lazy(() => import('./pages/Home').then(m => ({ default: m.Home })))
-const EventDetail = lazy(() =>
-  import('./pages/EventDetail').then(m => ({ default: m.EventDetail }))
-)
-const Order = lazy(() => import('./pages/Order').then(m => ({ default: m.Order })))
-const InviteLanding = lazy(() =>
-  import('./pages/InviteLanding').then(m => ({ default: m.InviteLanding }))
-)
-const Pickup = lazy(() => import('./pages/Pickup').then(m => ({ default: m.Pickup })))
-const PickupTicket = lazy(() =>
-  import('./pages/PickupTicket').then(m => ({ default: m.PickupTicket }))
-)
-const Ticket = lazy(() => import('./pages/Ticket').then(m => ({ default: m.Ticket })))
-const FindTickets = lazy(() =>
-  import('./pages/FindTickets').then(m => ({ default: m.FindTickets }))
-)
-const MyTickets = lazy(() =>
-  import('./pages/MyTickets').then(m => ({ default: m.MyTickets }))
-)
-const VerifyMerge = lazy(() =>
-  import('./pages/VerifyMerge').then(m => ({ default: m.VerifyMerge }))
-)
-// Cinema preview — staged behind /cinema/* until promoted. CinemaShell
-// is the chrome (top strip, nav, marquee, footer) that wraps every
-// preview page; CinemaLanding is the index page (hero/menu/calendar/
-// story sections).
+// Public pages. CinemaShell is the chrome (top strip, nav, marquee,
+// footer) that wraps every public route; CinemaLanding is the index
+// page (hero/menu/calendar/story sections).
 import { CinemaShell } from './components/cinema/CinemaShell'
 const CinemaLanding = lazy(() =>
   import('./components/cinema/CinemaLanding').then(m => ({ default: m.CinemaLanding }))
@@ -159,32 +135,12 @@ const Option5SoukMaximalism = lazy(() =>
 )
 
 export const router = createBrowserRouter([
-  // Production routes — left exactly as they were. The cinema redesign
-  // is staged behind /cinema/* (see below) so the live site is unchanged
-  // until the operator promotes it.
+  // Public site. CinemaShell provides the top strip, nav, marquee, and
+  // footer; each child route is its own page body. Order, Pickup, and
+  // PickupTicket render legacy page components inside the cinema chrome
+  // for now — those bodies still need a cinema reskin.
   {
     path: '/',
-    element: <PublicLayout />,
-    children: [
-      { index: true, element: <Home /> },
-      { path: 'events/:id', element: <EventDetail /> },
-      { path: 'events/:id/order', element: <Order /> },
-      { path: 'pickup', element: <Pickup /> },
-      { path: 'pickup/:token', element: <PickupTicket /> },
-      { path: 'ticket/:token', element: <Ticket /> },
-      { path: 'invite/:token', element: <InviteLanding /> },
-      { path: 'find-tickets', element: <FindTickets /> },
-      { path: 'my-tickets', element: <MyTickets /> },
-      { path: 'verify-merge', element: <VerifyMerge /> },
-    ],
-  },
-  // Cinema preview — a parallel cinema-styled site living at /cinema/*.
-  // Visually a complete rebuild of the public site. Lives behind /cinema
-  // until the operator chooses to promote it. CinemaShell provides the
-  // top strip, nav, marquee, and footer; each child route is its own
-  // page body.
-  {
-    path: '/cinema',
     element: <CinemaShell />,
     children: [
       { index: true, element: <Lazy><CinemaLanding /></Lazy> },

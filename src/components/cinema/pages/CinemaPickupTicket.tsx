@@ -1,7 +1,7 @@
 import { PickupTicket } from '../../../pages/PickupTicket'
 
 /**
- * /cinema/pickup/:token — wraps the legacy PickupTicket page (order
+ * /pickup/:token — wraps the legacy PickupTicket page (order
  * summary + Venmo link + I've-paid button) inside the cinema chrome.
  * Internal styling stays for now; cinema-tokenize follow-up TODO.
  */

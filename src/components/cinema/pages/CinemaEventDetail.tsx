@@ -25,7 +25,7 @@ import { CinemaPageLoader } from '../primitives'
 type RsvpWithGuest = RSVP & { guest: PublicGuestProfile }
 
 /**
- * /cinema/events/:id — cinema-styled event detail. Wraps the legacy
+ * /events/:id — cinema-styled event detail. Wraps the legacy
  * RSVPForm component (handles plus-ones, merge verification, ticketing
  * Venmo links — too dense to clone) inside a cinema-styled section.
  * Form internals are still legacy Tailwind for now; cinema-tokenize
@@ -145,7 +145,7 @@ export function CinemaEventDetail() {
             <span className="ck-italic">found.</span>
           </h1>
           <Link
-            to="/cinema/calendar"
+            to="/calendar"
             className="ck-btn ck-btn--primary"
             style={{ marginTop: 28 }}
           >
@@ -1221,7 +1221,7 @@ function StickyCartBar({
  * flow (upsert_guest, safe_create_order, Venmo deep link, order
  * confirmation notification) — wrapped in an overlay + inline guest
  * info form. On success replaces the body with a confirmation
- * pointing to /cinema/my-tickets.
+ * pointing to /my-tickets.
  */
 function CartCheckoutModal({
   cart,
@@ -1506,7 +1506,7 @@ function CartCheckoutModal({
               >
                 Anytime: see this order at{' '}
                 <Link
-                  to="/cinema/my-tickets"
+                  to="/my-tickets"
                   style={{ color: 'var(--ck-cobalt)', textDecoration: 'underline' }}
                 >
                   /my-tickets

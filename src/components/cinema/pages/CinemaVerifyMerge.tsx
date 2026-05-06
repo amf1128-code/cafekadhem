@@ -4,11 +4,11 @@ import { supabase } from '../../../lib/supabase'
 import { setGuestToken } from '../../../lib/utils/guest-token'
 
 /**
- * Cinema-styled /cinema/verify-merge?token=...
+ * Cinema-styled /verify-merge?token=...
  *
  * Same logic as the legacy page: confirm the merge token, repoint
  * localStorage to the canonical guest_id, then send the visitor to
- * /cinema/my-tickets. USER_FLOWS_SPEC.md §3.4.
+ * /my-tickets. USER_FLOWS_SPEC.md §3.4.
  */
 type Phase = 'verifying' | 'success' | 'error'
 
@@ -43,7 +43,7 @@ export function CinemaVerifyMerge() {
         if (data.guest_id) setGuestToken(data.guest_id)
         setPhase('success')
         setTimeout(() => {
-          if (!cancelled) navigate('/cinema/my-tickets', { replace: true })
+          if (!cancelled) navigate('/my-tickets', { replace: true })
         }, 800)
         return
       }
@@ -126,7 +126,7 @@ export function CinemaVerifyMerge() {
                     ? 'No verification token in the URL.'
                     : "We couldn't confirm this link."}
             </p>
-            <Link to="/cinema/find-tickets" className="ck-btn ck-btn--primary">
+            <Link to="/find-tickets" className="ck-btn ck-btn--primary">
               Look up my tickets →
             </Link>
           </>
