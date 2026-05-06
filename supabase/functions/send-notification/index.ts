@@ -352,10 +352,119 @@ const messageTemplates: Record<string, (data: Record<string, string>) => { subje
     return { subject, body, html }
   },
   order_confirmation: (data) => {
-    const link = data.history_url ? `\n\nView your order: ${data.history_url}` : ''
+    const title = data.event_title || 'Cafe Kadhem'
+    const greeting = data.first_name ? `Hi ${data.first_name},` : 'Hi,'
+
+    // line_items is JSON-encoded by the request handler from a DB read so
+    // the email always reflects what was actually written, not whatever
+    // the client claims the cart looked like.
+    type Line = { name: string; quantity: number; unit_price: number }
+    let lines: Line[] = []
+    if (data.line_items) {
+      try {
+        const parsed = JSON.parse(data.line_items)
+        if (Array.isArray(parsed)) lines = parsed as Line[]
+      } catch {
+        // Malformed payload — render the email without an itemization
+        // rather than failing the send.
+      }
+    }
+    const total = Number(data.order_total || '0')
+    const formatMoney = (n: number) => `$${n.toFixed(2)}`
+
+    const detailLines: string[] = []
+    if (data.event_when) detailLines.push(`When: ${data.event_when}`)
+    if (data.event_where) detailLines.push(`Where: ${data.event_where}`)
+    const detailsText = detailLines.length ? `\n\n${detailLines.join('\n')}` : ''
+
+    const itemsText = lines.length
+      ? '\n\n' + lines
+          .map((l) => `- ${l.name} × ${l.quantity} — ${formatMoney(l.unit_price * l.quantity)}`)
+          .join('\n') +
+        `\n\nTotal: ${formatMoney(total)}`
+      : ''
+
+    const linkText = data.history_url ? `\n\nPull up your order any time: ${data.history_url}` : ''
+
+    const body = `${greeting}\n\nThanks for ordering — your pre-order for ${title} is locked in. صحتين!${itemsText}${detailsText}${linkText}`
+
+    const itemRows = lines
+      .map(
+        (l) => `
+        <tr>
+          <td style="padding:10px 0;border-bottom:1px dashed #e7e0cf;font-size:14px;color:#1a2e1f;">
+            <strong style="font-weight:700;">${escapeHtml(l.name)}</strong>
+            <span style="color:#6b6452;">&nbsp;×&nbsp;${l.quantity}</span>
+          </td>
+          <td align="right" style="padding:10px 0;border-bottom:1px dashed #e7e0cf;font-size:14px;color:#1a2e1f;font-weight:700;white-space:nowrap;">
+            ${formatMoney(l.unit_price * l.quantity)}
+          </td>
+        </tr>`,
+      )
+      .join('')
+
+    const itemsBlock = lines.length
+      ? `<tr><td style="padding:20px 0 4px;">
+          <p style="margin:0 0 10px;letter-spacing:0.18em;text-transform:uppercase;font-size:10px;color:#6b6452;">Your order</p>
+          <table cellpadding="0" cellspacing="0" width="100%">
+            ${itemRows}
+            <tr>
+              <td style="padding:14px 0 0;font-family:Georgia,serif;font-weight:900;font-size:18px;color:#1a2e1f;">Total</td>
+              <td align="right" style="padding:14px 0 0;font-family:Georgia,serif;font-weight:900;font-size:18px;color:#1a2e1f;white-space:nowrap;">${formatMoney(total)}</td>
+            </tr>
+          </table>
+        </td></tr>`
+      : ''
+
+    const detailRow = (label: string, value: string) => `
+        <tr><td align="center" style="padding:6px 0;">
+          <p style="margin:0;letter-spacing:0.18em;text-transform:uppercase;font-size:10px;color:#6b6452;">${label}</p>
+          <p style="margin:4px 0 0;font-size:14px;color:#1a2e1f;">${escapeHtml(value)}</p>
+        </td></tr>`
+    const detailsBlock = (data.event_when || data.event_where)
+      ? `<tr><td align="center" style="padding:18px 0 8px;border-top:1px solid #e7e0cf;border-bottom:1px solid #e7e0cf;">
+          <table cellpadding="0" cellspacing="0" width="100%">
+            ${data.event_when ? detailRow('When', data.event_when) : ''}
+            ${data.event_where ? detailRow('Where', data.event_where) : ''}
+          </table>
+        </td></tr>`
+      : ''
+
+    const button = data.history_url
+      ? `<tr><td align="center" style="padding:24px 0 4px;">
+          <a href="${escapeHtml(data.history_url)}" style="display:inline-block;background:#1a2e1f;color:#fdfaf3;text-decoration:none;padding:14px 28px;letter-spacing:0.2em;text-transform:uppercase;font-size:12px;">View Your Order</a>
+        </td></tr>`
+      : ''
+
+    const html = `<!doctype html>
+<html><body style="margin:0;padding:0;background:#fdfaf3;font-family:Georgia,'Times New Roman',serif;color:#1a2e1f;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#fdfaf3;padding:32px 16px;">
+    <tr><td align="center">
+      <table width="480" cellpadding="0" cellspacing="0" style="max-width:480px;background:#ffffff;border:1px solid #e7e0cf;padding:32px;">
+        <tr><td align="center" style="padding-bottom:6px;">
+          <p style="margin:0;letter-spacing:0.25em;text-transform:uppercase;font-size:11px;color:#6b6452;">Cafe Kadhem</p>
+        </td></tr>
+        <tr><td align="center" style="padding-bottom:8px;">
+          <p style="margin:0;letter-spacing:0.18em;text-transform:uppercase;font-size:10px;color:#6b6452;">Order confirmed</p>
+          <h1 style="margin:8px 0 0;font-style:italic;font-weight:400;font-size:26px;color:#1a2e1f;">${escapeHtml(title)}</h1>
+        </td></tr>
+        <tr><td align="center" style="padding:14px 0 4px;">
+          <p style="margin:0;font-size:15px;line-height:1.5;color:#3a3a3a;">${escapeHtml(greeting)}</p>
+          <p style="margin:8px 0 0;font-size:15px;line-height:1.5;color:#3a3a3a;">Thanks for ordering — your pre-order is locked in.</p>
+          <p style="margin:8px 0 0;font-size:22px;line-height:1;color:#1a2e1f;font-style:italic;">صحتين</p>
+        </td></tr>
+        ${itemsBlock}
+        ${detailsBlock}
+        ${button}
+      </table>
+    </td></tr>
+  </table>
+</body></html>`
+
     return {
-      subject: `Order Confirmed - ${data.event_title || 'Cafe Kadhem'}`,
-      body: `Your pre-order for ${data.event_title || 'our event'} has been submitted. Your host will confirm payment once received via Venmo.${link}`,
+      subject: `Order Confirmed - ${title}`,
+      body,
+      html,
     }
   },
   pickup_order_confirmation: (data) => {
@@ -694,6 +803,40 @@ Deno.serve(async (req: Request) => {
         data.pickup_url = `${siteUrl}/pickup/${data.pickup_token}`
         const qrImageUrl = await generateAndUploadQr(data.pickup_token, data.pickup_url)
         if (qrImageUrl) data.qr_image_url = qrImageUrl
+      }
+      // Pull the actual line items + total from the DB so the receipt
+      // section of the email is sourced from what was written, not from
+      // anything the client passed. Falls back silently if order_id is
+      // missing — the template just omits the itemization in that case.
+      if (type === 'order_confirmation' && data.order_id) {
+        const { data: orderRow } = await supabase
+          .from('orders')
+          .select('total')
+          .eq('id', data.order_id)
+          .eq('guest_id', guestId)
+          .maybeSingle()
+        const { data: items } = await supabase
+          .from('order_items')
+          .select('quantity, unit_price, menu_items(name)')
+          .eq('order_id', data.order_id)
+        if (items) {
+          const lines = (items as Array<{
+            quantity: number
+            unit_price: number | null
+            menu_items: { name: string } | { name: string }[] | null
+          }>).map((it) => {
+            const m = Array.isArray(it.menu_items) ? it.menu_items[0] : it.menu_items
+            return {
+              name: m?.name || 'Item',
+              quantity: it.quantity,
+              unit_price: Number(it.unit_price ?? 0),
+            }
+          })
+          data.line_items = JSON.stringify(lines)
+        }
+        if (orderRow?.total != null) {
+          data.order_total = String(orderRow.total)
+        }
       }
     }
 

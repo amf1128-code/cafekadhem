@@ -222,6 +222,7 @@ export function Order() {
         guestId,
         eventId: id!,
         type: 'order_confirmation',
+        data: { order_id: order.id as string },
       })
 
       // Stash the link so the receipt can render a fallback anchor, then
