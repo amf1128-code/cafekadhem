@@ -134,6 +134,14 @@ The list of functions modified is in each per-commit doc under **"User actions r
 6. **Optional migration 045 (`get_guest_event_state_v2`) skipped**. The plan flagged it as conditional; Commit 4's data needs were met by the existing 029/035 RPC, so no extension was needed.
 7. **No new use-case walkthroughs run as gating tests** for this commit. Without the page rewrite, the 11 spec §3a.7 walkthroughs would test pre-existing behavior, not the changes in this commit. Spot-test the scroll-preservation fix instead.
 
+### Post-Commit-5 hot-fixes
+
+1. **PostgREST embed ambiguity** (regression introduced by migration 044). When `rsvps.referred_by_guest_id` was added with `REFERENCES guests(id)`, the rsvps table gained a *second* FK to guests. PostgREST nested embeds (`guest:guests(*)` / `guest:public_guest_profiles(*)`) silently broke — no error, just empty results. Symptoms: public attendees count showed 0 even when RSVPs existed; admin Tickets / Waitlist / Check-in / Dashboard "Recent RSVPs" sections all empty. Fix: disambiguate every embed with the column hint, e.g. `guest:guests!guest_id(*)`. Affected files: `EventDetail.tsx`, `Dashboard.tsx`, `EventTickets.tsx`, `EventWaitlist.tsx`, `EventCheckIn.tsx`. **No automated test caught this**; future migrations that add a same-target FK should grep for `guest:guests(` in the frontend.
+
+2. **Paid-RSVP transition policy reversed.** Migration 033's `paid_rsvp_cannot_change_status` block has been dropped (migration 046). New policy: a paid guest CAN change status to maybe/no; ticket_token persists; admin Tickets page now shows all payment-active rows regardless of RSVP status. See spec §4.3 for the new model. Plus-ones still cascade-delete via the existing trigger.
+
+3. **Admin Tickets page query rewritten.** Previously filtered `eq('status', 'yes')` — paid+declined rows would silently disappear. Now filters only on `plus_one_of IS NULL` (exclude +1 stubs) and shows the RSVP status as a column. Pending/Unpaid/Paid bucket counts unchanged in semantics.
+
 ### Commit 4 deviations from plan
 
 1. **Migration numbering shifted by 1 again**: 043/044/045 instead of plan's 042/043/044.

@@ -35,13 +35,18 @@ export function AdminEventTickets() {
   }, [id])
 
   async function loadData() {
+    // Show every RSVP for this event that has any payment activity
+    // (paid / pending / unpaid for a ticketed event), regardless of
+    // RSVP status. A guest who paid then declined still shows up so
+    // the host can refund or comp the stub. Plus-ones excluded —
+    // they never pay separately. USER_FLOWS_SPEC.md §4.3.
     const [eventResult, rsvpResult] = await Promise.all([
       supabase.from('events').select('*').eq('id', id!).single(),
       supabase
         .from('rsvps')
-        .select('*, guest:guests(*)')
+        .select('*, guest:guests!guest_id(*)')
         .eq('event_id', id!)
-        .eq('status', 'yes')
+        .is('plus_one_of', null)
         .order('created_at', { ascending: true }),
     ])
 
@@ -196,7 +201,8 @@ export function AdminEventTickets() {
               <tr className="border-b border-warm bg-warm/30">
                 <th className="text-left px-4 py-2 font-medium text-ink/70">Guest</th>
                 <th className="text-left px-4 py-2 font-medium text-ink/70">Contact</th>
-                <th className="text-left px-4 py-2 font-medium text-ink/70">Status</th>
+                <th className="text-left px-4 py-2 font-medium text-ink/70">RSVP</th>
+                <th className="text-left px-4 py-2 font-medium text-ink/70">Payment</th>
                 <th className="text-left px-4 py-2 font-medium text-ink/70">Checked In</th>
                 <th className="text-right px-4 py-2 font-medium text-ink/70">Actions</th>
               </tr>
@@ -211,6 +217,17 @@ export function AdminEventTickets() {
                   <td className="px-4 py-3 text-ink/70">
                     {row.guest.email && <span className="block">{row.guest.email}</span>}
                     {row.guest.phone && <span className="block">{formatPhone(row.guest.phone)}</span>}
+                  </td>
+                  <td className="px-4 py-3">
+                    <Badge
+                      variant={
+                        row.status === 'yes' ? 'success'
+                        : row.status === 'waitlisted' ? 'warning'
+                        : 'default'
+                      }
+                    >
+                      {row.status}
+                    </Badge>
                   </td>
                   <td className="px-4 py-3">
                     <Badge variant={paymentVariant[row.payment_status]}>

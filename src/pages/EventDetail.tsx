@@ -68,7 +68,7 @@ export function EventDetail() {
     // Load RSVPs with public guest profiles
     const { data: rsvpData } = await supabase
       .from('rsvps')
-      .select('*, guest:public_guest_profiles(*)')
+      .select('*, guest:public_guest_profiles!guest_id(*)')
       .eq('event_id', id!)
       .in('status', ['yes', 'maybe', 'waitlisted'])
 
