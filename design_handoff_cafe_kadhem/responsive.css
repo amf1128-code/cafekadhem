@@ -1,0 +1,74 @@
+/* Cafe Kadhem responsive — container-query based so the mobile artboard
+   renders the mobile layout regardless of viewport width. */
+
+.cinema-root { container-type: inline-size; container-name: cinema; }
+
+@container cinema (max-width: 720px) {
+  .hide-mobile { display: none !important; }
+  .cinema-strip { padding: 8px 16px !important; font-size: 9px !important; }
+  .cinema-nav { padding: 12px 16px !important; }
+  .cinema-nav-links, .cinema-reserve { display: none !important; }
+  .cinema-burger { display: flex !important; }
+  .cinema-mobile-nav { display: flex !important; }
+
+  .cinema-hero { padding: 16px 16px 18px !important; }
+  .cinema-hero-strap { flex-direction: column; align-items: flex-start !important; margin-bottom: 12px !important; }
+  .cinema-hero-grid { grid-template-columns: 1fr !important; }
+  .cinema-poster-wrap { border-right: none !important; border-bottom: 3px solid var(--ink) !important; }
+  .cinema-rsvp-rail { padding: 18px !important; gap: 12px !important; }
+
+  .cinema-event-card, .cinema-story-grid { grid-template-columns: 1fr !important; gap: 22px !important; }
+
+  /* Menu grid → tighter single-column rows on mobile */
+  .cinema-bakes-grid { grid-template-columns: 1fr !important; }
+  .cinema-bake-cell {
+    border-right: none !important;
+    min-height: 0 !important;
+    padding: 14px 16px !important;
+  }
+  .cinema-bake-cell > div:first-child > div:first-child { font-size: 9px !important; }
+  .cinema-bake-cell > div:first-child > div:nth-child(2) { font-size: 20px !important; margin-top: 4px !important; }
+  .cinema-bake-cell > div:first-child > div:nth-child(3) { font-size: 12px !important; margin-top: 4px !important; line-height: 1.4 !important; }
+  .cinema-bake-cell > div:last-child { margin-top: 10px !important; padding-top: 6px !important; }
+
+  .cinema-also, .cinema-menu-head { flex-direction: column; align-items: flex-start !important; gap: 10px !important; margin-bottom: 16px !important; }
+
+  .cinema-story-cols { column-count: 1 !important; }
+
+  /* Calendar row → tight 2-line stack on mobile */
+  .cinema-cal-row {
+    grid-template-columns: 56px 1fr auto !important;
+    grid-template-areas:
+      "date title price"
+      "date loc btn" !important;
+    gap: 4px 12px !important;
+    padding: 12px 14px !important;
+    align-items: center !important;
+  }
+  .cinema-cal-row > :nth-child(1) { display: none !important; }
+  .cinema-cal-row > :nth-child(2) { grid-area: date !important; }
+  .cinema-cal-row > :nth-child(2) > div:first-child { font-size: 22px !important; }
+  .cinema-cal-row > :nth-child(2) > div:last-child { font-size: 9px !important; }
+  .cinema-cal-row > :nth-child(3) { grid-area: title !important; }
+  .cinema-cal-row > :nth-child(3) > div:first-child > span:first-child { font-size: 18px !important; }
+  .cinema-cal-row > :nth-child(3) > div:first-child > span:last-child { font-size: 18px !important; }
+  .cinema-cal-row > :nth-child(3) > div:last-child { display: none !important; } /* hide tagline on mobile */
+  .cinema-cal-row > :nth-child(4) { grid-area: loc !important; font-size: 9px !important; line-height: 1.3 !important; }
+  .cinema-cal-row > :nth-child(4) br + span { display: none !important; }
+  .cinema-cal-row > :nth-child(5) { grid-area: price !important; font-size: 16px !important; text-align: right !important; }
+  .cinema-cal-row > :nth-child(6) { grid-area: btn !important; padding: 6px 10px !important; font-size: 9px !important; }
+
+  .cinema-root section { padding: 28px 16px !important; }
+  .cinema-root footer { padding: 22px 16px !important; flex-direction: column; align-items: flex-start !important; }
+}
+
+/* Fallback for browsers w/o container queries — at least make the page viewport-responsive. */
+@supports not (container-type: inline-size) {
+  @media (max-width: 720px) {
+    .hide-mobile { display: none !important; }
+    .cinema-nav-links, .cinema-reserve { display: none !important; }
+    .cinema-burger { display: flex !important; }
+    .cinema-hero-grid, .cinema-event-card, .cinema-story-grid, .cinema-bakes-grid { grid-template-columns: 1fr !important; }
+    .cinema-rsvp-rail { border-left: none !important; border-top: 3px solid var(--ink) !important; }
+  }
+}
