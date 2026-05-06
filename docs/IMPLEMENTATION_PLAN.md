@@ -120,6 +120,8 @@ The list of functions modified is in each per-commit doc under **"User actions r
 3. **`safe_create_rsvp` returns `rsvps` (the row), not jsonb.** The plan's sketch returned jsonb, which would have broken every existing caller. Migration 033 preserves the original signature; the body adds the advisory lock and the paid→non-yes block, plus keeps the contact-dedup logic from migration 025.
 4. **`get_guest_event_state.invited_by` is currently `NULL`**. Wiring it up requires the ambient/invite token resolution from Commit 4.
 5. **`useGuestEventState` hook** (planned in Commit 5) will type the response. The shape returned by 029 matches the plan's spec §5 shape exactly except for `invited_by` (see #4).
+6. **Hot-fix migration 035** added after user testing: `events.is_published BOOLEAN`, not `events.status TEXT` as the plan and 029 assumed. Migration 035 replaces `get_guest_event_state` body with the corrected SELECT and `IF NOT v_event.is_published` check.
+7. **Migration numbering for Commit 2 shifts by 1.** What the plan calls `035`/`036`/`037` (`merge_guests`, `merge_verifications`, `upsert_guest_collision`) becomes `036`/`037`/`038`. Subsequent commits' migration numbers also shift accordingly.
 
 ---
 
