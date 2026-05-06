@@ -407,16 +407,16 @@ function RsvpCard({
       <div
         style={{
           display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'baseline',
+          alignItems: 'flex-start',
           gap: 12,
-          flexWrap: 'wrap',
           marginBottom: 8,
         }}
       >
         <Link
           to={rsvp.is_published ? `/events/${rsvp.event_id}` : '#'}
           style={{
+            flex: 1,
+            minWidth: 0,
             fontFamily: 'var(--ck-serif)',
             fontWeight: 800,
             fontSize: 24,
@@ -562,16 +562,16 @@ function OrphanOrderCard({ order }: { order: EventOrderRow }) {
       <div
         style={{
           display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'baseline',
+          alignItems: 'flex-start',
           gap: 12,
-          flexWrap: 'wrap',
           marginBottom: 8,
         }}
       >
         <Link
           to={order.is_published ? `/events/${order.event_id}` : '#'}
           style={{
+            flex: 1,
+            minWidth: 0,
             fontFamily: 'var(--ck-serif)',
             fontWeight: 800,
             fontSize: 22,
