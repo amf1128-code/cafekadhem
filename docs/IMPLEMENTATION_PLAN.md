@@ -14,8 +14,8 @@
 |---|---|---|---|---|---|
 | 1 | Foundations (additive schema, no behavior change) | ✅ verified | `4af91ba` + hot-fix `91181e7` | ✅ 2026-05-06 | [01-foundations.md](commits/01-foundations.md) |
 | 2 | Identity merge & reconciliation | ✅ verified | `ae873e0` | ✅ 2026-05-06 | [02-identity-merge.md](commits/02-identity-merge.md) |
-| 3 | Notifications hardening (channel routing, dedup, consent, suppression) | 🟢 committed | *(see git log)* | ⬜ pending user verification | [03-notifications.md](commits/03-notifications.md) |
-| 4 | Recognition & sharing (ambient `?as=`, header, ShareButton, `?ref=`) | ⬜ not started | — | — | [04-recognition-sharing.md](commits/04-recognition-sharing.md) |
+| 3 | Notifications hardening (channel routing, dedup, consent, suppression) | ✅ verified | `71aa05f` | ✅ 2026-05-06 | [03-notifications.md](commits/03-notifications.md) |
+| 4 | Recognition & sharing (ambient `?as=`, header, ShareButton, `?ref=`) | 🟢 committed | *(see git log)* | ⬜ pending user verification | [04-recognition-sharing.md](commits/04-recognition-sharing.md) |
 | 5 | State unification (`get_guest_event_state` consumed by all pages) | ⬜ not started | — | — | [05-state-unification.md](commits/05-state-unification.md) |
 | 6 | Bulk operations (mass invites, mass notifications, audience selectors) | ⬜ not started | — | — | [06-bulk-operations.md](commits/06-bulk-operations.md) |
 
@@ -122,6 +122,20 @@ The list of functions modified is in each per-commit doc under **"User actions r
 5. **`useGuestEventState` hook** (planned in Commit 5) will type the response. The shape returned by 029 matches the plan's spec §5 shape exactly except for `invited_by` (see #4).
 6. **Hot-fix migration 035** added after user testing: `events.is_published BOOLEAN`, not `events.status TEXT` as the plan and 029 assumed. Migration 035 replaces `get_guest_event_state` body with the corrected SELECT and `IF NOT v_event.is_published` check.
 7. **Migration numbering for Commit 2 shifts by 1.** What the plan calls `035`/`036`/`037` (`merge_guests`, `merge_verifications`, `upsert_guest_collision`) becomes `036`/`037`/`038`. Subsequent commits' migration numbers also shift accordingly.
+
+### Commit 4 deviations from plan
+
+1. **Migration numbering shifted by 1 again**: 043/044/045 instead of plan's 042/043/044.
+2. **`merge_guests` re-issued in migration 045** to add `referred_by_guest_id` and `ambient_tokens` to FK reassignment list. This is the third re-issue (036, 040, 045) — each new commit that adds a guest-FK target must re-issue. Future commits should follow the same pattern.
+3. **Ambient token minted per-send, not per-link**: spec said "mint a token for this guest" and inject. Implementation mints exactly one token per `send-notification` call and reuses it across all same-domain URLs in that send. Cleaner than minting per link.
+4. **`injectAmbientToken` skips `/verify-merge` URLs explicitly**: those are single-use credentials; recognition is already handled by the verify flow's success redirect.
+5. **`mint_ambient_token` failure is non-fatal**: if the mint RPC errors, the notification still goes out (just without `?as=`). Logged to console for admin visibility. Avoids the failure mode where a transient RPC issue blocks confirmations entirely.
+6. **`useMyGuest` uses `useSyncExternalStore`** with a custom event channel (`GUEST_TOKEN_EVENT`) so the recognition header updates in real-time when localStorage changes within the same tab. Plain `storage` events only fire across tabs. `setGuestToken` and `clearGuestToken` now dispatch the event.
+7. **Ticket page ShareButton omits `?ref=`**: `TicketView` doesn't include `guest_id`, so we can't attribute. Acceptable — the share still works; attribution just isn't captured. A small future migration to extend `get_ticket` could add it.
+8. **`AmbientTokenHandler` strips param via `navigate({...}, {replace: true})`**: prevents back-button revealing the token. Tested in build; need real-browser verification.
+9. **`RecognitionHeader` confirm dialog**: uses native `confirm()` for "not you?" rather than building a custom modal. Acceptable for v1.
+10. **`smsEnabled`-vs-not branching in RSVPForm validation simplified** (carried over from Commit 3): when SMS disabled, email is required; when SMS enabled, either is fine. The forced-fallback effect that flipped 'sms' → 'email' on smsEnabled change was removed because preference is now inferred, not user-set.
+11. **`set_rsvp_referrer` is fire-and-forget** in the RSVPForm (no `await`) so a failure doesn't block the RSVP confirmation. Attribution is metadata, not transactional.
 
 ### Commit 3 deviations from plan
 

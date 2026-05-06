@@ -6,6 +6,7 @@ import { formatDate, formatTime } from '../lib/utils/date'
 import { ticketUrl } from '../lib/utils/ticket'
 import { PageLoader } from '../components/ui/LoadingSpinner'
 import { QRCode } from '../components/tickets/QRCode'
+import { ShareButton } from '../components/ui/ShareButton'
 import { usePageTheme, type ThemeId } from '../lib/theme/themes'
 
 export function Ticket() {
@@ -135,6 +136,15 @@ export function Ticket() {
       <p className="text-center text-xs text-ink-muted mt-6">
         Save this page or screenshot the QR code so it's ready at the door.
       </p>
+
+      <div className="text-center mt-8">
+        <ShareButton
+          url={`${window.location.origin}/events/${ticket.event_id}`}
+          title={ticket.event_title}
+          text={`I'm going to ${ticket.event_title} at Cafe Kadhem — want to join?`}
+          label="Invite a friend"
+        />
+      </div>
     </div>
   )
 }

@@ -4,6 +4,7 @@ import type { RSVP, Event, AdminSettings, PublicGuestProfile } from '../../lib/t
 import { getGuestToken, setGuestToken } from '../../lib/utils/guest-token'
 import { dispatchMergeVerification, type PendingMerge } from '../../lib/identity/handlePendingMerge'
 import { ConsentNote } from '../ui/ConsentNote'
+import { ShareButton } from '../ui/ShareButton'
 import { normalizePhone, isValidPhone } from '../../lib/utils/phone'
 import { normalizeInstagram, isValidInstagram } from '../../lib/utils/instagram'
 import { sendNotification } from '../../lib/notifications'
@@ -203,6 +204,12 @@ export function RSVPForm({ eventId, event, existingRsvp, existingPlusOne, isFull
         void dispatchMergeVerification(pendingMerge)
       }
 
+      // Capture ?ref= (soft attribution from a shared link). One-shot:
+      // set_rsvp_referrer only writes if the column is currently NULL,
+      // so re-RSVPs don't overwrite the original referrer.
+      // USER_FLOWS_SPEC.md §3a.8.
+      const refGuestId = new URLSearchParams(window.location.search).get('ref')
+
       // Use safe_create_rsvp function for capacity enforcement
       const { data: rsvpResult, error: rsvpError } = await supabase.rpc('safe_create_rsvp', {
         p_event_id: eventId,
@@ -211,6 +218,15 @@ export function RSVPForm({ eventId, event, existingRsvp, existingPlusOne, isFull
       })
 
       if (rsvpError) throw rsvpError
+
+      // Persist the ?ref= attribution (one-shot, ignored if already set).
+      if (refGuestId) {
+        void supabase.rpc('set_rsvp_referrer', {
+          p_event_id: eventId,
+          p_guest_id: guestId,
+          p_referrer_id: refGuestId,
+        })
+      }
 
       // Plus-one reconciliation. Four shapes to consider, run after the
       // host's RSVP has been upserted:
@@ -445,6 +461,22 @@ export function RSVPForm({ eventId, event, existingRsvp, existingPlusOne, isFull
         >
           [ Change RSVP ]
         </button>
+
+        {/* Share affordance. Shown only for confirmed yes-RSVPs (or
+            waitlisted, since the friend might still get in). The URL
+            carries ?ref=<sharer_guest_id> for soft attribution; never
+            ?as= (those are personal recognition tokens).
+            USER_FLOWS_SPEC.md §3a.8. */}
+        {event && (existingRsvp.status === 'yes' || existingRsvp.status === 'waitlisted') && (
+          <div className="mt-6">
+            <ShareButton
+              url={`${window.location.origin}/events/${eventId}?ref=${existingRsvp.guest_id}`}
+              title={event.title}
+              text={`I'm going to ${event.title} at Cafe Kadhem — want to join?`}
+              label="Tell your friends"
+            />
+          </div>
+        )}
       </div>
     )
   }

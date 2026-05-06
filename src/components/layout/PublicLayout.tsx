@@ -2,6 +2,7 @@ import { Suspense, useEffect } from 'react'
 import { Outlet } from 'react-router-dom'
 import { Header } from './Header'
 import { Footer } from './Footer'
+import { AmbientTokenHandler } from './AmbientTokenHandler'
 import { PageLoader } from '../ui/LoadingSpinner'
 import { useTheme } from '../../lib/theme/themes'
 
@@ -23,6 +24,7 @@ export function PublicLayout() {
 
   return (
     <div data-theme={activeTheme} className="min-h-dvh page-bg flex flex-col">
+      <AmbientTokenHandler />
       <Header />
       <main className="flex-1">
         <Suspense fallback={<PageLoader />}>

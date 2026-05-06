@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
+import { RecognitionHeader } from './RecognitionHeader'
 
 export function Header() {
   const [pickupActive, setPickupActive] = useState(false)
@@ -48,6 +49,7 @@ export function Header() {
               Pick-Up
             </Link>
           )}
+          <RecognitionHeader />
         </nav>
       </div>
     </header>

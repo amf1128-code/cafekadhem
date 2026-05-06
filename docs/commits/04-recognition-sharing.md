@@ -2,11 +2,11 @@
 
 > **Goal:** ambient `?as=` token-based recognition; "Hi, X · not you?" header on every public page; ShareButton component on confirmation/event/ticket pages; `?ref=` soft attribution; promote `/find-tickets` to "I've been here before" in the header. After this commit, returning guests are recognized silently across devices via notification clicks, and sharing is one tap.
 
-**Status:** ⬜ not started
+**Status:** 🟢 committed (pending user verification)
 **Prerequisites:** Commits 1, 2, 3 ✅ user-verified
-**Estimated migration files:** 3 (`042` through `044`)
-**SHA on commit:** —
-**User-verified:** —
+**Estimated migration files:** 3 (renumbered to `043`/`044`/`045`)
+**SHA on commit:** *(see git log)*
+**User-verified:** ⬜ pending
 
 ---
 
@@ -630,23 +630,40 @@ Edge function: redeploy without ambient injection (or revert to prior SHA's vers
 
 ## Status section
 
-**Last updated:** *(when implementation starts)*
+**Last updated:** 2026-05-06, end of Commit 4
 
 | Sub-item | Status | Notes |
 |---|---|---|
-| 042 — ambient_tokens | ⬜ | |
-| 043 — rsvps.referred_by_guest_id | ⬜ | |
-| 044 — merge_guests update | ⬜ | |
-| send-notification ambient injection | ⬜ | |
-| AmbientTokenHandler | ⬜ | |
-| RecognitionHeader | ⬜ | |
-| ShareButton | ⬜ | |
-| useMyGuest hook | ⬜ | |
-| PublicLayout integration | ⬜ | |
-| RSVPForm `?ref=` capture | ⬜ | |
-| ShareButton placements (3) | ⬜ | |
-| All tests | ⬜ | |
+| 043 — ambient_tokens table + mint/resolve RPCs | 🟢 | 90-day TTL |
+| 044 — rsvps.referred_by_guest_id + set_rsvp_referrer | 🟢 | One-shot (no overwrite) |
+| 045 — merge_guests re-issued | 🟢 | Now reassigns referred_by_guest_id + ambient_tokens |
+| send-notification ambient injection | 🟢 | injectAmbientToken helper, mint per send, skip off-domain + /verify-merge |
+| AmbientTokenHandler | 🟢 | Resolves ?as=, sets localStorage, strips param |
+| useMyGuest hook | 🟢 | useSyncExternalStore + GUEST_TOKEN_EVENT |
+| RecognitionHeader | 🟢 | "Hi, X · not you?" / "I've been here before" |
+| ShareButton | 🟢 | navigator.share / clipboard / mailto fallback |
+| PublicLayout integration | 🟢 | AmbientTokenHandler mounted; RecognitionHeader in Header |
+| RSVPForm `?ref=` capture | 🟢 | One-shot via set_rsvp_referrer |
+| ShareButton placements | 🟢 | RSVPForm confirmation (yes/waitlisted), Ticket page (no ?ref=) |
+| Migrations applied | ⬜ | User action |
+| Edge function deployed | ⬜ | User action |
+| All tests | ⬜ | User action |
 
 ### Result notes (post-commit)
 
-*(To be filled in.)*
+- **Files changed:**
+  - `supabase/migrations/043_ambient_tokens.sql` (new)
+  - `supabase/migrations/044_rsvps_referred_by.sql` (new)
+  - `supabase/migrations/045_merge_guests_ambient.sql` (new — re-issues merge_guests)
+  - `supabase/functions/send-notification/index.ts` (injectAmbientToken helper + mint per send)
+  - `src/components/layout/AmbientTokenHandler.tsx` (new)
+  - `src/components/layout/RecognitionHeader.tsx` (new)
+  - `src/components/layout/PublicLayout.tsx` (mounts handler)
+  - `src/components/layout/Header.tsx` (renders RecognitionHeader)
+  - `src/components/ui/ShareButton.tsx` (new)
+  - `src/lib/identity/useMyGuest.ts` (new)
+  - `src/lib/utils/guest-token.ts` (emits GUEST_TOKEN_EVENT on set/clear)
+  - `src/components/events/RSVPForm.tsx` (?ref= capture, ShareButton on confirmation)
+  - `src/pages/Ticket.tsx` (ShareButton on ticket page, no ?ref= due to TicketView shape)
+- **Deviations** (11 items, see plan Open Questions §"Commit 4 deviations from plan").
+- **Build:** `npm run build` passes.
