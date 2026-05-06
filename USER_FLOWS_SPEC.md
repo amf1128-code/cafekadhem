@@ -409,7 +409,7 @@ paid ──[scanner: check_in_ticket]──▶ paid + checked_in_at (idempotent)
 - `mark_rsvp_unpaid` does **not** delete `ticket_token`. Reason: if the admin un-marks by mistake, the same QR continues to work after re-marking. Lookup (`get_ticket`) checks `payment_status='paid'` to decide validity — the token alone is not authority.
 - **Refund**: `payment_status='refunded'`, `get_ticket` returns `valid: false`. Token row is preserved for audit.
 - **Check-in**: `check_in_ticket` is admin-only and idempotent (`already_checked_in` flag). Re-scan never errors.
-- **Status change yes → no on a paid RSVP**: blocked. Guest must contact admin for refund first. Add a UI guard in `RSVPForm.tsx` plus a server-side check in `safe_create_rsvp` (currently missing — see §11 follow-ups).
+- **Status change yes → no on a paid RSVP**: blocked at the server (migration 033 raises `paid_rsvp_cannot_change_status`). Guest sees a generic error toast and is expected to contact the host out-of-band for a refund. *(A UI guard that pre-disabled Maybe/Decline was tried in Commit 5 and reverted — marginal UX value didn't justify the surface area.)*
 - **Lost ticket**: guest uses Find Tickets (§4.6) with their phone/email; magic link returns the token.
 
 ### 4.4 Invite (single)
