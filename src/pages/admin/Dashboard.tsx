@@ -131,6 +131,9 @@ export function AdminDashboard() {
                 <Link to={`/admin/events/${event.id}/invite`}>
                   <Button variant="ghost" size="sm">Invite</Button>
                 </Link>
+                <Link to={`/admin/events/${event.id}/blast`}>
+                  <Button variant="ghost" size="sm">Blast</Button>
+                </Link>
                 {event.rsvp_waitlisted > 0 && (
                   <Link to={`/admin/events/${event.id}/waitlist`}>
                     <Button variant="ghost" size="sm">Waitlist</Button>
@@ -166,9 +169,12 @@ export function AdminDashboard() {
                 <span>{event.rsvp_yes} went</span>
                 <span>{event.order_count} orders</span>
               </div>
-              <div className="flex gap-2">
+              <div className="flex gap-2 flex-wrap">
                 <Link to={`/admin/events/${event.id}/edit`}>
                   <Button variant="outline" size="sm">Edit</Button>
+                </Link>
+                <Link to={`/admin/events/${event.id}/blast`}>
+                  <Button variant="ghost" size="sm">Blast</Button>
                 </Link>
                 <Link to={`/events/${event.id}`} target="_blank">
                   <Button variant="ghost" size="sm">View</Button>

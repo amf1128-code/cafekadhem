@@ -600,7 +600,9 @@ Each row stores `status ∈ {queued, sent, failed, suppressed}` and `error`. On 
 
 ---
 
-## 8. Mass Invite (future)
+## 8. Mass Invite
+
+> **Implementation status:** existing `/admin/events/:id/invite` page (`EventBulkInvite.tsx`) ships a working sequential bulk-invite flow today. Commit 6b enriches it with preview/confirm/resume, `bulk_invite_jobs` + `bulk_invite_job_recipients` tables, and retry-failed-only. The §8 design below describes the enriched version.
 
 **Entry:** admin's `/admin/events/:id/invite` page, currently `EventBulkInvite.tsx`.
 
@@ -658,7 +660,13 @@ Admin clicks **Send N invites** to commit. No invites go out before this click.
 
 ---
 
-## 9. Mass Notification (future, distinct from invites)
+## 9. Notification Blast (canonical: see [Notification Blast Feature](#) spec; superseded the original §9 "Mass Notification" sketch)
+
+> **Implementation status:** shipped in Commit 6a. Per-event scope, single `notification_blasts` table, three audience options (yes_only / yes_and_maybe / all_invited), separate email + SMS copy per blast. Admin route `/admin/events/:id/blast`. Per-recipient results in `notifications_log` via `dedup_key='blast:<id>:<guest_id>'`. Future features (drafts, email preview, retry-failed UI, scheduling, blast-opt-out, invite-table recipients) are tracked but not yet built.
+>
+> **Original §9 sketch below** — superseded for blasts. Some pieces (audience selectors, quiet hours, per-day caps) may resurface if a separate "broadcast / cross-event" channel is ever added.
+
+### Original §9 sketch (superseded for blast use case)
 
 Used for: event updates ("menu changed"), reminders ("tomorrow at 7"), broadcasts ("doors open at 6:30 tonight"), and ad-hoc admin messages.
 

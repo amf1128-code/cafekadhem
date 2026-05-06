@@ -17,7 +17,8 @@
 | 3 | Notifications hardening (channel routing, dedup, consent, suppression) | ✅ verified | `71aa05f` | ✅ 2026-05-06 | [03-notifications.md](commits/03-notifications.md) |
 | 4 | Recognition & sharing (ambient `?as=`, header, ShareButton, `?ref=`) | ✅ verified | `9b2cb16` (+ `f9ce5d8` hot-fix, `d3beb43`/`7e243f3`/`449d751` polish) | ✅ 2026-05-06 | [04-recognition-sharing.md](commits/04-recognition-sharing.md) |
 | 5 | State unification — **scoped down to Option A** (hook + paid-RSVP UI guard; full page rewrite deferred) | 🟢 committed | *(see git log)* | ⬜ pending user verification | [05-state-unification.md](commits/05-state-unification.md) |
-| 6 | Bulk operations (mass invites, mass notifications, audience selectors) | ⬜ not started | — | — | [06-bulk-operations.md](commits/06-bulk-operations.md) |
+| 6a | Notification Blast (per-event admin comms to RSVPd guests) | 🟢 committed | *(see git log)* | ⬜ pending user verification | [06-bulk-operations.md](commits/06-bulk-operations.md) |
+| 6b | Bulk Invite enrichment (preview/confirm/resume + retry-failed) | ⬜ not started | — | — | [06-bulk-operations.md](commits/06-bulk-operations.md) |
 
 **Status legend:** ⬜ not started · 🟡 in progress · 🟢 committed · ✅ user-verified · 🔴 blocked
 
@@ -133,6 +134,18 @@ The list of functions modified is in each per-commit doc under **"User actions r
 5. **Order / Ticket / Pickup unchanged.** They already render correctly today; the deferred refactor is tracked here in case a divergence bug ever surfaces or a new state-aware page is added.
 6. **Optional migration 045 (`get_guest_event_state_v2`) skipped**. The plan flagged it as conditional; Commit 4's data needs were met by the existing 029/035 RPC, so no extension was needed.
 7. **No new use-case walkthroughs run as gating tests** for this commit. Without the page rewrite, the 11 spec §3a.7 walkthroughs would test pre-existing behavior, not the changes in this commit. Spot-test the scroll-preservation fix instead.
+
+### Commit 6 deviations from plan
+
+1. **Commit 6 split into 6a + 6b** to match the user's reframing.
+   - **6a Notification Blast** — replaces the original "mass notifications" feature with the user's `notification_blasts`-table model from a separate spec. Per-event scope, three audience options (yes_only / yes_and_maybe / all_invited) instead of eight, separate email + SMS copy per blast, simpler status machine (pending/sending/sent/failed), per-recipient results in `notifications_log` via `dedup_key='blast:<id>:<guest_id>'`. Admin route `/admin/events/:id/blast` with compose form + per-event history.
+   - **6b Bulk Invite enrichment** — keeps the original "rewrite `EventBulkInvite.tsx`" intent: preview/confirm/resume pattern, `bulk_invite_jobs` + `bulk_invite_job_recipients` tables, retry-failed-only.
+2. **Quiet hours / per-day caps deferred.** User's blast spec doesn't require them; the original Commit 6 plan had them for mass notifications. Adopt later if SMS volume becomes a real cost concern.
+3. **`?as=` ambient token injection on blast links.** Same default as transactional sends in Commit 4 — recipients tapping a blast link are silently recognized in localStorage. Deviation from spec text (which doesn't mention `?as=`) but consistent with the rest of the system.
+4. **`preference='both'` routing for blasts: email.** Spec channel ladder doesn't cover `'both'` explicitly; with the three-rule fallback, `'both'` users land in the email branch. Blasts aren't time-sensitive so this matches the per-type routing convention from Commit 3 (where event_update / order_confirmation also default to email).
+5. **Two-layer idempotency for blasts.** Per-blast guard rejects re-runs when status='sending' AND started_at < 10 min old. Beyond 10 min, the blast is treated as stuck and recoverable — the next `send-blast` call resets it. Per-recipient `notifications_log.dedup_key` prevents double-sends during a recovery (a recipient who already received the message in the first attempt won't get it again on the retry).
+6. **JWT verification at the edge function**, not just RLS. The `send-blast` function decodes the caller's bearer token via the anon-key client and rejects 401 if invalid. Belt-and-suspenders against a misconfigured RLS policy or a service-role token leak.
+7. **Future blast features (drafts, email preview, retry-failed UI, scheduling, blast-opt-out, invite-table recipients)** explicitly NOT shipped in 6a. They're tracked in the user's spec under "Planned Features"; corresponding backlog lives in the per-commit doc.
 
 ### Post-Commit-5 hot-fixes
 
