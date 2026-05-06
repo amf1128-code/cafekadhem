@@ -3,12 +3,11 @@ import { Link, NavLink, Outlet, useLocation } from 'react-router-dom'
 import { clearMyGuest, useMyGuest } from '../../lib/identity/useMyGuest'
 import { KadhemLockup, Marquee, RegMark } from './primitives'
 
-// Nav links — all rooted under /cinema/* so the preview is self-contained.
 const NAV_LINKS = [
-  { en: 'CALENDAR', ar: 'التقويم', href: '/cinema/calendar' },
-  { en: 'MENU', ar: 'القائمة', href: '/cinema#menu' },
-  { en: 'STORY', ar: 'القصة', href: '/cinema#story' },
-  { en: 'TICKETS', ar: 'تذاكر', href: '/cinema/my-tickets' },
+  { en: 'CALENDAR', ar: 'التقويم', href: '/calendar' },
+  { en: 'MENU', ar: 'القائمة', href: '/#menu' },
+  { en: 'STORY', ar: 'القصة', href: '/#story' },
+  { en: 'TICKETS', ar: 'تذاكر', href: '/my-tickets' },
 ]
 
 // Phrases scrolling at the bottom of every cinema page. Same set as
@@ -18,7 +17,7 @@ const FOOTER_MARQUEE_EN = [
   'EVERYTHING FROM SCRATCH',
   "BETTER THAN YOUR GRANDMA'S",
   'PISTACHIO BUNS HOT AT 9AM',
-  'COME HUNGRY',
+  'BAGHDAD TO BROOKLYN',
 ]
 const FOOTER_MARQUEE_AR = ['كافيه كاظم', 'صحتين', 'تفضل', 'بالعافية']
 const FOOTER_MARQUEE: string[] = []
@@ -60,7 +59,7 @@ export function CinemaShell() {
     return `${m} / ${d} / ${dow} · صباح الخير`
   }, [])
 
-  const isHome = pathname === '/cinema'
+  const isHome = pathname === '/'
 
   return (
     <div className="cinema-root" style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
@@ -102,7 +101,7 @@ export function CinemaShell() {
         }}
       >
         <Link
-          to="/cinema"
+          to="/"
           aria-label="Cafe Kadhem home"
           style={{
             display: 'flex',
@@ -132,7 +131,7 @@ export function CinemaShell() {
         </nav>
         {isHome ? (
           <Link
-            to="/cinema/calendar"
+            to="/calendar"
             className="ck-reserve"
             style={{
               padding: '12px 18px',
@@ -151,7 +150,7 @@ export function CinemaShell() {
           </Link>
         ) : (
           <Link
-            to="/cinema"
+            to="/"
             className="ck-reserve"
             style={{
               padding: '12px 18px',
@@ -377,7 +376,7 @@ function CinemaRecognition({ fallback }: { fallback: string }) {
   if (!guest?.first_name) {
     return (
       <Link
-        to="/cinema/find-tickets"
+        to="/find-tickets"
         style={{
           color: 'var(--ck-ink)',
           textDecoration: 'none',

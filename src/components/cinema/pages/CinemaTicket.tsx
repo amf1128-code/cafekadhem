@@ -6,8 +6,8 @@ import type { TicketView } from '../../../lib/types'
 import { CinemaPageLoader } from '../primitives'
 
 /**
- * /cinema/ticket/:token — cinema-styled paid ticket display. QR encodes
- * the same /cinema/ticket/:token URL so the door scanner reads it.
+ * /ticket/:token — cinema-styled paid ticket display. QR encodes
+ * the same /ticket/:token URL so the door scanner reads it.
  */
 export function CinemaTicket() {
   const { token } = useParams<{ token: string }>()
@@ -35,7 +35,7 @@ export function CinemaTicket() {
       const row = Array.isArray(data) ? data[0] : data
       setTicket(row as TicketView)
       const url =
-        typeof window !== 'undefined' ? window.location.href : `/cinema/ticket/${token}`
+        typeof window !== 'undefined' ? window.location.href : `/ticket/${token}`
       const dataUrl = await QRCode.toDataURL(url, {
         margin: 1,
         width: 480,

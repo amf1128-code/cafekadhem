@@ -3,6 +3,16 @@ import { Link } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import type { Event, MenuItem } from '../../lib/types'
 import { isUpcoming } from '../../lib/utils/date'
+import { CursorSticker } from '../CursorSticker'
+import {
+  formatCinemaDate,
+  formatCinemaDay,
+  formatCinemaTime,
+  interleaveAlternating,
+  makeDisplayTitle,
+  padNo,
+  splitBullets,
+} from './helpers'
 import { Marquee } from './primitives'
 
 interface CinemaEvent {
@@ -20,6 +30,9 @@ interface CinemaEvent {
   bullets: string[]
   posterUrl: string | null
   menu: CinemaMenuItem[]
+  // When false, the event is "coming soon" — RSVP/ticket CTAs are
+  // swapped for a teaser panel and a Jaya (جاية) tag is shown.
+  rsvpOpen: boolean
 }
 
 interface CinemaMenuItem {
@@ -40,105 +53,14 @@ const HERO_MARQUEE_EN = [
   'EVERYTHING FROM SCRATCH',
   "BETTER THAN YOUR GRANDMA'S",
   'PISTACHIO BUNS HOT AT 9AM',
-  'COME HUNGRY',
+  'BAGHDAD TO BROOKLYN',
 ]
 const HERO_MARQUEE_AR = ['كافيه كاظم', 'صحتين', 'تفضل', 'بالعافية']
 const HERO_MARQUEE_ITEMS = interleaveAlternating(HERO_MARQUEE_EN, HERO_MARQUEE_AR)
 
-/**
- * Zips two lists so the output strictly alternates between them.
- * If the lists are uneven the longer one's leftover entries get
- * appended at the end (acceptable for a marquee that loops).
- */
-function interleaveAlternating<T>(a: T[], b: T[]): T[] {
-  const out: T[] = []
-  const max = Math.max(a.length, b.length)
-  for (let i = 0; i < max; i++) {
-    if (i < a.length) out.push(a[i])
-    if (i < b.length) out.push(b[i])
-  }
-  return out
-}
-
 // Designer-supplied fallback copy when the live event row is missing the
-// optional cinema fields (Arabic display word, tagline, bullets). This
-// keeps the layout's chrome populated until the schema is extended.
+// optional cinema fields (Arabic display word, tagline, bullets).
 const FALLBACK_AR = ['الكأس', 'عيد ميلاد', 'طرب', 'سينما']
-
-function padNo(n: string | number | null | undefined, fallback: string): string {
-  if (n === null || n === undefined || n === '') return fallback
-  // Admins sometimes type "No. 006" or "no 14" into the gathering_number
-  // field. Strip leading "No." / "Number" / etc. so we don't end up with
-  // "NO. No. 006" once the cinema landing prepends its own "NO." prefix.
-  const cleaned = String(n)
-    .replace(/^\s*(no\.?|number|num\.?|#)\s*/i, '')
-    .trim()
-  if (!cleaned) return fallback
-  return cleaned.length >= 3 ? cleaned : cleaned.padStart(3, '0')
-}
-
-function formatCinemaDate(dateStr: string): string {
-  // "2026-06-16" → "06.16.26"
-  const [y, m, d] = dateStr.split('-')
-  if (!y || !m || !d) return dateStr
-  return `${m}.${d}.${y.slice(-2)}`
-}
-
-function formatCinemaDay(dateStr: string): string {
-  const date = new Date(dateStr + 'T12:00:00')
-  return date
-    .toLocaleDateString('en-US', { weekday: 'short', timeZone: 'America/New_York' })
-    .toUpperCase()
-}
-
-function formatCinemaTime(start: string, end: string | null): string {
-  const startHour = Number(start.split(':')[0])
-  const period = startHour >= 12 ? 'PM' : 'AM'
-  const display = startHour % 12 || 12
-  if (!end) return `${display}${period} TILL LATE`
-  const endHour = Number(end.split(':')[0])
-  const endPeriod = endHour >= 12 ? 'PM' : 'AM'
-  const endDisplay = endHour % 12 || 12
-  return `${display}${period} – ${endDisplay}${endPeriod}`
-}
-
-function splitBullets(text: string | null): string[] {
-  if (!text) return []
-  // Accept either explicit newlines (one bullet per line) or a paragraph
-  // of 2-3 sentences. Split on either, trim list markers if present.
-  const byLine = text
-    .split(/\r?\n/)
-    .map(line => line.trim().replace(/^[-•·*]\s*/, ''))
-    .filter(Boolean)
-  if (byLine.length > 1) return byLine.slice(0, 4)
-  // Single-line text → split by sentence terminators.
-  return text
-    .split(/(?<=[.!?])\s+/)
-    .map(s => s.trim())
-    .filter(Boolean)
-    .slice(0, 4)
-}
-
-// Heuristic: titles longer than ~14 chars get split into two visual lines
-// at the nearest space past the midpoint, matching the designer's
-// "WORLD CUP / WATCH PARTY" treatment.
-function makeDisplayTitle(title: string): string {
-  const clean = title.toUpperCase().trim()
-  if (clean.length <= 14 || clean.includes('\n')) return clean
-  const mid = Math.floor(clean.length / 2)
-  const after = clean.indexOf(' ', mid)
-  const before = clean.lastIndexOf(' ', mid)
-  const breakAt =
-    after === -1
-      ? before
-      : before === -1
-        ? after
-        : after - mid <= mid - before
-          ? after
-          : before
-  if (breakAt <= 0) return clean
-  return clean.slice(0, breakAt) + '\n' + clean.slice(breakAt + 1)
-}
 
 function mapEvent(e: Event, idx: number, items: MenuItem[]): CinemaEvent {
   const display = makeDisplayTitle(e.title)
@@ -166,6 +88,7 @@ function mapEvent(e: Event, idx: number, items: MenuItem[]): CinemaEvent {
       cat: (item.category || 'BAKE').toUpperCase(),
       ar: item.display_arabic?.trim() ?? '',
     })),
+    rsvpOpen: e.is_rsvp_open ?? true,
   }
 }
 
@@ -235,6 +158,10 @@ export function CinemaLanding() {
 
       {/* STORY */}
       <StorySection />
+
+      {/* Cursor sticker — orange Arabic pill that follows the cursor and
+          cycles phrases on click. Brand "personality moment". */}
+      <CursorSticker />
     </>
   )
 }
@@ -263,9 +190,16 @@ function HeroSection({ event }: { event: CinemaEvent }) {
             letterSpacing: '0.18em',
             color: 'var(--ck-cobalt)',
             textTransform: 'uppercase',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 10,
+            flexWrap: 'wrap',
           }}
         >
-          ✦ NEXT POP-UP · NO. {event.no} · {event.day} {event.date}
+          <span>
+            ✦ {event.rsvpOpen ? 'NEXT POP-UP' : 'COMING SOON'} · NO. {event.no} · {event.day} {event.date}
+          </span>
+          {!event.rsvpOpen && <JayaTag />}
         </div>
         <div
           className="ck-hide-mobile"
@@ -370,7 +304,9 @@ function HeroSection({ event }: { event: CinemaEvent }) {
               </div>
             )}
 
-            {/* Price seal bottom-right */}
+            {/* Price seal bottom-right — swaps to a Jaya seal when the
+                event is still in coming-soon mode (no RSVP yet, so the
+                price isn't a real commitment). */}
             <div
               style={{
                 position: 'absolute',
@@ -399,28 +335,57 @@ function HeroSection({ event }: { event: CinemaEvent }) {
               >
                 NO. {event.no}
               </div>
-              <div
-                style={{
-                  fontFamily: 'var(--ck-serif)',
-                  fontWeight: 900,
-                  fontSize: event.price > 0 ? 22 : 28,
-                  lineHeight: 1,
-                  marginTop: event.price > 0 ? 2 : 4,
-                }}
-              >
-                {event.price > 0 ? `$${event.price}` : 'FREE'}
-              </div>
-              {event.price > 0 && (
-                <div
-                  style={{
-                    fontFamily: 'var(--ck-mono)',
-                    fontSize: 7,
-                    letterSpacing: '0.16em',
-                    marginTop: 2,
-                  }}
-                >
-                  SEAT
-                </div>
+              {event.rsvpOpen ? (
+                <>
+                  <div
+                    style={{
+                      fontFamily: 'var(--ck-serif)',
+                      fontWeight: 900,
+                      fontSize: event.price > 0 ? 22 : 28,
+                      lineHeight: 1,
+                      marginTop: event.price > 0 ? 2 : 4,
+                    }}
+                  >
+                    {event.price > 0 ? `$${event.price}` : 'FREE'}
+                  </div>
+                  {event.price > 0 && (
+                    <div
+                      style={{
+                        fontFamily: 'var(--ck-mono)',
+                        fontSize: 7,
+                        letterSpacing: '0.16em',
+                        marginTop: 2,
+                      }}
+                    >
+                      SEAT
+                    </div>
+                  )}
+                </>
+              ) : (
+                <>
+                  <div
+                    style={{
+                      fontFamily: 'var(--ck-arabic-display)',
+                      direction: 'rtl',
+                      fontSize: 26,
+                      lineHeight: 1,
+                      marginTop: 4,
+                      color: 'var(--ck-sun)',
+                    }}
+                  >
+                    جاية
+                  </div>
+                  <div
+                    style={{
+                      fontFamily: 'var(--ck-mono)',
+                      fontSize: 7,
+                      letterSpacing: '0.16em',
+                      marginTop: 2,
+                    }}
+                  >
+                    SOON
+                  </div>
+                </>
               )}
             </div>
 
@@ -608,28 +573,32 @@ function HeroSection({ event }: { event: CinemaEvent }) {
             </ul>
           )}
 
-          <Link
-            to={`/cinema/events/${event.id}`}
-            style={{
-              padding: '14px 22px',
-              border: '2px solid var(--ck-ink)',
-              background: 'var(--ck-cobalt)',
-              color: 'var(--ck-cream)',
-              fontFamily: 'var(--ck-sans)',
-              fontWeight: 700,
-              fontSize: 13,
-              letterSpacing: '0.12em',
-              textTransform: 'uppercase',
-              textDecoration: 'none',
-              display: 'inline-flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              width: '100%',
-            }}
-          >
-            <span>{event.price > 0 ? `Reserve · $${event.price}` : 'Save my seat'}</span>
-            <span aria-hidden>→</span>
-          </Link>
+          {event.rsvpOpen ? (
+            <Link
+              to={`/events/${event.id}`}
+              style={{
+                padding: '14px 22px',
+                border: '2px solid var(--ck-ink)',
+                background: 'var(--ck-cobalt)',
+                color: 'var(--ck-cream)',
+                fontFamily: 'var(--ck-sans)',
+                fontWeight: 700,
+                fontSize: 13,
+                letterSpacing: '0.12em',
+                textTransform: 'uppercase',
+                textDecoration: 'none',
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                width: '100%',
+              }}
+            >
+              <span>{event.price > 0 ? `Reserve · $${event.price}` : 'Save my seat'}</span>
+              <span aria-hidden>→</span>
+            </Link>
+          ) : (
+            <ComingSoonPanel eventId={event.id} />
+          )}
 
           <div
             style={{
@@ -647,11 +616,128 @@ function HeroSection({ event }: { event: CinemaEvent }) {
             }}
           >
             <span>CK-{event.no}</span>
-            <span>RSVP / حجز</span>
+            <span>{event.rsvpOpen ? 'RSVP / حجز' : 'JAYA / جاية'}</span>
           </div>
         </div>
       </div>
     </section>
+  )
+}
+
+/** Small inline tag stamped over coming-soon events. Reads "JAYA"
+ *  (جاية, colloquial Arabic for "coming") in the orange display face
+ *  next to a tiny Latin label. */
+function JayaTag() {
+  return (
+    <span
+      style={{
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: 6,
+        padding: '3px 10px',
+        border: '2px solid var(--ck-ink)',
+        background: 'var(--ck-sun)',
+        color: 'var(--ck-ink)',
+        fontFamily: 'var(--ck-mono)',
+        fontSize: 10,
+        letterSpacing: '0.16em',
+        textTransform: 'uppercase',
+        lineHeight: 1.2,
+      }}
+    >
+      <span
+        style={{
+          fontFamily: 'var(--ck-arabic-display)',
+          fontSize: 18,
+          direction: 'rtl',
+          letterSpacing: 0,
+          lineHeight: 1,
+        }}
+      >
+        جاية
+      </span>
+      <span>Jaya · Coming</span>
+    </span>
+  )
+}
+
+/** Replaces the RSVP CTA on the cinema landing hero when an event is
+ *  published in coming-soon mode. Still links to the event detail
+ *  page so curious visitors can read whatever's there. */
+function ComingSoonPanel({ eventId }: { eventId: string }) {
+  return (
+    <div
+      style={{
+        padding: '16px 20px',
+        border: '2px solid var(--ck-ink)',
+        background: 'var(--ck-paper)',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 8,
+      }}
+    >
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          gap: 10,
+          flexWrap: 'wrap',
+        }}
+      >
+        <div
+          style={{
+            fontFamily: 'var(--ck-mono)',
+            fontSize: 10,
+            letterSpacing: '0.18em',
+            textTransform: 'uppercase',
+            color: 'var(--ck-cobalt)',
+          }}
+        >
+          ✦ Save the date
+        </div>
+        <JayaTag />
+      </div>
+      <div
+        style={{
+          fontFamily: 'var(--ck-serif)',
+          fontWeight: 900,
+          fontSize: 22,
+          lineHeight: 1,
+        }}
+      >
+        More details to come.
+      </div>
+      <p
+        className="ck-italic"
+        style={{
+          fontFamily: 'var(--ck-serif-edit)',
+          fontStyle: 'italic',
+          fontSize: 14,
+          lineHeight: 1.4,
+          margin: 0,
+          opacity: 0.85,
+        }}
+      >
+        RSVPs aren't open yet. Hold the date — we'll flip the door open
+        soon.
+      </p>
+      <Link
+        to={`/events/${eventId}`}
+        style={{
+          marginTop: 4,
+          fontFamily: 'var(--ck-mono)',
+          fontSize: 11,
+          letterSpacing: '0.16em',
+          textTransform: 'uppercase',
+          color: 'var(--ck-ink)',
+          textDecoration: 'underline',
+          textUnderlineOffset: 4,
+        }}
+      >
+        See what we know →
+      </Link>
+    </div>
   )
 }
 
@@ -1016,7 +1102,7 @@ function CalendarSection({
           </div>
         </div>
         <Link
-          to="/cinema/calendar"
+          to="/calendar"
           style={{
             fontFamily: 'var(--ck-mono)',
             fontSize: 11,
@@ -1084,7 +1170,7 @@ function CalendarRow({
   // Whole row is a Link to the event detail page.
   return (
     <Link
-      to={`/cinema/events/${event.id}`}
+      to={`/events/${event.id}`}
       className="ck-cal-row"
       style={{
         display: 'grid',
@@ -1128,6 +1214,7 @@ function CalendarRow({
             {event.ar}
           </span>
         )}
+        {!event.rsvpOpen && <JayaTag />}
       </div>
 
       <div

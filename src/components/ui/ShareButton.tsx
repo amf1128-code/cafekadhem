@@ -59,12 +59,9 @@ export function ShareButton({
     <button
       type="button"
       onClick={onClick}
-      className={
-        className ||
-        'border border-warm px-5 py-2 text-xs tracking-[0.2em] uppercase text-ink-muted hover:border-ink hover:text-ink transition-colors'
-      }
+      className={className || 'ck-btn'}
     >
-      {copied ? '[ Link copied ]' : `[ ${label} ]`}
+      {copied ? 'Link copied ✓' : `${label} →`}
     </button>
   )
 }

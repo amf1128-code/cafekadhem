@@ -33,6 +33,10 @@ export interface Event {
   event_type: string | null
   rsvp_required: boolean
   is_published: boolean
+  // When false, the event is "coming soon" — info is shown but the
+  // public RSVP/ticketing CTAs are swapped for a "more details to
+  // come" panel with a جاية tag. Defaults to true.
+  is_rsvp_open: boolean
   ticketing_enabled: boolean
   ticket_price: number | null
   theme: 'theme1' | 'theme2' | 'theme3'

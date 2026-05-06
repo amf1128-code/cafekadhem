@@ -8,7 +8,19 @@ import { consentNoteText, type ConsentVerb } from '../../lib/notifications/conse
  */
 export function ConsentNote({ verb }: { verb: ConsentVerb }) {
   return (
-    <p className="text-[10px] leading-relaxed text-ink-muted opacity-60 mt-4 px-4 max-w-md mx-auto text-center">
+    <p
+      style={{
+        fontFamily: 'var(--ck-mono)',
+        fontSize: 9,
+        lineHeight: 1.5,
+        letterSpacing: '0.06em',
+        opacity: 0.55,
+        marginTop: 16,
+        maxWidth: 480,
+        marginInline: 'auto',
+        textAlign: 'center',
+      }}
+    >
       {consentNoteText(verb)}
     </p>
   )

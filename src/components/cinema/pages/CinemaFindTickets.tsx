@@ -6,7 +6,7 @@ import { getGuestToken } from '../../../lib/utils/guest-token'
 import { useToast } from '../../ui/Toast'
 
 /**
- * /cinema/find-tickets — magic-link lookup. Same behavior as the legacy
+ * /find-tickets — magic-link lookup. Same behavior as the legacy
  * page; UI rewritten in cinema style.
  */
 export function CinemaFindTickets() {
@@ -121,7 +121,7 @@ export function CinemaFindTickets() {
             <span>We recognize this device.</span>
             <button
               type="button"
-              onClick={() => navigate('/cinema/my-tickets')}
+              onClick={() => navigate('/my-tickets')}
               className="ck-btn ck-btn--ink"
             >
               Take me to my stuff →
