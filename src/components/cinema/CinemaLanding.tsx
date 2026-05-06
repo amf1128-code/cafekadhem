@@ -49,7 +49,7 @@ const HERO_MARQUEE_EN = [
   'EVERYTHING FROM SCRATCH',
   "BETTER THAN YOUR GRANDMA'S",
   'PISTACHIO BUNS HOT AT 9AM',
-  'COME HUNGRY',
+  'BAGHDAD TO BROOKLYN',
 ]
 const HERO_MARQUEE_AR = ['كافيه كاظم', 'صحتين', 'تفضل', 'بالعافية']
 const HERO_MARQUEE_ITEMS = interleaveAlternating(HERO_MARQUEE_EN, HERO_MARQUEE_AR)
