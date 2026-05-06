@@ -17,7 +17,7 @@ import {
 import { ConsentNote } from '../components/ui/ConsentNote'
 import { normalizePhone } from '../lib/utils/phone'
 import { formatTime } from '../lib/utils/date'
-import { getPaymentProvider } from '../lib/payment'
+import { getPaymentProvider, openPaymentLink } from '../lib/payment'
 import { sendNotification } from '../lib/notifications'
 import { useToast } from '../components/ui/Toast'
 import { CinemaPageLoader } from '../components/cinema/primitives'
@@ -290,9 +290,9 @@ export function Pickup() {
         },
       })
 
-      // Render a receipt with a Venmo anchor instead of programmatic
-      // window.open — anchor taps reliably hand off to the Venmo app on
-      // mobile (same pattern as the RSVP/ticket flow).
+      // Stash the link so the receipt can render a fallback anchor, then
+      // hand off same-tab to Venmo (window.open with _blank doesn't open
+      // the app for venmo:// on mobile).
       setSubmitted({
         pickupToken: order.pickup_token,
         paymentUrl: paymentLink.url,
@@ -301,6 +301,7 @@ export function Pickup() {
         when: pickupWhen,
       })
       addToast('Order submitted!')
+      openPaymentLink(paymentLink)
       return
     } catch (err) {
       addToast(err instanceof Error ? err.message : 'Failed to submit order', 'error')
@@ -339,34 +340,50 @@ export function Pickup() {
             className="ck-italic"
             style={{ fontSize: 18, marginTop: 8, lineHeight: 1.5 }}
           >
-            One last step — tap below to send payment via Venmo. We
-            emailed a confirmation; the host marks it paid.
+            Venmo opened to finish payment — come back here when it's
+            sent. We emailed a confirmation; the host marks it paid.
           </p>
-          <a
-            href={submitted.paymentUrl}
-            target={submitted.paymentLinkType === 'deep_link' ? undefined : '_blank'}
-            rel="noopener noreferrer"
-            className="ck-btn ck-btn--primary"
-            style={{ marginTop: 22, display: 'inline-block' }}
-          >
-            Pay ${submitted.amount.toFixed(2)} on Venmo →
-          </a>
           <div
             style={{
-              marginTop: 18,
+              marginTop: 22,
               display: 'flex',
               flexWrap: 'wrap',
               justifyContent: 'center',
               gap: 8,
             }}
           >
-            <Link to={`/pickup/${submitted.pickupToken}`} className="ck-btn">
+            <Link
+              to={`/pickup/${submitted.pickupToken}`}
+              className="ck-btn ck-btn--primary"
+            >
               See pickup ticket →
             </Link>
             <Link to="/my-tickets" className="ck-btn">
               My tickets &amp; orders
             </Link>
           </div>
+          <p
+            style={{
+              marginTop: 14,
+              fontFamily: 'var(--ck-mono)',
+              fontSize: 10,
+              letterSpacing: '0.14em',
+              textTransform: 'uppercase',
+              opacity: 0.7,
+              lineHeight: 1.6,
+            }}
+          >
+            Venmo didn't open?{' '}
+            <a
+              href={submitted.paymentUrl}
+              target={submitted.paymentLinkType === 'deep_link' ? undefined : '_blank'}
+              rel="noopener noreferrer"
+              style={{ color: 'var(--ck-cobalt)', textDecoration: 'underline' }}
+            >
+              Tap here to retry (${submitted.amount.toFixed(2)})
+            </a>
+            .
+          </p>
         </div>
       </section>
     )
