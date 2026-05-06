@@ -126,18 +126,14 @@ const Option5SoukMaximalism = lazy(() =>
 )
 
 export const router = createBrowserRouter([
-  // Home is the cinema landing — full-bleed, ships its own chrome, so it
-  // sits outside PublicLayout. The legacy event-list home (with the
-  // "Past Gatherings" archive) lives at /calendar inside PublicLayout.
-  {
-    path: '/',
-    element: <Lazy><CinemaLanding /></Lazy>,
-  },
+  // Production routes — left exactly as they were. The cinema redesign
+  // is staged behind /cinema/* (see below) so the live site is unchanged
+  // until the operator promotes it.
   {
     path: '/',
     element: <PublicLayout />,
     children: [
-      { path: 'calendar', element: <Home /> },
+      { index: true, element: <Home /> },
       { path: 'events/:id', element: <EventDetail /> },
       { path: 'events/:id/order', element: <Order /> },
       { path: 'pickup', element: <Pickup /> },
@@ -148,6 +144,13 @@ export const router = createBrowserRouter([
       { path: 'my-tickets', element: <MyTickets /> },
       { path: 'verify-merge', element: <VerifyMerge /> },
     ],
+  },
+  // Cinema preview — a parallel cinema-styled site living at /cinema/*.
+  // Only the home page is wired up here for now; sibling pages
+  // (/cinema/calendar, /cinema/events/:id, etc.) come next.
+  {
+    path: '/cinema',
+    element: <Lazy><CinemaLanding /></Lazy>,
   },
   {
     path: '/admin/login',
