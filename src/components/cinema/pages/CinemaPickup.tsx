@@ -1,18 +1,10 @@
-import { useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { CinemaPageLoader } from '../primitives'
+import { Pickup } from '../../../pages/Pickup'
 
 /**
- * /cinema/pickup — pickup ordering flow.
- *
- * STUB: redirects to the legacy /pickup page so the existing flow keeps
- * working while the cinema rebuild lands. The cinema chrome still wraps
- * the page since /cinema/pickup is a child of CinemaShell.
+ * /cinema/pickup — wraps the legacy Pickup page (slot picker, cart,
+ * Venmo deep link) inside the cinema chrome. Internal styling stays
+ * for now; cinema-tokenize follow-up TODO.
  */
 export function CinemaPickup() {
-  const navigate = useNavigate()
-  useEffect(() => {
-    navigate('/pickup', { replace: true })
-  }, [navigate])
-  return <CinemaPageLoader />
+  return <Pickup />
 }

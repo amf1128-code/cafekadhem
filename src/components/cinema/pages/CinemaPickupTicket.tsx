@@ -1,18 +1,10 @@
-import { useEffect } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
-import { CinemaPageLoader } from '../primitives'
+import { PickupTicket } from '../../../pages/PickupTicket'
 
 /**
- * /cinema/pickup/:token — pickup ticket display.
- *
- * STUB: redirects to the legacy /pickup/:token page. Cinema rebuild
- * lands next.
+ * /cinema/pickup/:token — wraps the legacy PickupTicket page (order
+ * summary + Venmo link + I've-paid button) inside the cinema chrome.
+ * Internal styling stays for now; cinema-tokenize follow-up TODO.
  */
 export function CinemaPickupTicket() {
-  const { token } = useParams<{ token: string }>()
-  const navigate = useNavigate()
-  useEffect(() => {
-    if (token) navigate(`/pickup/${token}`, { replace: true })
-  }, [token, navigate])
-  return <CinemaPageLoader />
+  return <PickupTicket />
 }

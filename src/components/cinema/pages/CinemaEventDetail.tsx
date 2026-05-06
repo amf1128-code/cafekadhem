@@ -2,16 +2,18 @@ import { useEffect, useState } from 'react'
 import { Link, useLocation, useParams } from 'react-router-dom'
 import { supabase } from '../../../lib/supabase'
 import type { Event, MenuItem, PublicGuestProfile, RSVP } from '../../../lib/types'
+import { getGuestToken } from '../../../lib/utils/guest-token'
+import { RSVPForm } from '../../events/RSVPForm'
 import { CinemaPageLoader } from '../primitives'
 
+type RsvpWithGuest = RSVP & { guest: PublicGuestProfile }
+
 /**
- * /cinema/events/:id — cinema-styled event detail.
- *
- * STUB: data fetch + minimal cinema-styled detail. The full RSVP form,
- * ticketing, share, invite, and menu rendering still live on the legacy
- * /events/:id page. This stub exists so /cinema/* routes compile and so
- * the operator can preview the cinema chrome around an event detail
- * page; deep flows are filled in next.
+ * /cinema/events/:id — cinema-styled event detail. Wraps the legacy
+ * RSVPForm component (handles plus-ones, merge verification, ticketing
+ * Venmo links — too dense to clone) inside a cinema-styled section.
+ * Form internals are still legacy Tailwind for now; cinema-tokenize
+ * follow-up TODO.
  */
 export function CinemaEventDetail() {
   const { id } = useParams<{ id: string }>()
@@ -19,44 +21,72 @@ export function CinemaEventDetail() {
   const invitedBy = (location.state as { invitedBy?: string } | null)?.invitedBy ?? null
   const [event, setEvent] = useState<Event | null>(null)
   const [items, setItems] = useState<MenuItem[]>([])
-  const [rsvps, setRsvps] = useState<(RSVP & { guest: PublicGuestProfile })[]>([])
+  const [rsvps, setRsvps] = useState<RsvpWithGuest[]>([])
+  const [myRsvp, setMyRsvp] = useState<RSVP | null>(null)
+  const [myPlusOne, setMyPlusOne] = useState<RsvpWithGuest | null>(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    let cancelled = false
-    ;(async () => {
-      if (!id) return
-      const { data: ev } = await supabase
-        .from('events')
-        .select('*')
-        .eq('id', id)
-        .single()
-      if (cancelled) return
-      setEvent(ev as Event | null)
-
-      if (ev?.menu_id) {
-        const { data: menuItems } = await supabase
-          .from('public_menu_items')
-          .select('*')
-          .eq('menu_id', ev.menu_id)
-          .order('sort_order')
-        if (!cancelled && menuItems) setItems(menuItems as MenuItem[])
-      }
-      const { data: rsvpRows } = await supabase
-        .from('rsvps')
-        .select('*, guest:public_guest_profiles!guest_id(*)')
-        .eq('event_id', id)
-        .in('status', ['yes', 'maybe', 'waitlisted'])
-      if (!cancelled && rsvpRows) {
-        setRsvps(rsvpRows as (RSVP & { guest: PublicGuestProfile })[])
-      }
-
-      setLoading(false)
-    })()
-    return () => {
-      cancelled = true
-    }
+    if (id) loadEvent()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id])
+
+  async function loadEvent({ silent = false }: { silent?: boolean } = {}) {
+    if (!id) return
+    if (!silent) setLoading(true)
+
+    const { data: ev } = await supabase
+      .from('events')
+      .select('*')
+      .eq('id', id)
+      .single()
+    setEvent(ev as Event | null)
+
+    if (ev?.menu_id) {
+      const { data: menuItems } = await supabase
+        .from('public_menu_items')
+        .select('*')
+        .eq('menu_id', ev.menu_id)
+        .order('sort_order')
+      if (menuItems) setItems(menuItems as MenuItem[])
+    }
+
+    const { data: rsvpRows } = await supabase
+      .from('rsvps')
+      .select('*, guest:public_guest_profiles!guest_id(*)')
+      .eq('event_id', id)
+      .in('status', ['yes', 'maybe', 'waitlisted'])
+    if (rsvpRows) setRsvps(rsvpRows as RsvpWithGuest[])
+
+    const guestToken = getGuestToken()
+    if (guestToken) {
+      const { data: mine } = await supabase
+        .from('rsvps')
+        .select('*')
+        .eq('event_id', id)
+        .eq('guest_id', guestToken)
+        .is('plus_one_of', null)
+        .maybeSingle()
+      setMyRsvp((mine as RSVP | null) ?? null)
+
+      // The host's plus-one row points back at the host's RSVP via plus_one_of.
+      if (mine) {
+        const { data: po } = await supabase
+          .from('rsvps')
+          .select('*, guest:public_guest_profiles!guest_id(*)')
+          .eq('plus_one_of', (mine as RSVP).id)
+          .maybeSingle()
+        setMyPlusOne((po as RsvpWithGuest | null) ?? null)
+      } else {
+        setMyPlusOne(null)
+      }
+    } else {
+      setMyRsvp(null)
+      setMyPlusOne(null)
+    }
+
+    if (!silent) setLoading(false)
+  }
 
   if (loading) return <CinemaPageLoader />
   if (!event) {
@@ -286,13 +316,61 @@ export function CinemaEventDetail() {
               >
                 {price === 0 ? 'FREE' : `$${price}`}
               </div>
-              <Link
-                to={`/events/${event.id}`}
+              <a
+                href="#rsvp"
                 className="ck-btn ck-btn--primary"
               >
                 {event.ticketing_enabled ? 'Get a ticket' : 'RSVP'} →
-              </Link>
+              </a>
             </div>
+          </div>
+        </div>
+      </section>
+
+      {/* RSVP FORM — wraps the legacy form in a cinema-styled container.
+          The form's internals still use the existing tailwind palette;
+          cinema-tokenize follow-up. */}
+      <section
+        id="rsvp"
+        className="ck-page"
+        style={{ background: 'var(--ck-paper)' }}
+      >
+        <div className="ck-narrow">
+          <div className="ck-eyebrow">
+            ✦ {event.ticketing_enabled ? 'Get a ticket' : 'Save a spot'}
+          </div>
+          <div
+            className="ck-section-head-row"
+            style={{ marginTop: 6, alignItems: 'baseline' }}
+          >
+            <h2 className="ck-h2">RSVP.</h2>
+            <span
+              style={{
+                fontFamily: 'var(--ck-arabic-display)',
+                fontSize: 'clamp(36px, 4vw, 56px)',
+                direction: 'rtl',
+                color: 'var(--ck-cobalt)',
+                lineHeight: 0.9,
+              }}
+            >
+              حجز
+            </span>
+          </div>
+          <div
+            className="ck-card"
+            style={{ marginTop: 22, padding: 24, background: 'var(--ck-cream)' }}
+          >
+            <RSVPForm
+              eventId={event.id}
+              event={event}
+              existingRsvp={myRsvp}
+              existingPlusOne={myPlusOne}
+              isFull={
+                !!event.capacity &&
+                rsvps.filter(r => r.status === 'yes').length >= event.capacity
+              }
+              onRsvpComplete={() => loadEvent({ silent: true })}
+            />
           </div>
         </div>
       </section>

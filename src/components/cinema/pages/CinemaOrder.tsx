@@ -1,18 +1,14 @@
-import { useEffect } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
-import { CinemaPageLoader } from '../primitives'
+import { Order } from '../../../pages/Order'
 
 /**
- * /cinema/events/:id/order — pre-order flow.
+ * /cinema/events/:id/order — wraps the legacy Order page (cart, Venmo
+ * deep link, confirmation) inside the cinema chrome (CinemaShell). The
+ * Order component's internal Tailwind styling stays for now; cinema-
+ * tokenize follow-up TODO.
  *
- * STUB: redirects to the legacy order page for now, so the cart + Venmo
- * deep-link flow keeps working. The cinema-styled rebuild lands next.
+ * Functional behavior is identical to the production /events/:id/order
+ * route — same RPCs, same Venmo handle, same notification fan-out.
  */
 export function CinemaOrder() {
-  const { id } = useParams<{ id: string }>()
-  const navigate = useNavigate()
-  useEffect(() => {
-    if (id) navigate(`/events/${id}/order`, { replace: true })
-  }, [id, navigate])
-  return <CinemaPageLoader />
+  return <Order />
 }
