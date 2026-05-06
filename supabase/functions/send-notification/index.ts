@@ -717,38 +717,129 @@ Deno.serve(async (req: Request) => {
       ]
     }
 
-    if (preference === 'sms' && guest.phone) {
-      channel = 'sms'
-      success = await sendSMS(guest.phone, body)
-    } else if (preference === 'email' && guest.email) {
-      channel = 'email'
-      success = await sendEmail(guest.email, subject, body, html, attachments)
-    } else if (preference === 'none') {
-      // Guest opted out
+    // Per-type routing for guests with preference='both'. Time-sensitive
+    // sends go SMS (if phone available + sms_enabled), bulkier or less
+    // urgent sends go email. USER_FLOWS_SPEC.md §7.1.
+    const BOTH_PREFERS_SMS: Record<string, boolean> = {
+      rsvp_confirmation: true,
+      ticket_issued: true,
+      invite: true,
+      event_reminder: true,
+      waitlist_promoted: true,
+      merge_verification: false,    // forced channel per §3.4 — never falls here
+      order_confirmation: false,
+      pickup_order_confirmation: false,
+      event_update: false,
+    }
+
+    // Resolve sms_enabled (the global toggle from admin_settings).
+    let smsEnabled = false
+    {
+      const { data: settings } = await supabase
+        .from('admin_settings')
+        .select('sms_enabled')
+        .limit(1)
+        .single()
+      smsEnabled = !!settings?.sms_enabled
+    }
+
+    if (preference === 'none') {
+      // Guest opted out — log and skip.
+      await supabase.from('notifications_log').insert({
+        guest_id: guestId,
+        event_id: eventId,
+        channel: 'email',  // placeholder — nothing was sent
+        type,
+        status: 'queued',  // existing CHECK only allows sent/failed/queued; 'queued' here means "suppressed"
+        dedup_key: data.dedup_key ?? null,
+        sent_at: null,
+        error: 'suppressed: notification_preference=none',
+      })
       return new Response(JSON.stringify({ success: true, channel: 'none', skipped: true }), {
         headers: jsonHeaders,
       })
+    }
+
+    // Pre-send idempotency check: if caller passed a dedup_key and a
+    // 'sent' row already exists, skip the actual provider call. Without
+    // this, a retry would log a duplicate but still fire the SMS/email.
+    if (data.dedup_key) {
+      const { data: existing } = await supabase
+        .from('notifications_log')
+        .select('id, status')
+        .eq('dedup_key', data.dedup_key)
+        .limit(1)
+        .maybeSingle()
+      if (existing && existing.status === 'sent') {
+        return new Response(
+          JSON.stringify({ success: true, skipped: true, reason: 'dedup' }),
+          { headers: jsonHeaders },
+        )
+      }
+    }
+
+    if (preference === 'sms' && guest.phone && smsEnabled) {
+      channel = 'sms'
+      success = await sendSMS(guest.phone, body)
+    } else if (preference === 'sms' && guest.email) {
+      // SMS preferred but globally disabled → fall back to email.
+      channel = 'email'
+      success = await sendEmail(guest.email, subject, body, html, attachments)
+    } else if (preference === 'email' && guest.email) {
+      channel = 'email'
+      success = await sendEmail(guest.email, subject, body, html, attachments)
+    } else if (preference === 'both') {
+      const wantsSms = BOTH_PREFERS_SMS[type] ?? false
+      if (wantsSms && smsEnabled && guest.phone) {
+        channel = 'sms'
+        success = await sendSMS(guest.phone, body)
+      } else if (guest.email) {
+        channel = 'email'
+        success = await sendEmail(guest.email, subject, body, html, attachments)
+      } else if (smsEnabled && guest.phone) {
+        channel = 'sms'
+        success = await sendSMS(guest.phone, body)
+      }
     } else {
-      // Fallback: try email first, then SMS
+      // Last-resort fallback: try email first, then SMS.
       if (guest.email) {
         channel = 'email'
         success = await sendEmail(guest.email, subject, body, html, attachments)
-      } else if (guest.phone) {
+      } else if (smsEnabled && guest.phone) {
         channel = 'sms'
         success = await sendSMS(guest.phone, body)
       }
     }
 
-    // Log notification
-    await supabase.from('notifications_log').insert({
-      guest_id: guestId,
-      event_id: eventId,
-      channel,
-      type,
-      status: success ? 'sent' : 'failed',
-      sent_at: success ? new Date().toISOString() : null,
-      error: success ? null : 'Send failed',
-    })
+    // Log notification. dedup_key is optional; when present the partial
+    // unique index on notifications_log catches double-sends.
+    // ON CONFLICT DO NOTHING so a duplicate (caller hit retry) is a
+    // safe no-op. USER_FLOWS_SPEC.md §7.2.
+    if (data.dedup_key) {
+      await supabase.from('notifications_log').upsert(
+        {
+          guest_id: guestId,
+          event_id: eventId,
+          channel,
+          type,
+          status: success ? 'sent' : 'failed',
+          dedup_key: data.dedup_key,
+          sent_at: success ? new Date().toISOString() : null,
+          error: success ? null : 'Send failed',
+        },
+        { onConflict: 'dedup_key', ignoreDuplicates: true },
+      )
+    } else {
+      await supabase.from('notifications_log').insert({
+        guest_id: guestId,
+        event_id: eventId,
+        channel,
+        type,
+        status: success ? 'sent' : 'failed',
+        sent_at: success ? new Date().toISOString() : null,
+        error: success ? null : 'Send failed',
+      })
+    }
 
     return new Response(JSON.stringify({ success, channel }), {
       headers: jsonHeaders,

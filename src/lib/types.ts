@@ -92,7 +92,7 @@ export interface Guest {
   email: string | null
   phone: string | null
   instagram: string | null
-  notification_preference: 'sms' | 'email' | 'none'
+  notification_preference: 'sms' | 'email' | 'both' | 'none'
   created_at: string
   updated_at: string
 }

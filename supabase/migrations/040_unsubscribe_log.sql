@@ -1,0 +1,156 @@
+-- ============================================================
+-- 040: Audit log for inbound STOP / unsubscribe events.
+--
+-- record_unsubscribe(p_guest_id, p_channel, p_source, p_payload):
+--   Logs the event and sets guests.notification_preference = 'none'.
+--   Called by:
+--     webhook-sms   (Telnyx STOP/HELP/CANCEL replies)
+--     webhook-email (Resend unsubscribe events)
+--     admin manual / future "/my-tickets" preference toggle
+--
+-- USER_FLOWS_SPEC.md §7 + §11 action item 12.
+-- ============================================================
+
+CREATE TABLE IF NOT EXISTS unsubscribe_log (
+  id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  guest_id    UUID NOT NULL REFERENCES guests(id) ON DELETE CASCADE,
+  channel     TEXT NOT NULL CHECK (channel IN ('sms', 'email')),
+  source      TEXT NOT NULL,  -- 'telnyx_stop', 'resend_unsubscribe', 'admin', 'guest_self'
+  raw_payload JSONB,
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS unsubscribe_log_guest_idx
+  ON unsubscribe_log (guest_id);
+
+ALTER TABLE unsubscribe_log ENABLE ROW LEVEL SECURITY;
+-- No public policies; admin-only via dashboard.
+
+CREATE OR REPLACE FUNCTION record_unsubscribe(
+  p_guest_id UUID,
+  p_channel  TEXT,
+  p_source   TEXT,
+  p_payload  JSONB DEFAULT NULL
+) RETURNS VOID
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+  IF p_channel NOT IN ('sms', 'email') THEN
+    RAISE EXCEPTION 'invalid_channel';
+  END IF;
+
+  INSERT INTO unsubscribe_log (guest_id, channel, source, raw_payload)
+  VALUES (p_guest_id, p_channel, p_source, p_payload);
+
+  -- Suppression is sticky. Even a partial unsubscribe (one channel)
+  -- sets the whole preference to 'none' — Cafe Kadhem operationally
+  -- doesn't run multi-channel preference splits. If a guest wants
+  -- only-email, admin sets it explicitly via Guest Directory.
+  UPDATE guests
+     SET notification_preference = 'none',
+         updated_at = now()
+   WHERE id = p_guest_id;
+END;
+$$;
+
+REVOKE EXECUTE ON FUNCTION record_unsubscribe(UUID, TEXT, TEXT, JSONB) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION record_unsubscribe(UUID, TEXT, TEXT, JSONB)
+  TO service_role;
+
+-- Extend merge_guests to reassign unsubscribe_log rows. Without this,
+-- merging two guests where the dropped row has unsubscribe history
+-- would either CASCADE-delete that history (if FK was CASCADE — it is)
+-- or block the merge. CASCADE is fine for log integrity but we'd lose
+-- the audit trail; reassigning preserves it.
+--
+-- Since 036's merge_guests doesn't yet reference unsubscribe_log, we
+-- replace it here. Behavior identical to 036 except for the new line.
+
+CREATE OR REPLACE FUNCTION merge_guests(
+  p_keep_id UUID,
+  p_drop_id UUID
+) RETURNS JSONB
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_keep guests;
+  v_drop guests;
+BEGIN
+  IF p_keep_id IS NULL OR p_drop_id IS NULL THEN
+    RETURN jsonb_build_object('merged', false, 'reason', 'null_id');
+  END IF;
+  IF p_keep_id = p_drop_id THEN
+    RETURN jsonb_build_object('merged', false, 'reason', 'same_id');
+  END IF;
+
+  SELECT * INTO v_keep FROM guests WHERE id = p_keep_id;
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'merge_guests: keep_id % not found', p_keep_id;
+  END IF;
+
+  SELECT * INTO v_drop FROM guests WHERE id = p_drop_id;
+  IF NOT FOUND THEN
+    RETURN jsonb_build_object('merged', false, 'reason', 'drop_not_found');
+  END IF;
+
+  WITH conflicts AS (
+    SELECT k.id AS keep_rsvp_id, d.id AS drop_rsvp_id,
+           k.payment_status AS keep_payment, d.payment_status AS drop_payment,
+           k.status AS keep_status, d.status AS drop_status
+    FROM rsvps k
+    JOIN rsvps d ON d.event_id = k.event_id
+                AND d.plus_one_of IS NULL AND k.plus_one_of IS NULL
+    WHERE k.guest_id = p_keep_id AND d.guest_id = p_drop_id
+  ),
+  ranked AS (
+    SELECT keep_rsvp_id, drop_rsvp_id,
+      CASE WHEN keep_payment = 'paid' THEN 5
+           WHEN keep_status = 'yes' THEN 4
+           WHEN keep_status = 'waitlisted' THEN 3
+           WHEN keep_status = 'maybe' THEN 2
+           WHEN keep_status = 'no' THEN 1
+           ELSE 0 END AS keep_rank,
+      CASE WHEN drop_payment = 'paid' THEN 5
+           WHEN drop_status = 'yes' THEN 4
+           WHEN drop_status = 'waitlisted' THEN 3
+           WHEN drop_status = 'maybe' THEN 2
+           WHEN drop_status = 'no' THEN 1
+           ELSE 0 END AS drop_rank
+    FROM conflicts
+  )
+  DELETE FROM rsvps WHERE id IN (
+    SELECT CASE WHEN keep_rank >= drop_rank THEN drop_rsvp_id ELSE keep_rsvp_id END
+      FROM ranked
+  );
+
+  UPDATE rsvps             SET guest_id             = p_keep_id WHERE guest_id             = p_drop_id;
+  UPDATE orders            SET guest_id             = p_keep_id WHERE guest_id             = p_drop_id;
+  UPDATE pickup_orders     SET guest_id             = p_keep_id WHERE guest_id             = p_drop_id;
+  UPDATE invites           SET invited_by           = p_keep_id WHERE invited_by           = p_drop_id;
+  UPDATE invites           SET consumed_by_guest_id = p_keep_id WHERE consumed_by_guest_id = p_drop_id;
+  UPDATE notifications_log SET guest_id             = p_keep_id WHERE guest_id             = p_drop_id;
+  UPDATE magic_links       SET guest_id             = p_keep_id WHERE guest_id             = p_drop_id;
+  UPDATE unsubscribe_log   SET guest_id             = p_keep_id WHERE guest_id             = p_drop_id;
+
+  UPDATE guests SET
+    email      = COALESCE(email,      v_drop.email),
+    phone      = COALESCE(phone,      v_drop.phone),
+    last_name  = COALESCE(last_name,  v_drop.last_name),
+    instagram  = COALESCE(instagram,  v_drop.instagram),
+    updated_at = now()
+  WHERE id = p_keep_id;
+
+  IF v_drop.notification_preference = 'none'
+     OR v_keep.notification_preference = 'none' THEN
+    UPDATE guests SET notification_preference = 'none' WHERE id = p_keep_id;
+  END IF;
+
+  DELETE FROM guests WHERE id = p_drop_id;
+
+  RETURN jsonb_build_object('merged', true, 'kept', p_keep_id, 'dropped', p_drop_id);
+END;
+$$;

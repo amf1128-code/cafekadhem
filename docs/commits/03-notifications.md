@@ -2,11 +2,11 @@
 
 > **Goal:** wire `dedup_key` end-to-end, add per-type channel routing for `'both'`, add the consent note to every public form, drop the channel-preference dropdown, hook up STOP / unsubscribe webhooks, flip `sms_enabled = true` (10DLC approved). After this commit, notifications are idempotent, compliant, and inferred-from-fields.
 
-**Status:** ⬜ not started
+**Status:** 🟢 committed (pending user verification)
 **Prerequisites:** Commits 1 + 2 ✅ user-verified
-**Estimated migration files:** 3 (`038` through `040`)
-**SHA on commit:** —
-**User-verified:** —
+**Estimated migration files:** 4 (renumbered to `039`/`040`/`041`/`042`)
+**SHA on commit:** *(see git log)*
+**User-verified:** ⬜ pending
 
 ---
 
@@ -681,23 +681,43 @@ External: revert webhook URLs in Telnyx + Resend dashboards (or leave them — f
 
 ## Status section
 
-**Last updated:** *(when implementation starts)*
+**Last updated:** 2026-05-06, end of Commit 3
 
 | Sub-item | Status | Notes |
 |---|---|---|
-| 038 — preference enum 'both' | ⬜ | |
-| 039 — unsubscribe_log table | ⬜ | |
-| 040 — sms_enabled flip | ⬜ | |
-| 041 — upsert_guest pref inference | ⬜ | |
-| send-notification rewrite | ⬜ | |
-| webhook-sms function | ⬜ | |
-| webhook-email function | ⬜ | |
-| ConsentNote component + copy | ⬜ | |
-| Dropdown removal (4 forms) | ⬜ | |
-| Telnyx webhook configured | ⬜ | |
-| Resend webhook configured | ⬜ | |
-| All tests | ⬜ | |
+| 039 — preference enum 'both' | 🟢 | CHECK constraint extended |
+| 040 — unsubscribe_log + record_unsubscribe + merge_guests re-issued | 🟢 | merge_guests now reassigns unsubscribe_log rows |
+| 041 — sms_enabled flip | 🟢 | UPDATE admin_settings SET sms_enabled=true |
+| 042 — upsert_guest preference inference | 🟢 | infers 'both'/'sms'/'email' from filled fields |
+| send-notification updates | 🟢 | dedup_key (pre-send check + ON CONFLICT log), 'both' per-type routing, channel override, 'none' suppression-log |
+| webhook-sms function | 🟢 | Telnyx ed25519 verification, STOP/HELP/START handling |
+| webhook-email function | 🟢 | Resend Svix HMAC verification, email.unsubscribed handling |
+| ConsentNote component + copy | 🟢 | `src/lib/notifications/consent.ts` + `src/components/ui/ConsentNote.tsx` |
+| Dropdown removal (RSVPForm) | 🟢 | Order/Pickup/Invite never had one |
+| ConsentNote on all 4 forms | 🟢 | RSVPForm, Order, Pickup, InviteForm |
+| Types updated for 'both' | 🟢 | `src/lib/types.ts` Guest interface |
+| Telnyx webhook configured | ⬜ | User action — see "User actions required" in plan |
+| Resend webhook configured | ⬜ | Same |
+| Migrations applied | ⬜ | User action |
+| Edge functions deployed | ⬜ | User action |
+| All tests | ⬜ | User action |
 
 ### Result notes (post-commit)
 
-*(To be filled in.)*
+- **Files changed:**
+  - `supabase/migrations/039_notification_preference_both.sql` (new)
+  - `supabase/migrations/040_unsubscribe_log.sql` (new — also re-issues merge_guests to include unsubscribe_log)
+  - `supabase/migrations/041_sms_enabled_flip.sql` (new)
+  - `supabase/migrations/042_upsert_guest_infer_preference.sql` (new)
+  - `supabase/functions/send-notification/index.ts` (surgical edits)
+  - `supabase/functions/webhook-sms/index.ts` (new)
+  - `supabase/functions/webhook-email/index.ts` (new)
+  - `src/lib/notifications/consent.ts` (new)
+  - `src/components/ui/ConsentNote.tsx` (new)
+  - `src/components/events/RSVPForm.tsx` (dropdown removed, validation simplified, ConsentNote added)
+  - `src/pages/Order.tsx` (ConsentNote added)
+  - `src/pages/Pickup.tsx` (ConsentNote added)
+  - `src/components/guests/InviteForm.tsx` (ConsentNote added)
+  - `src/lib/types.ts` (Guest.notification_preference includes 'both')
+- **Deviations** (12 items, see plan Open Questions §"Commit 3 deviations from plan").
+- **Build:** `npm run build` passes.
