@@ -255,22 +255,23 @@ function CalendarFullRow({
               style={{
                 display: 'inline-flex',
                 alignItems: 'center',
-                gap: 5,
-                padding: '2px 8px',
+                gap: 7,
+                padding: '5px 12px',
                 border: '2px solid var(--ck-ink)',
                 background: 'var(--ck-sun)',
                 color: 'var(--ck-ink)',
-                fontFamily: 'var(--ck-mono)',
-                fontSize: 9,
-                letterSpacing: '0.16em',
-                textTransform: 'uppercase',
-                lineHeight: 1.2,
+                borderRadius: 999,
+                boxShadow: '2px 2px 0 var(--ck-ink)',
+                transform: 'rotate(-10deg)',
+                transformOrigin: 'center',
+                whiteSpace: 'nowrap',
+                lineHeight: 1,
               }}
             >
               <span
                 style={{
                   fontFamily: 'var(--ck-arabic-display)',
-                  fontSize: 16,
+                  fontSize: 19,
                   direction: 'rtl',
                   letterSpacing: 0,
                   lineHeight: 1,
@@ -278,7 +279,17 @@ function CalendarFullRow({
               >
                 جاية
               </span>
-              <span>Jaya</span>
+              <span
+                style={{
+                  fontFamily: 'var(--ck-mono)',
+                  fontSize: 9,
+                  letterSpacing: '0.16em',
+                  textTransform: 'uppercase',
+                  fontWeight: 700,
+                }}
+              >
+                Coming soon
+              </span>
             </span>
           )}
         </div>

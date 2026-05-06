@@ -197,7 +197,7 @@ function HeroSection({ event }: { event: CinemaEvent }) {
           }}
         >
           <span>
-            ✦ {event.rsvpOpen ? 'NEXT POP-UP' : 'COMING SOON'} · NO. {event.no} · {event.day} {event.date}
+            ✦ NEXT POP-UP · NO. {event.no} · {event.day} {event.date}
           </span>
           {!event.rsvpOpen && <JayaTag />}
         </div>
@@ -616,7 +616,7 @@ function HeroSection({ event }: { event: CinemaEvent }) {
             }}
           >
             <span>CK-{event.no}</span>
-            <span>{event.rsvpOpen ? 'RSVP / حجز' : 'JAYA / جاية'}</span>
+            <span>{event.rsvpOpen ? 'RSVP / حجز' : 'COMING SOON / جاية'}</span>
           </div>
         </div>
       </div>
@@ -624,31 +624,34 @@ function HeroSection({ event }: { event: CinemaEvent }) {
   )
 }
 
-/** Small inline tag stamped over coming-soon events. Reads "JAYA"
- *  (جاية, colloquial Arabic for "coming") in the orange display face
- *  next to a tiny Latin label. */
+/** Slapped-on "coming soon" sticker, modeled on the Cursor Sticker
+ *  pattern from the design handoff: sun-yellow pill, ink border, hard
+ *  2px shadow offset, rotated ~-10deg so it reads as a peeled-on
+ *  label. Renders the Arabic جاية ("coming") next to a small Latin
+ *  "Coming soon" gloss. */
 function JayaTag() {
   return (
     <span
       style={{
         display: 'inline-flex',
         alignItems: 'center',
-        gap: 6,
-        padding: '3px 10px',
+        gap: 8,
+        padding: '6px 14px',
         border: '2px solid var(--ck-ink)',
         background: 'var(--ck-sun)',
         color: 'var(--ck-ink)',
-        fontFamily: 'var(--ck-mono)',
-        fontSize: 10,
-        letterSpacing: '0.16em',
-        textTransform: 'uppercase',
-        lineHeight: 1.2,
+        borderRadius: 999,
+        boxShadow: '2px 2px 0 var(--ck-ink)',
+        transform: 'rotate(-10deg)',
+        transformOrigin: 'center',
+        whiteSpace: 'nowrap',
+        lineHeight: 1,
       }}
     >
       <span
         style={{
           fontFamily: 'var(--ck-arabic-display)',
-          fontSize: 18,
+          fontSize: 22,
           direction: 'rtl',
           letterSpacing: 0,
           lineHeight: 1,
@@ -656,7 +659,17 @@ function JayaTag() {
       >
         جاية
       </span>
-      <span>Jaya · Coming</span>
+      <span
+        style={{
+          fontFamily: 'var(--ck-mono)',
+          fontSize: 10,
+          letterSpacing: '0.16em',
+          textTransform: 'uppercase',
+          fontWeight: 700,
+        }}
+      >
+        Coming soon
+      </span>
     </span>
   )
 }
