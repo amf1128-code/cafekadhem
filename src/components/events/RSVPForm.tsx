@@ -573,8 +573,8 @@ export function RSVPForm({ eventId, event, existingRsvp, existingPlusOne, isFull
             Decline
           </button>
         </div>
-        <ConsentNote verb="rsvp" />
       </div>
+      <ConsentNote verb="rsvp" />
     </form>
   )
 }
