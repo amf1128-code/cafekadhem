@@ -545,35 +545,55 @@ export function RSVPForm({ eventId, event, existingRsvp, existingPlusOne, isFull
         </div>
       )}
 
-      {/* RSVP buttons — bracket style */}
-      <div className="flex justify-center pt-4">
-        <div className="flex flex-wrap justify-center gap-3">
-          <button
-            type="button"
-            onClick={() => handleRSVP('yes')}
-            disabled={loading}
-            className="border border-forest px-8 py-3 text-xs tracking-[0.2em] uppercase text-forest hover:bg-forest hover:text-cream transition-colors disabled:opacity-50 whitespace-nowrap"
-          >
-            [ {isFull ? 'Join Waitlist' : 'Reserve a Seat'} ]
-          </button>
-          <button
-            type="button"
-            onClick={() => handleRSVP('maybe')}
-            disabled={loading}
-            className="border border-warm px-6 py-3 text-xs tracking-[0.2em] uppercase text-ink-muted hover:border-ink hover:text-ink transition-colors disabled:opacity-50 whitespace-nowrap"
-          >
-            [ Maybe ]
-          </button>
-          <button
-            type="button"
-            onClick={() => handleRSVP('no')}
-            disabled={loading}
-            className="px-4 py-3 text-xs tracking-[0.2em] uppercase text-stone-dark hover:text-ink transition-colors disabled:opacity-50"
-          >
-            Decline
-          </button>
-        </div>
-      </div>
+      {/* RSVP buttons — bracket style.
+
+          Paid-RSVP guard: when the existing RSVP has payment_status='paid',
+          the server (safe_create_rsvp via migration 033) blocks transitions
+          away from 'yes' with `paid_rsvp_cannot_change_status`. We disable
+          Maybe and Decline here so the user can't dead-end into that error.
+          USER_FLOWS_SPEC.md §4.3. */}
+      {(() => {
+        const paidLocked = existingRsvp?.payment_status === 'paid'
+        const paidLockedHint =
+          'You’ve already paid for this ticket. Contact the host to refund or cancel before changing your RSVP.'
+        return (
+          <div className="flex justify-center pt-4">
+            <div className="flex flex-wrap justify-center gap-3">
+              <button
+                type="button"
+                onClick={() => handleRSVP('yes')}
+                disabled={loading}
+                className="border border-forest px-8 py-3 text-xs tracking-[0.2em] uppercase text-forest hover:bg-forest hover:text-cream transition-colors disabled:opacity-50 whitespace-nowrap"
+              >
+                [ {isFull ? 'Join Waitlist' : 'Reserve a Seat'} ]
+              </button>
+              <button
+                type="button"
+                onClick={() => handleRSVP('maybe')}
+                disabled={loading || paidLocked}
+                title={paidLocked ? paidLockedHint : undefined}
+                className="border border-warm px-6 py-3 text-xs tracking-[0.2em] uppercase text-ink-muted hover:border-ink hover:text-ink transition-colors disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
+              >
+                [ Maybe ]
+              </button>
+              <button
+                type="button"
+                onClick={() => handleRSVP('no')}
+                disabled={loading || paidLocked}
+                title={paidLocked ? paidLockedHint : undefined}
+                className="px-4 py-3 text-xs tracking-[0.2em] uppercase text-stone-dark hover:text-ink transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Decline
+              </button>
+            </div>
+          </div>
+        )
+      })()}
+      {existingRsvp?.payment_status === 'paid' && (
+        <p className="text-[10px] leading-relaxed text-ink-muted opacity-60 mt-2 px-4 max-w-md mx-auto text-center italic">
+          You’ve paid for this ticket — contact the host to change your RSVP.
+        </p>
+      )}
       <ConsentNote verb="rsvp" />
     </form>
   )

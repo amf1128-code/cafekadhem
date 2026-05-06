@@ -449,6 +449,8 @@ Out of scope for cross-event consistency, but inherits the §3 identity rules. T
 
 This is the **single source of truth** for "what should the user see / do next?". Implement as a server-side selector — call it `get_guest_event_state(p_event_id, p_guest_id)` — and use its output everywhere a page decides what to render. No page may infer this from a partial subset of fields.
 
+> **Implementation status:** the selector RPC ships in migration 029 (hot-fixed in 035) and the `useGuestEventState` React hook in Commit 5. Existing pages (EventDetail, Order, Ticket, Pickup) **still infer state locally as of this writing** — they each get the right answer, but not from the canonical RPC. The full migration of those pages to consume the hook is a tracked-but-deferred cleanup; see `docs/IMPLEMENTATION_PLAN.md` decision log #4. New state-aware pages should consume the hook directly.
+
 **Returned shape:**
 ```ts
 {
@@ -715,7 +717,7 @@ A guest who replied `STOP` to an SMS or unsubscribed from email is permanently `
 Tracked here so future work has a checklist; not all are blocking.
 
 1. Hoist `normalizePhone` to `src/lib/utils/contact.ts`; replace duplicate copies in `RSVPForm.tsx` and `Order.tsx`.
-2. Add `get_guest_event_state(event_id, guest_id)` RPC. Refactor EventDetail / Order / Ticket to consume it.
+2. Add `get_guest_event_state(event_id, guest_id)` RPC. *(Done in migration 029, fixed in 035. Hook `useGuestEventState` shipped in Commit 5.)* **Refactor EventDetail / Order / Ticket to consume it: deferred** — see `docs/IMPLEMENTATION_PLAN.md` decision log #4. Pages already implement the §5 decision tree correctly per-page; full rewrite would produce zero behavior diff but carry regression risk. Adopt the hook in any *new* state-aware page; refactor an existing one only if a real divergence bug surfaces.
 3. Migration: partial unique index on `invites` (§4.4).
 4. Migration: `notifications_log.dedup_key` + unique constraint (§7.2).
 5. Migration: `orders.idempotency_key` + `pickup_orders.idempotency_key` unique columns (§10).

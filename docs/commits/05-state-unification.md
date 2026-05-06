@@ -2,11 +2,19 @@
 
 > **Goal:** every public page consumes `get_guest_event_state` (added in Commit 1) instead of inferring state from a partial subset of fields. Pages render based on the canonical `next_step` from spec §5. Eliminates the class of bugs where Order, EventDetail, and Ticket diverge on what they think the user should see.
 
-**Status:** ⬜ not started
+**Status:** 🟢 committed (pending user verification) — **scoped down to Option A**
 **Prerequisites:** Commits 1, 2, 3, 4 ✅ user-verified
-**Estimated migration files:** 0 (frontend-only; minor RPC tweaks)
-**SHA on commit:** —
-**User-verified:** —
+**Estimated migration files:** 0 (frontend-only)
+**SHA on commit:** *(see git log)*
+**User-verified:** ⬜ pending
+
+> **Scope decision (2026-05-06).** This commit ships **only the additive pieces** of the original plan:
+> 1. The `useGuestEventState` hook (so future code can consume the canonical state).
+> 2. The paid-RSVP UI guard in `RSVPForm` (the one user-visible improvement).
+>
+> The **full page rewrite** (EventDetail / Order / Ticket / Pickup driving render off `next_step`) is **deferred**. Existing pages already implement the spec §5 decision tree correctly per-page; a refactor would produce zero behavior diff while carrying real regression risk and requiring a manual walkthrough of all 11 use cases (no test suite). See `docs/IMPLEMENTATION_PLAN.md` decision log #4 for the full reasoning.
+>
+> Adopt the hook in any *new* state-aware page; refactor an existing one only if a real divergence bug surfaces.
 
 ---
 
@@ -301,20 +309,28 @@ For each scenario, the page should land on the correct `next_step` without a har
 
 ## Status section
 
-**Last updated:** *(when implementation starts)*
+**Last updated:** 2026-05-06, end of Commit 5
 
 | Sub-item | Status | Notes |
 |---|---|---|
-| useGuestEventState hook | ⬜ | |
-| EventDetail refactor | ⬜ | |
-| Order refactor | ⬜ | |
-| Ticket refactor | ⬜ | |
-| Pickup light refactor | ⬜ | |
-| InviteLanding ref passthrough | ⬜ | |
-| RSVPForm paid guard | ⬜ | |
-| 11 scenario walkthroughs | ⬜ | |
-| 5 edge cases | ⬜ | |
+| useGuestEventState hook | 🟢 | `src/lib/hooks/useGuestEventState.ts`. Provided for future use; not yet consumed by existing pages |
+| EventDetail refactor | ⏸ deferred | Existing logic correct; refactor produces no behavior change |
+| Order refactor | ⏸ deferred | Same |
+| Ticket refactor | ⏸ deferred | Same |
+| Pickup light refactor | ⏸ deferred | Same |
+| InviteLanding ref passthrough | ⏸ deferred | Same — RSVPForm already captures `?ref=` in Commit 4 |
+| RSVPForm paid guard | 🟢 | Maybe/Decline disabled with title tooltip + explanatory line when `payment_status='paid'` |
+| 11 scenario walkthroughs | n/a | Would test pre-existing behavior, not this commit |
+| 5 edge cases | n/a | Same |
+| Manual paid-guard test | ⬜ | User action |
 
 ### Result notes (post-commit)
 
-*(To be filled in.)*
+- **Files changed:**
+  - `src/lib/hooks/useGuestEventState.ts` (new — hook, not yet consumed)
+  - `src/components/events/RSVPForm.tsx` (paid-RSVP UI guard added)
+  - `USER_FLOWS_SPEC.md` (status note added under §5; action item #2 updated)
+  - `docs/IMPLEMENTATION_PLAN.md` (decision log #4, Commit 5 deviations)
+- **Deviations:** scope narrowed from full rewrite to additive-only. See plan Open Questions §"Commit 5 deviations from plan" (6 items).
+- **Build:** `npm run build` passes.
+- **Tracked-but-deferred cleanup:** rewrite EventDetail / Order / Ticket / Pickup to consume `useGuestEventState` and switch on `next_step`. Defer until either (a) a real cross-page divergence bug, or (b) a new state-aware page would benefit from being consistent with the existing four. Spec §5 status note documents this.
