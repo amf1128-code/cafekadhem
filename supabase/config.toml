@@ -1,0 +1,19 @@
+# Supabase project config.
+# This file is committed; secrets (anon key, service role key, etc.)
+# are NOT stored here — they live in `supabase secrets`.
+
+# ============================================================
+# Edge Functions
+# ============================================================
+# By default, Supabase Edge Functions require a Supabase JWT in the
+# Authorization header. For webhooks called by external services
+# (Telnyx, Resend), that's wrong — the caller has no Supabase JWT.
+# Each webhook function does its own provider-signature verification
+# (ed25519 for Telnyx, Svix HMAC for Resend), so the JWT layer is
+# unnecessary and would block legitimate requests.
+
+[functions.webhook-sms]
+verify_jwt = false
+
+[functions.webhook-email]
+verify_jwt = false
