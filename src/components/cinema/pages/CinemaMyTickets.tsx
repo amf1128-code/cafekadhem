@@ -37,12 +37,35 @@ interface PickupRow {
   created_at: string
 }
 
+interface EventOrderItem {
+  id: string
+  name: string | null
+  quantity: number
+  unit_price: number | null
+}
+
+interface EventOrderRow {
+  order_id: string
+  event_id: string
+  status: 'pending' | 'confirmed' | 'paid' | 'cancelled'
+  total: number | null
+  venmo_note: string | null
+  created_at: string
+  event_title: string
+  event_date: string
+  event_start_time: string
+  event_location_name: string | null
+  is_published: boolean
+  items: EventOrderItem[]
+}
+
 interface History {
   guest_id: string
   first_name: string
   last_name: string | null
   rsvps: RsvpRow[]
   pickups: PickupRow[]
+  event_orders?: EventOrderRow[]
 }
 
 type State =
@@ -150,6 +173,17 @@ export function CinemaMyTickets() {
   const upcoming = history.rsvps.filter(r => r.event_date >= t)
   const past = history.rsvps.filter(r => r.event_date < t)
 
+  const ordersByEvent = new Map<string, EventOrderRow[]>()
+  for (const order of history.event_orders ?? []) {
+    const list = ordersByEvent.get(order.event_id) ?? []
+    list.push(order)
+    ordersByEvent.set(order.event_id, list)
+  }
+  const rsvpEventIds = new Set(history.rsvps.map(r => r.event_id))
+  const orphanOrders = (history.event_orders ?? []).filter(
+    o => !rsvpEventIds.has(o.event_id) && o.event_date >= t,
+  )
+
   return (
     <>
       <section className="ck-page">
@@ -187,9 +221,27 @@ export function CinemaMyTickets() {
         {upcoming.length === 0 ? (
           <EmptyMsg text="Nothing on your calendar yet." />
         ) : (
-          upcoming.map(r => <RsvpCard key={r.rsvp_id} rsvp={r} />)
+          upcoming.map(r => (
+            <RsvpCard
+              key={r.rsvp_id}
+              rsvp={r}
+              orders={ordersByEvent.get(r.event_id) ?? []}
+            />
+          ))
         )}
       </CinemaListSection>
+
+      {orphanOrders.length > 0 && (
+        <CinemaListSection
+          title="YOUR PRE-ORDERS."
+          ar="طلبات"
+          eyebrow="Cart pickups at events"
+        >
+          {orphanOrders.map(o => (
+            <OrphanOrderCard key={o.order_id} order={o} />
+          ))}
+        </CinemaListSection>
+      )}
 
       {past.length > 0 && (
         <CinemaListSection
@@ -198,7 +250,12 @@ export function CinemaMyTickets() {
           eyebrow="Past"
         >
           {past.map(r => (
-            <RsvpCard key={r.rsvp_id} rsvp={r} past />
+            <RsvpCard
+              key={r.rsvp_id}
+              rsvp={r}
+              orders={ordersByEvent.get(r.event_id) ?? []}
+              past
+            />
           ))}
         </CinemaListSection>
       )}
@@ -327,8 +384,17 @@ function CinemaListSection({
   )
 }
 
-function RsvpCard({ rsvp, past = false }: { rsvp: RsvpRow; past?: boolean }) {
+function RsvpCard({
+  rsvp,
+  orders = [],
+  past = false,
+}: {
+  rsvp: RsvpRow
+  orders?: EventOrderRow[]
+  past?: boolean
+}) {
   const hasTicket = rsvp.payment_status === 'paid' && rsvp.ticket_token
+  const liveOrders = orders.filter(o => o.status !== 'cancelled')
   return (
     <div
       className="ck-card"
@@ -376,6 +442,9 @@ function RsvpCard({ rsvp, past = false }: { rsvp: RsvpRow; past?: boolean }) {
         {formatDate(rsvp.event_date)} · {formatTime(rsvp.event_start_time)}
         {rsvp.event_location_name ? ` · ${rsvp.event_location_name}` : ''}
       </div>
+      {liveOrders.map(o => (
+        <PreorderBlock key={o.order_id} order={o} />
+      ))}
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
         {hasTicket && (
           <Link
@@ -395,6 +464,168 @@ function RsvpCard({ rsvp, past = false }: { rsvp: RsvpRow; past?: boolean }) {
         )}
       </div>
     </div>
+  )
+}
+
+function PreorderBlock({ order }: { order: EventOrderRow }) {
+  return (
+    <div
+      style={{
+        marginBottom: 14,
+        padding: 14,
+        border: '2px dashed var(--ck-ink)',
+        background: 'var(--ck-paper)',
+      }}
+    >
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'baseline',
+          gap: 10,
+          flexWrap: 'wrap',
+          marginBottom: 8,
+        }}
+      >
+        <div className="ck-eyebrow">✦ Pre-order</div>
+        <OrderStatusBadge status={order.status} />
+      </div>
+      <ul
+        style={{
+          listStyle: 'none',
+          padding: 0,
+          margin: 0,
+          fontFamily: 'var(--ck-serif)',
+          fontSize: 15,
+          lineHeight: 1.5,
+        }}
+      >
+        {order.items.map(item => (
+          <li
+            key={item.id}
+            style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}
+          >
+            <span>
+              {item.name || 'Item'}
+              <span style={{ opacity: 0.55, marginLeft: 6 }}>× {item.quantity}</span>
+            </span>
+            {item.unit_price != null && (
+              <span style={{ fontWeight: 700 }}>
+                ${(item.unit_price * item.quantity).toFixed(2)}
+              </span>
+            )}
+          </li>
+        ))}
+      </ul>
+      {order.total != null && (
+        <div
+          style={{
+            marginTop: 10,
+            paddingTop: 10,
+            borderTop: '1px dashed var(--ck-ink)',
+            display: 'flex',
+            justifyContent: 'space-between',
+            fontFamily: 'var(--ck-serif)',
+            fontWeight: 800,
+            fontSize: 17,
+          }}
+        >
+          <span>Total</span>
+          <span>${order.total.toFixed(2)}</span>
+        </div>
+      )}
+      {order.status === 'pending' && (
+        <p
+          style={{
+            fontFamily: 'var(--ck-mono)',
+            fontSize: 10,
+            letterSpacing: '0.14em',
+            textTransform: 'uppercase',
+            opacity: 0.7,
+            marginTop: 10,
+            lineHeight: 1.6,
+          }}
+        >
+          Awaiting Venmo. The host marks it paid once the transfer lands.
+        </p>
+      )}
+    </div>
+  )
+}
+
+function OrphanOrderCard({ order }: { order: EventOrderRow }) {
+  return (
+    <div
+      className="ck-card"
+      style={{ marginBottom: 12, padding: 20 }}
+    >
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'baseline',
+          gap: 12,
+          flexWrap: 'wrap',
+          marginBottom: 8,
+        }}
+      >
+        <Link
+          to={order.is_published ? `/events/${order.event_id}` : '#'}
+          style={{
+            fontFamily: 'var(--ck-serif)',
+            fontWeight: 800,
+            fontSize: 22,
+            lineHeight: 1.1,
+            color: 'var(--ck-ink)',
+            textDecoration: 'none',
+          }}
+        >
+          {order.event_title}
+        </Link>
+        <OrderStatusBadge status={order.status} />
+      </div>
+      <div
+        style={{
+          fontFamily: 'var(--ck-mono)',
+          fontSize: 11,
+          letterSpacing: '0.14em',
+          textTransform: 'uppercase',
+          opacity: 0.75,
+          marginBottom: 14,
+        }}
+      >
+        {formatDate(order.event_date)} · {formatTime(order.event_start_time)}
+        {order.event_location_name ? ` · ${order.event_location_name}` : ''}
+      </div>
+      <PreorderBlock order={order} />
+    </div>
+  )
+}
+
+function OrderStatusBadge({ status }: { status: EventOrderRow['status'] }) {
+  const label =
+    status === 'paid'
+      ? 'Paid'
+      : status === 'confirmed'
+        ? 'Confirmed'
+        : status === 'cancelled'
+          ? 'Cancelled'
+          : 'Pending'
+  return (
+    <span
+      style={{
+        fontFamily: 'var(--ck-mono)',
+        fontSize: 10,
+        letterSpacing: '0.18em',
+        textTransform: 'uppercase',
+        padding: '4px 10px',
+        border: '2px solid var(--ck-ink)',
+        background: 'var(--ck-paper)',
+        whiteSpace: 'nowrap',
+      }}
+    >
+      {label}
+    </span>
   )
 }
 

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import type {
   AdminSettings,
@@ -30,7 +30,6 @@ import { CinemaPageLoader } from '../components/cinema/primitives'
  */
 export function Pickup() {
   const { addToast } = useToast()
-  const navigate = useNavigate()
   const [config, setConfig] = useState<PickupConfig | null>(null)
   const [slots, setSlots] = useState<PickupSlot[]>([])
   const [menuItems, setMenuItems] = useState<MenuItem[]>([])
@@ -41,6 +40,13 @@ export function Pickup() {
   const [settings, setSettings] = useState<AdminSettings | null>(null)
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
+  const [submitted, setSubmitted] = useState<{
+    pickupToken: string
+    paymentUrl: string
+    paymentLinkType: 'deep_link' | 'web_url'
+    amount: number
+    when: string
+  } | null>(null)
 
   const [firstName, setFirstName] = useState('')
   const [email, setEmail] = useState('')
@@ -270,22 +276,31 @@ export function Pickup() {
         settings.venmo_handle,
       )
 
-      window.open(paymentLink.url, '_blank')
+      const pickupWhen = `${new Date(selectedDate + 'T00:00:00').toLocaleDateString(
+        'en-US',
+        { weekday: 'long', month: 'long', day: 'numeric' },
+      )} at ${formatTime(selectedTime)}`
 
       sendNotification({
         guestId,
         type: 'pickup_order_confirmation',
         data: {
-          pickup_when: `${new Date(selectedDate + 'T00:00:00').toLocaleDateString(
-            'en-US',
-            { weekday: 'long', month: 'long', day: 'numeric' },
-          )} at ${formatTime(selectedTime)}`,
+          pickup_when: pickupWhen,
           pickup_token: order.pickup_token,
         },
       })
 
+      // Render a receipt with a Venmo anchor instead of programmatic
+      // window.open — anchor taps reliably hand off to the Venmo app on
+      // mobile (same pattern as the RSVP/ticket flow).
+      setSubmitted({
+        pickupToken: order.pickup_token,
+        paymentUrl: paymentLink.url,
+        paymentLinkType: paymentLink.type,
+        amount: total,
+        when: pickupWhen,
+      })
       addToast('Order submitted!')
-      navigate(`/pickup/${order.pickup_token}`)
       return
     } catch (err) {
       addToast(err instanceof Error ? err.message : 'Failed to submit order', 'error')
@@ -295,6 +310,67 @@ export function Pickup() {
   }
 
   if (loading) return <CinemaPageLoader />
+
+  if (submitted) {
+    return (
+      <section className="ck-page" style={{ textAlign: 'center', borderBottom: 'none' }}>
+        <div className="ck-narrow">
+          <div
+            style={{
+              fontFamily: 'var(--ck-arabic-display)',
+              fontSize: 'clamp(48px, 6vw, 72px)',
+              color: 'var(--ck-cobalt)',
+              direction: 'rtl',
+              lineHeight: 1,
+            }}
+          >
+            صحتين
+          </div>
+          <h1 className="ck-h1" style={{ marginTop: 12 }}>
+            ORDER CAPTURED.
+          </h1>
+          <p
+            className="ck-italic"
+            style={{ fontSize: 18, marginTop: 14, lineHeight: 1.5 }}
+          >
+            Pick up: {submitted.when}.
+          </p>
+          <p
+            className="ck-italic"
+            style={{ fontSize: 18, marginTop: 8, lineHeight: 1.5 }}
+          >
+            One last step — tap below to send payment via Venmo. We
+            emailed a confirmation; the host marks it paid.
+          </p>
+          <a
+            href={submitted.paymentUrl}
+            target={submitted.paymentLinkType === 'deep_link' ? undefined : '_blank'}
+            rel="noopener noreferrer"
+            className="ck-btn ck-btn--primary"
+            style={{ marginTop: 22, display: 'inline-block' }}
+          >
+            Pay ${submitted.amount.toFixed(2)} on Venmo →
+          </a>
+          <div
+            style={{
+              marginTop: 18,
+              display: 'flex',
+              flexWrap: 'wrap',
+              justifyContent: 'center',
+              gap: 8,
+            }}
+          >
+            <Link to={`/pickup/${submitted.pickupToken}`} className="ck-btn">
+              See pickup ticket →
+            </Link>
+            <Link to="/my-tickets" className="ck-btn">
+              My tickets &amp; orders
+            </Link>
+          </div>
+        </div>
+      </section>
+    )
+  }
 
   if (!config || !config.menu_id) {
     return (

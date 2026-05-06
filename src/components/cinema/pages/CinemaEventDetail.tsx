@@ -1401,6 +1401,8 @@ function CartCheckoutModal({
   const [phone, setPhone] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [submitted, setSubmitted] = useState(false)
+  const [paymentUrl, setPaymentUrl] = useState<string | null>(null)
+  const [paymentLinkType, setPaymentLinkType] = useState<'deep_link' | 'web_url'>('web_url')
 
   const smsEnabled = !!settings?.sms_enabled
   const total = cart.reduce(
@@ -1515,9 +1517,6 @@ function CartCheckoutModal({
         event,
         settings.venmo_handle,
       )
-      // Same-tab Venmo deep-link works on iOS/Android natively. For web
-      // fallback the provider URL also works.
-      window.open(paymentLink.url, '_blank')
 
       sendNotification({
         guestId,
@@ -1525,6 +1524,12 @@ function CartCheckoutModal({
         type: 'order_confirmation',
       })
 
+      // Programmatic window.open(_blank) on a venmo:// URL doesn't hand off
+      // to the app on mobile — the new tab can't render a custom scheme.
+      // Stash the link and let the receipt render an <a href> the user taps,
+      // mirroring the RSVPForm ticket pattern that does work on mobile.
+      setPaymentUrl(paymentLink.url)
+      setPaymentLinkType(paymentLink.type)
       setSubmitted(true)
     } catch (err) {
       addToast(err instanceof Error ? err.message : 'Failed to submit order', 'error')
@@ -1646,12 +1651,23 @@ function CartCheckoutModal({
                 className="ck-italic"
                 style={{ fontSize: 16, lineHeight: 1.5, margin: '0 auto', maxWidth: 380 }}
               >
-                Venmo just opened in another tab — finish payment there. We
-                emailed a confirmation; the host marks it paid.
+                One last step — tap below to send payment via Venmo.
+                We emailed a confirmation; the host marks it paid.
               </p>
+              {paymentUrl && (
+                <a
+                  href={paymentUrl}
+                  target={paymentLinkType === 'deep_link' ? undefined : '_blank'}
+                  rel="noopener noreferrer"
+                  className="ck-btn ck-btn--primary"
+                  style={{ marginTop: 18, display: 'inline-block' }}
+                >
+                  Pay ${total.toFixed(2)} on Venmo →
+                </a>
+              )}
               <div
                 style={{
-                  marginTop: 16,
+                  marginTop: 18,
                   padding: 12,
                   border: '2px solid var(--ck-ink)',
                   background: 'var(--ck-paper)',
@@ -1659,14 +1675,15 @@ function CartCheckoutModal({
                   fontSize: 11,
                   letterSpacing: '0.14em',
                   textTransform: 'uppercase',
+                  lineHeight: 1.5,
                 }}
               >
-                Anytime: see this order at{' '}
+                See this order anytime at{' '}
                 <Link
                   to="/my-tickets"
                   style={{ color: 'var(--ck-cobalt)', textDecoration: 'underline' }}
                 >
-                  /my-tickets
+                  My Tickets &amp; Orders
                 </Link>
               </div>
               <button
@@ -1849,7 +1866,7 @@ function CartCheckoutModal({
                 margin: 0,
               }}
             >
-              Venmo opens in a new tab. We email you a confirmation.
+              We capture your order, then hand off to Venmo. Email confirmation included.
             </p>
           </div>
         )}
