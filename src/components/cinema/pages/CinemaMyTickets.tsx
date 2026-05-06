@@ -52,7 +52,7 @@ type State =
   | { kind: 'expired' }
 
 /**
- * /cinema/my-tickets — cinema-styled rebuild of MyTickets.
+ * /my-tickets — cinema-styled rebuild of MyTickets.
  *
  * Same redeem-token-or-load-guest flow as the legacy page.
  */
@@ -134,7 +134,7 @@ export function CinemaMyTickets() {
             {sub}
           </p>
           <Link
-            to="/cinema/find-tickets"
+            to="/find-tickets"
             className="ck-btn ck-btn--primary"
             style={{ marginTop: 28 }}
           >
@@ -267,7 +267,7 @@ export function CinemaMyTickets() {
           type="button"
           onClick={() => {
             clearGuestToken()
-            window.location.href = '/cinema'
+            window.location.href = ''
           }}
           style={{
             background: 'transparent',
@@ -349,7 +349,7 @@ function RsvpCard({ rsvp, past = false }: { rsvp: RsvpRow; past?: boolean }) {
         }}
       >
         <Link
-          to={rsvp.is_published ? `/cinema/events/${rsvp.event_id}` : '#'}
+          to={rsvp.is_published ? `/events/${rsvp.event_id}` : '#'}
           style={{
             fontFamily: 'var(--ck-serif)',
             fontWeight: 800,
@@ -379,7 +379,7 @@ function RsvpCard({ rsvp, past = false }: { rsvp: RsvpRow; past?: boolean }) {
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
         {hasTicket && (
           <Link
-            to={`/cinema/ticket/${rsvp.ticket_token}`}
+            to={`/ticket/${rsvp.ticket_token}`}
             className="ck-btn ck-btn--ink"
           >
             View ticket →
@@ -387,7 +387,7 @@ function RsvpCard({ rsvp, past = false }: { rsvp: RsvpRow; past?: boolean }) {
         )}
         {!past && rsvp.is_published && (
           <Link
-            to={`/cinema/events/${rsvp.event_id}`}
+            to={`/events/${rsvp.event_id}`}
             className="ck-btn"
           >
             Event details →

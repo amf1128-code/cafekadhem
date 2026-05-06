@@ -3,6 +3,15 @@ import { Link } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import type { Event, MenuItem } from '../../lib/types'
 import { isUpcoming } from '../../lib/utils/date'
+import {
+  formatCinemaDate,
+  formatCinemaDay,
+  formatCinemaTime,
+  interleaveAlternating,
+  makeDisplayTitle,
+  padNo,
+  splitBullets,
+} from './helpers'
 import { Marquee } from './primitives'
 
 interface CinemaEvent {
@@ -40,105 +49,14 @@ const HERO_MARQUEE_EN = [
   'EVERYTHING FROM SCRATCH',
   "BETTER THAN YOUR GRANDMA'S",
   'PISTACHIO BUNS HOT AT 9AM',
-  'COME HUNGRY',
+  'BAGHDAD TO BROOKLYN',
 ]
 const HERO_MARQUEE_AR = ['كافيه كاظم', 'صحتين', 'تفضل', 'بالعافية']
 const HERO_MARQUEE_ITEMS = interleaveAlternating(HERO_MARQUEE_EN, HERO_MARQUEE_AR)
 
-/**
- * Zips two lists so the output strictly alternates between them.
- * If the lists are uneven the longer one's leftover entries get
- * appended at the end (acceptable for a marquee that loops).
- */
-function interleaveAlternating<T>(a: T[], b: T[]): T[] {
-  const out: T[] = []
-  const max = Math.max(a.length, b.length)
-  for (let i = 0; i < max; i++) {
-    if (i < a.length) out.push(a[i])
-    if (i < b.length) out.push(b[i])
-  }
-  return out
-}
-
 // Designer-supplied fallback copy when the live event row is missing the
-// optional cinema fields (Arabic display word, tagline, bullets). This
-// keeps the layout's chrome populated until the schema is extended.
+// optional cinema fields (Arabic display word, tagline, bullets).
 const FALLBACK_AR = ['الكأس', 'عيد ميلاد', 'طرب', 'سينما']
-
-function padNo(n: string | number | null | undefined, fallback: string): string {
-  if (n === null || n === undefined || n === '') return fallback
-  // Admins sometimes type "No. 006" or "no 14" into the gathering_number
-  // field. Strip leading "No." / "Number" / etc. so we don't end up with
-  // "NO. No. 006" once the cinema landing prepends its own "NO." prefix.
-  const cleaned = String(n)
-    .replace(/^\s*(no\.?|number|num\.?|#)\s*/i, '')
-    .trim()
-  if (!cleaned) return fallback
-  return cleaned.length >= 3 ? cleaned : cleaned.padStart(3, '0')
-}
-
-function formatCinemaDate(dateStr: string): string {
-  // "2026-06-16" → "06.16.26"
-  const [y, m, d] = dateStr.split('-')
-  if (!y || !m || !d) return dateStr
-  return `${m}.${d}.${y.slice(-2)}`
-}
-
-function formatCinemaDay(dateStr: string): string {
-  const date = new Date(dateStr + 'T12:00:00')
-  return date
-    .toLocaleDateString('en-US', { weekday: 'short', timeZone: 'America/New_York' })
-    .toUpperCase()
-}
-
-function formatCinemaTime(start: string, end: string | null): string {
-  const startHour = Number(start.split(':')[0])
-  const period = startHour >= 12 ? 'PM' : 'AM'
-  const display = startHour % 12 || 12
-  if (!end) return `${display}${period} TILL LATE`
-  const endHour = Number(end.split(':')[0])
-  const endPeriod = endHour >= 12 ? 'PM' : 'AM'
-  const endDisplay = endHour % 12 || 12
-  return `${display}${period} – ${endDisplay}${endPeriod}`
-}
-
-function splitBullets(text: string | null): string[] {
-  if (!text) return []
-  // Accept either explicit newlines (one bullet per line) or a paragraph
-  // of 2-3 sentences. Split on either, trim list markers if present.
-  const byLine = text
-    .split(/\r?\n/)
-    .map(line => line.trim().replace(/^[-•·*]\s*/, ''))
-    .filter(Boolean)
-  if (byLine.length > 1) return byLine.slice(0, 4)
-  // Single-line text → split by sentence terminators.
-  return text
-    .split(/(?<=[.!?])\s+/)
-    .map(s => s.trim())
-    .filter(Boolean)
-    .slice(0, 4)
-}
-
-// Heuristic: titles longer than ~14 chars get split into two visual lines
-// at the nearest space past the midpoint, matching the designer's
-// "WORLD CUP / WATCH PARTY" treatment.
-function makeDisplayTitle(title: string): string {
-  const clean = title.toUpperCase().trim()
-  if (clean.length <= 14 || clean.includes('\n')) return clean
-  const mid = Math.floor(clean.length / 2)
-  const after = clean.indexOf(' ', mid)
-  const before = clean.lastIndexOf(' ', mid)
-  const breakAt =
-    after === -1
-      ? before
-      : before === -1
-        ? after
-        : after - mid <= mid - before
-          ? after
-          : before
-  if (breakAt <= 0) return clean
-  return clean.slice(0, breakAt) + '\n' + clean.slice(breakAt + 1)
-}
 
 function mapEvent(e: Event, idx: number, items: MenuItem[]): CinemaEvent {
   const display = makeDisplayTitle(e.title)
@@ -609,7 +527,7 @@ function HeroSection({ event }: { event: CinemaEvent }) {
           )}
 
           <Link
-            to={`/cinema/events/${event.id}`}
+            to={`/events/${event.id}`}
             style={{
               padding: '14px 22px',
               border: '2px solid var(--ck-ink)',
@@ -1016,7 +934,7 @@ function CalendarSection({
           </div>
         </div>
         <Link
-          to="/cinema/calendar"
+          to="/calendar"
           style={{
             fontFamily: 'var(--ck-mono)',
             fontSize: 11,
@@ -1084,7 +1002,7 @@ function CalendarRow({
   // Whole row is a Link to the event detail page.
   return (
     <Link
-      to={`/cinema/events/${event.id}`}
+      to={`/events/${event.id}`}
       className="ck-cal-row"
       style={{
         display: 'grid',
