@@ -15,8 +15,8 @@
 | 1 | Foundations (additive schema, no behavior change) | ✅ verified | `4af91ba` + hot-fix `91181e7` | ✅ 2026-05-06 | [01-foundations.md](commits/01-foundations.md) |
 | 2 | Identity merge & reconciliation | ✅ verified | `ae873e0` | ✅ 2026-05-06 | [02-identity-merge.md](commits/02-identity-merge.md) |
 | 3 | Notifications hardening (channel routing, dedup, consent, suppression) | ✅ verified | `71aa05f` | ✅ 2026-05-06 | [03-notifications.md](commits/03-notifications.md) |
-| 4 | Recognition & sharing (ambient `?as=`, header, ShareButton, `?ref=`) | 🟢 committed | *(see git log)* | ⬜ pending user verification | [04-recognition-sharing.md](commits/04-recognition-sharing.md) |
-| 5 | State unification (`get_guest_event_state` consumed by all pages) | ⬜ not started | — | — | [05-state-unification.md](commits/05-state-unification.md) |
+| 4 | Recognition & sharing (ambient `?as=`, header, ShareButton, `?ref=`) | ✅ verified | `9b2cb16` (+ `f9ce5d8` hot-fix, `d3beb43`/`7e243f3`/`449d751` polish) | ✅ 2026-05-06 | [04-recognition-sharing.md](commits/04-recognition-sharing.md) |
+| 5 | State unification — **scoped down to Option A** (hook + paid-RSVP UI guard; full page rewrite deferred) | 🟢 committed | *(see git log)* | ⬜ pending user verification | [05-state-unification.md](commits/05-state-unification.md) |
 | 6 | Bulk operations (mass invites, mass notifications, audience selectors) | ⬜ not started | — | — | [06-bulk-operations.md](commits/06-bulk-operations.md) |
 
 **Status legend:** ⬜ not started · 🟡 in progress · 🟢 committed · ✅ user-verified · 🔴 blocked
@@ -106,6 +106,7 @@ The list of functions modified is in each per-commit doc under **"User actions r
 | 1 | 2026-05-06 | Implement spec in 6 commits on a single branch, all in one Claude session. | User confirmed no live data; data-destruction risks → low. Phasing across deploys is unnecessary overhead. |
 | 2 | 2026-05-06 | Per-commit docs split into `docs/commits/0N-*.md` with top-level index here. | User preference. Improves handoff readability. |
 | 3 | 2026-05-06 | Each migration is committed to `supabase/migrations/` AND copied inline into the per-commit doc. | User asked for inline code; duplication is acceptable for handoff completeness. |
+| 4 | 2026-05-06 | **Commit 5 scoped down to Option A.** Ship the `useGuestEventState` hook + the paid-RSVP UI guard in RSVPForm; defer the full EventDetail / Order / Ticket / Pickup rewrite. | Original plan called for refactoring all four pages to drive render off `next_step`. The existing pages already implement the spec §5 decision tree correctly per-page; a rewrite would produce zero behavior diff but carry real regression risk and a heavy manual-test burden (no test suite). Drift-prevention value is real but not urgent; defer until a concrete bug or new state-aware page makes it necessary. The hook is provided so future code can adopt the canonical pattern incrementally. |
 
 ---
 
@@ -122,6 +123,15 @@ The list of functions modified is in each per-commit doc under **"User actions r
 5. **`useGuestEventState` hook** (planned in Commit 5) will type the response. The shape returned by 029 matches the plan's spec §5 shape exactly except for `invited_by` (see #4).
 6. **Hot-fix migration 035** added after user testing: `events.is_published BOOLEAN`, not `events.status TEXT` as the plan and 029 assumed. Migration 035 replaces `get_guest_event_state` body with the corrected SELECT and `IF NOT v_event.is_published` check.
 7. **Migration numbering for Commit 2 shifts by 1.** What the plan calls `035`/`036`/`037` (`merge_guests`, `merge_verifications`, `upsert_guest_collision`) becomes `036`/`037`/`038`. Subsequent commits' migration numbers also shift accordingly.
+
+### Commit 5 deviations from plan
+
+1. **Scope narrowed from "full page rewrite" to "hook + paid-RSVP UI guard."** See decision log #4. The original plan called for refactoring EventDetail / Order / Ticket / Pickup to consume `useGuestEventState` + `next_step`. After cost-benefit review (zero user-visible behavior change vs. real regression risk and manual-test burden), shipped only the additive pieces.
+2. **`useGuestEventState` hook delivered but not yet consumed**. New state-aware pages should adopt it; existing pages keep their per-page logic. Documented at the top of the hook file.
+3. **Paid-RSVP UI guard implemented in RSVPForm**: when `existingRsvp.payment_status === 'paid'`, the Maybe and Decline buttons are disabled with a `title` tooltip and a small explanatory line beneath the button row. Server-side block (migration 033) is unchanged; this is the UI belt-and-suspenders.
+4. **Order / Ticket / Pickup unchanged.** They already render correctly today; the deferred refactor is tracked here in case a divergence bug ever surfaces or a new state-aware page is added.
+5. **Optional migration 045 (`get_guest_event_state_v2`) skipped**. The plan flagged it as conditional; Commit 4's data needs were met by the existing 029/035 RPC, so no extension was needed.
+6. **No new use-case walkthroughs run as gating tests** for this commit. Without the page rewrite, the 11 spec §3a.7 walkthroughs would test pre-existing behavior, not the changes in this commit. Spot-test the paid-RSVP guard (the only user-visible change) instead.
 
 ### Commit 4 deviations from plan
 
