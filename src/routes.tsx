@@ -39,10 +39,43 @@ const MyTickets = lazy(() =>
 const VerifyMerge = lazy(() =>
   import('./pages/VerifyMerge').then(m => ({ default: m.VerifyMerge }))
 )
-// Cinema landing — primary home page (/). Renders outside PublicLayout
-// because it ships its own top strip / nav / footer.
+// Cinema preview — staged behind /cinema/* until promoted. CinemaShell
+// is the chrome (top strip, nav, marquee, footer) that wraps every
+// preview page; CinemaLanding is the index page (hero/menu/calendar/
+// story sections).
+import { CinemaShell } from './components/cinema/CinemaShell'
 const CinemaLanding = lazy(() =>
   import('./components/cinema/CinemaLanding').then(m => ({ default: m.CinemaLanding }))
+)
+const CinemaCalendar = lazy(() =>
+  import('./components/cinema/pages/CinemaCalendar').then(m => ({ default: m.CinemaCalendar }))
+)
+const CinemaEventDetail = lazy(() =>
+  import('./components/cinema/pages/CinemaEventDetail').then(m => ({ default: m.CinemaEventDetail }))
+)
+const CinemaOrder = lazy(() =>
+  import('./components/cinema/pages/CinemaOrder').then(m => ({ default: m.CinemaOrder }))
+)
+const CinemaTicket = lazy(() =>
+  import('./components/cinema/pages/CinemaTicket').then(m => ({ default: m.CinemaTicket }))
+)
+const CinemaFindTickets = lazy(() =>
+  import('./components/cinema/pages/CinemaFindTickets').then(m => ({ default: m.CinemaFindTickets }))
+)
+const CinemaMyTickets = lazy(() =>
+  import('./components/cinema/pages/CinemaMyTickets').then(m => ({ default: m.CinemaMyTickets }))
+)
+const CinemaInviteLanding = lazy(() =>
+  import('./components/cinema/pages/CinemaInviteLanding').then(m => ({ default: m.CinemaInviteLanding }))
+)
+const CinemaPickup = lazy(() =>
+  import('./components/cinema/pages/CinemaPickup').then(m => ({ default: m.CinemaPickup }))
+)
+const CinemaPickupTicket = lazy(() =>
+  import('./components/cinema/pages/CinemaPickupTicket').then(m => ({ default: m.CinemaPickupTicket }))
+)
+const CinemaVerifyMerge = lazy(() =>
+  import('./components/cinema/pages/CinemaVerifyMerge').then(m => ({ default: m.CinemaVerifyMerge }))
 )
 
 const AdminLogin = lazy(() =>
@@ -146,11 +179,26 @@ export const router = createBrowserRouter([
     ],
   },
   // Cinema preview — a parallel cinema-styled site living at /cinema/*.
-  // Only the home page is wired up here for now; sibling pages
-  // (/cinema/calendar, /cinema/events/:id, etc.) come next.
+  // Visually a complete rebuild of the public site. Lives behind /cinema
+  // until the operator chooses to promote it. CinemaShell provides the
+  // top strip, nav, marquee, and footer; each child route is its own
+  // page body.
   {
     path: '/cinema',
-    element: <Lazy><CinemaLanding /></Lazy>,
+    element: <CinemaShell />,
+    children: [
+      { index: true, element: <Lazy><CinemaLanding /></Lazy> },
+      { path: 'calendar', element: <Lazy><CinemaCalendar /></Lazy> },
+      { path: 'events/:id', element: <Lazy><CinemaEventDetail /></Lazy> },
+      { path: 'events/:id/order', element: <Lazy><CinemaOrder /></Lazy> },
+      { path: 'ticket/:token', element: <Lazy><CinemaTicket /></Lazy> },
+      { path: 'find-tickets', element: <Lazy><CinemaFindTickets /></Lazy> },
+      { path: 'my-tickets', element: <Lazy><CinemaMyTickets /></Lazy> },
+      { path: 'invite/:token', element: <Lazy><CinemaInviteLanding /></Lazy> },
+      { path: 'pickup', element: <Lazy><CinemaPickup /></Lazy> },
+      { path: 'pickup/:token', element: <Lazy><CinemaPickupTicket /></Lazy> },
+      { path: 'verify-merge', element: <Lazy><CinemaVerifyMerge /></Lazy> },
+    ],
   },
   {
     path: '/admin/login',

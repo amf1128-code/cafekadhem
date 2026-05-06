@@ -1,12 +1,14 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, NavLink, Outlet, useLocation } from 'react-router-dom'
+import { clearMyGuest, useMyGuest } from '../../lib/identity/useMyGuest'
 import { KadhemLockup, Marquee, RegMark } from './primitives'
 
+// Nav links — all rooted under /cinema/* so the preview is self-contained.
 const NAV_LINKS = [
-  { en: 'CALENDAR', ar: 'التقويم', href: '/calendar' },
-  { en: 'MENU', ar: 'القائمة', href: '/#menu' },
-  { en: 'STORY', ar: 'القصة', href: '/#story' },
-  { en: 'TICKETS', ar: 'تذاكر', href: '/my-tickets' },
+  { en: 'CALENDAR', ar: 'التقويم', href: '/cinema/calendar' },
+  { en: 'MENU', ar: 'القائمة', href: '/cinema#menu' },
+  { en: 'STORY', ar: 'القصة', href: '/cinema#story' },
+  { en: 'TICKETS', ar: 'تذاكر', href: '/cinema/my-tickets' },
 ]
 
 const FOOTER_MARQUEE = [
@@ -53,7 +55,7 @@ export function CinemaShell() {
     return `${m} / ${d} / ${dow} · صباح الخير`
   }, [])
 
-  const isHome = pathname === '/'
+  const isHome = pathname === '/cinema'
 
   return (
     <div className="cinema-root" style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
@@ -74,7 +76,9 @@ export function CinemaShell() {
         }}
       >
         <span>✦ POP-UP CAFE SERIES · NEW YORK · EST. 2025</span>
-        <span className="ck-hide-mobile">{todayLine}</span>
+        <span className="ck-hide-mobile">
+          <CinemaRecognition fallback={todayLine} />
+        </span>
       </div>
 
       {/* NAV */}
@@ -93,7 +97,7 @@ export function CinemaShell() {
         }}
       >
         <Link
-          to="/"
+          to="/cinema"
           aria-label="Cafe Kadhem home"
           style={{
             display: 'flex',
@@ -123,7 +127,7 @@ export function CinemaShell() {
         </nav>
         {isHome ? (
           <Link
-            to="/calendar"
+            to="/cinema/calendar"
             className="ck-reserve"
             style={{
               padding: '12px 18px',
@@ -142,7 +146,7 @@ export function CinemaShell() {
           </Link>
         ) : (
           <Link
-            to="/"
+            to="/cinema"
             className="ck-reserve"
             style={{
               padding: '12px 18px',
@@ -348,5 +352,68 @@ function NavLinkItem({ en, ar, href }: { en: string; ar: string; href: string })
         {ar}
       </span>
     </NavLink>
+  )
+}
+
+/**
+ * Cinema-styled recognition strip. When the visitor's guest_id is in
+ * localStorage, renders "HI, FIRST · NOT YOU?" — clicking "not you?"
+ * prompts to forget the device. Anonymous visitors see a "I've been
+ * here before →" link to /cinema/find-tickets.
+ *
+ * Falls back to the rotating date/greeting line while the guest row is
+ * still loading so the strip doesn't flicker.
+ */
+function CinemaRecognition({ fallback }: { fallback: string }) {
+  const { guest, loading } = useMyGuest()
+
+  if (loading) return <span>{fallback}</span>
+
+  if (!guest?.first_name) {
+    return (
+      <Link
+        to="/cinema/find-tickets"
+        style={{
+          color: 'var(--ck-ink)',
+          textDecoration: 'none',
+          letterSpacing: '0.16em',
+        }}
+      >
+        I&apos;ve been here before →
+      </Link>
+    )
+  }
+
+  return (
+    <span style={{ letterSpacing: '0.16em' }}>
+      <span style={{ opacity: 0.7 }}>HI, </span>
+      <span style={{ color: 'var(--ck-cobalt)' }}>
+        {guest.first_name.toUpperCase()}
+      </span>
+      <span style={{ opacity: 0.45, margin: '0 8px' }}>·</span>
+      <button
+        type="button"
+        onClick={() => {
+          if (
+            confirm('Forget this device? You can sign back in from the next page.')
+          ) {
+            clearMyGuest()
+          }
+        }}
+        style={{
+          background: 'transparent',
+          border: 'none',
+          padding: 0,
+          font: 'inherit',
+          letterSpacing: 'inherit',
+          color: 'var(--ck-ink)',
+          textDecoration: 'underline',
+          textUnderlineOffset: 3,
+          cursor: 'pointer',
+        }}
+      >
+        not you?
+      </button>
+    </span>
   )
 }

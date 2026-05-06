@@ -10,7 +10,6 @@ import { PageLoader } from '../../components/ui/LoadingSpinner'
 import { sendNotification } from '../../lib/notifications'
 import { THEMES, type ThemeId } from '../../lib/theme/themes'
 
-const MAX_FILE_SIZE = 5 * 1024 * 1024 // 5MB
 const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp']
 
 export function AdminEventForm() {
@@ -130,9 +129,6 @@ export function AdminEventForm() {
   async function uploadFlyer(file: File): Promise<string> {
     if (!ALLOWED_TYPES.includes(file.type)) {
       throw new Error('Only JPG, PNG, and WebP files are allowed')
-    }
-    if (file.size > MAX_FILE_SIZE) {
-      throw new Error('File must be under 5MB')
     }
 
     const ext = file.name.split('.').pop()
@@ -442,7 +438,7 @@ export function AdminEventForm() {
               className="sr-only"
             />
           </label>
-          <p className="text-xs text-ink/50 mt-1">JPG, PNG, or WebP. Max 5MB.</p>
+          <p className="text-xs text-ink/50 mt-1">JPG, PNG, or WebP. 4:3 aspect (e.g. 1600&times;1200) recommended.</p>
         </div>
 
         {/* Home Page Image — optional alternate cropped for the home card */}
@@ -475,7 +471,7 @@ export function AdminEventForm() {
               Remove
             </button>
           )}
-          <p className="text-xs text-ink/50 mt-1">JPG, PNG, or WebP. Max 5MB.</p>
+          <p className="text-xs text-ink/50 mt-1">JPG, PNG, or WebP. 4:3 aspect (e.g. 1600&times;1200) recommended.</p>
         </div>
 
         {/* Ticketing */}

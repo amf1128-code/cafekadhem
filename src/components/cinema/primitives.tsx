@@ -97,3 +97,74 @@ export function Marquee({
   )
 }
 
+/** Cinema-styled full-page loader. Mirrors the visual feel of the cream
+ *  cinema chrome — used while individual /cinema/* pages are fetching
+ *  data. */
+export function CinemaPageLoader() {
+  return (
+    <section
+      className="ck-page"
+      style={{
+        textAlign: 'center',
+        padding: '80px 28px',
+        borderBottom: 'none',
+      }}
+    >
+      <div
+        style={{
+          fontFamily: 'var(--ck-mono)',
+          fontSize: 11,
+          letterSpacing: '0.18em',
+          textTransform: 'uppercase',
+          color: 'var(--ck-cobalt)',
+        }}
+      >
+        ✦ Loading the kitchen…
+      </div>
+    </section>
+  )
+}
+
+/** Single-line "X / Y" eyebrow with an Arabic word slot. Used as a
+ *  section eyebrow on the cinema pages. */
+export function CinemaEyebrow({
+  en,
+  ar,
+}: {
+  en: string
+  ar?: string
+}) {
+  return (
+    <div
+      style={{
+        display: 'inline-flex',
+        alignItems: 'baseline',
+        gap: 10,
+        fontFamily: 'var(--ck-mono)',
+        fontSize: 11,
+        letterSpacing: '0.18em',
+        textTransform: 'uppercase',
+        color: 'var(--ck-cobalt)',
+      }}
+    >
+      <span>{en}</span>
+      {ar && (
+        <>
+          <span style={{ opacity: 0.5 }}>/</span>
+          <span
+            style={{
+              fontFamily: 'var(--ck-arabic-display)',
+              fontSize: 22,
+              direction: 'rtl',
+              color: 'var(--ck-cobalt)',
+              letterSpacing: 0,
+            }}
+          >
+            {ar}
+          </span>
+        </>
+      )}
+    </div>
+  )
+}
+

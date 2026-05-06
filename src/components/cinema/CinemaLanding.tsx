@@ -1,9 +1,9 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import type { Event, MenuItem } from '../../lib/types'
 import { isUpcoming } from '../../lib/utils/date'
-import { KadhemLockup, Marquee, RegMark } from './primitives'
+import { Marquee } from './primitives'
 
 interface CinemaEvent {
   id: string
@@ -30,17 +30,12 @@ interface CinemaMenuItem {
   ar: string
 }
 
-const CONTACT = {
-  email: 'HI@CAFEKADHEM.COM',
-  ig: '@CAFEKADHEM',
-}
-
-// Phrases scrolling under the hero. Mix of English + Arabic.
+// Phrases scrolling between hero and the menu section. Mix of EN + AR.
 // Arabic: تفضل (tfadal — please come in / help yourself),
 //         بالعافية (bel3afia — to your strength / enjoy your meal),
 //         بالهنا والشفا (bel-hana wel-shifa — to your enjoyment + health),
 //         صحتين (sahteen — to your health), كافيه كاظم (Cafe Kadhem).
-const MARQUEE_ITEMS = [
+const HERO_MARQUEE_ITEMS = [
   'EVERYTHING FROM SCRATCH',
   'كافيه كاظم',
   "BETTER THAN YOUR GRANDMA'S",
@@ -49,13 +44,6 @@ const MARQUEE_ITEMS = [
   'بالهنا والشفا',
   'بالعافية',
   'PISTACHIO BUNS HOT AT 9AM',
-]
-
-const NAV_LINKS = [
-  { en: 'CALENDAR', ar: 'التقويم', href: '#calendar' },
-  { en: 'MENU', ar: 'القائمة', href: '#menu' },
-  { en: 'STORY', ar: 'القصة', href: '#story' },
-  { en: 'ARCHIVE', ar: 'الأرشيف', href: '#archive' },
 ]
 
 // Designer-supplied fallback copy when the live event row is missing the
@@ -174,7 +162,6 @@ export function CinemaLanding() {
   const [events, setEvents] = useState<CinemaEvent[]>([])
   const [menuBlurb, setMenuBlurb] = useState<string>(DEFAULT_MENU_BLURB)
   const [loading, setLoading] = useState(true)
-  const [navOpen, setNavOpen] = useState(false)
 
   useEffect(() => {
     let cancelled = false
@@ -210,186 +197,8 @@ export function CinemaLanding() {
 
   const next = events[0]
 
-  const todayLine = useMemo(() => {
-    const now = new Date()
-    const m = String(now.getMonth() + 1).padStart(2, '0')
-    const d = String(now.getDate()).padStart(2, '0')
-    const dow = now
-      .toLocaleDateString('en-US', { weekday: 'short' })
-      .toUpperCase()
-    return `${m} / ${d} / ${dow} · صباح الخير`
-  }, [])
-
   return (
-    <div className="cinema-root" style={{ minHeight: '100vh' }}>
-      {/* TOP STRIP */}
-      <div
-        className="ck-strip"
-        style={{
-          borderBottom: '2px solid var(--ck-ink)',
-          padding: '10px 28px',
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          background: 'var(--ck-cream)',
-          fontFamily: 'var(--ck-mono)',
-          fontSize: 10,
-          letterSpacing: '0.16em',
-          textTransform: 'uppercase',
-        }}
-      >
-        <span>✦ POP-UP CAFE SERIES · NEW YORK · EST. 2025</span>
-        <span className="ck-hide-mobile">{todayLine}</span>
-      </div>
-
-      {/* NAV */}
-      <header
-        className="ck-nav"
-        style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          padding: '20px 28px',
-          borderBottom: '2px solid var(--ck-ink)',
-          gap: 16,
-          background: 'var(--ck-cream)',
-          position: 'relative',
-          zIndex: 10,
-        }}
-      >
-        <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-          <RegMark size={18} />
-          <KadhemLockup size={0.6} />
-        </div>
-        <nav
-          className="ck-nav-links"
-          style={{
-            display: 'flex',
-            gap: 26,
-            fontFamily: 'var(--ck-mono)',
-            fontSize: 11,
-            letterSpacing: '0.12em',
-            alignItems: 'center',
-          }}
-        >
-          {NAV_LINKS.map(l => (
-            <a
-              key={l.en}
-              href={l.href}
-              style={{
-                color: 'var(--ck-ink)',
-                textDecoration: 'none',
-                display: 'inline-flex',
-                alignItems: 'baseline',
-                gap: 8,
-              }}
-            >
-              <span>{l.en}</span>
-              <span style={{ opacity: 0.5 }}>/</span>
-              <span
-                style={{
-                  fontFamily: 'var(--ck-arabic-display)',
-                  fontSize: 18,
-                  direction: 'rtl',
-                  letterSpacing: 0,
-                }}
-              >
-                {l.ar}
-              </span>
-            </a>
-          ))}
-        </nav>
-        {next ? (
-          <Link
-            to={`/events/${next.id}`}
-            className="ck-reserve"
-            style={{
-              padding: '12px 18px',
-              border: '2px solid var(--ck-ink)',
-              background: 'var(--ck-cobalt)',
-              color: 'var(--ck-cream)',
-              fontFamily: 'var(--ck-sans)',
-              fontWeight: 700,
-              fontSize: 12,
-              letterSpacing: '0.12em',
-              textTransform: 'uppercase',
-              textDecoration: 'none',
-              display: 'inline-flex',
-              alignItems: 'center',
-            }}
-          >
-            Save a Spot →
-          </Link>
-        ) : null}
-        <button
-          type="button"
-          className="ck-burger"
-          onClick={() => setNavOpen(o => !o)}
-          aria-label="Menu"
-          aria-expanded={navOpen}
-          style={{
-            display: 'none',
-            width: 40,
-            height: 40,
-            border: '2px solid var(--ck-ink)',
-            background: 'var(--ck-cream)',
-            padding: 0,
-            cursor: 'pointer',
-            flexDirection: 'column',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: 4,
-          }}
-        >
-          <span style={{ width: 18, height: 2, background: 'var(--ck-ink)' }} />
-          <span style={{ width: 18, height: 2, background: 'var(--ck-ink)' }} />
-          <span style={{ width: 18, height: 2, background: 'var(--ck-ink)' }} />
-        </button>
-      </header>
-
-      {navOpen && (
-        <div
-          style={{
-            display: 'flex',
-            flexDirection: 'column',
-            borderBottom: '2px solid var(--ck-ink)',
-            background: 'var(--ck-cream)',
-          }}
-        >
-          {NAV_LINKS.map(l => (
-            <a
-              key={l.en}
-              href={l.href}
-              onClick={() => setNavOpen(false)}
-              style={{
-                padding: '16px 28px',
-                fontFamily: 'var(--ck-mono)',
-                fontSize: 12,
-                letterSpacing: '0.16em',
-                color: 'var(--ck-ink)',
-                textDecoration: 'none',
-                borderTop: '1px solid var(--ck-ink)',
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-              }}
-            >
-              <span>{l.en}</span>
-              <span
-                style={{
-                  fontFamily: 'var(--ck-arabic-display)',
-                  fontSize: 22,
-                  direction: 'rtl',
-                  letterSpacing: 0,
-                }}
-              >
-                {l.ar}
-              </span>
-            </a>
-          ))}
-        </div>
-      )}
-
+    <>
       {/* HERO */}
       {next ? (
         <HeroSection event={next} />
@@ -399,7 +208,7 @@ export function CinemaLanding() {
         <HeroEmpty />
       )}
 
-      <Marquee items={MARQUEE_ITEMS} />
+      <Marquee items={HERO_MARQUEE_ITEMS} />
 
       {/* CURRENT MENU — only render if the next event has menu items */}
       {next && next.menu.length > 0 && (
@@ -407,52 +216,12 @@ export function CinemaLanding() {
       )}
 
       {/* CALENDAR — small preview of the next 1-2 upcoming events
-          AFTER the hero one. Full calendar is its own page (TODO). */}
+          AFTER the hero one. Full calendar is /cinema/calendar. */}
       <CalendarSection events={events.slice(1, 3)} loading={loading} />
 
       {/* STORY */}
       <StorySection />
-
-      {/* FOOTER */}
-      <footer
-        className="ck-footer"
-        style={{
-          padding: '32px 28px',
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'flex-end',
-          flexWrap: 'wrap',
-          gap: 24,
-          background: 'var(--ck-cream)',
-          borderTop: '2px solid var(--ck-ink)',
-        }}
-      >
-        <KadhemLockup size={0.7} />
-        <div
-          style={{
-            fontFamily: 'var(--ck-mono)',
-            fontSize: 10,
-            letterSpacing: '0.14em',
-            lineHeight: 1.7,
-            textTransform: 'uppercase',
-          }}
-        >
-          {CONTACT.email}
-          <br />
-          {CONTACT.ig}
-        </div>
-        <div
-          style={{
-            fontFamily: 'var(--ck-arabic-display)',
-            fontSize: 36,
-            direction: 'rtl',
-            color: 'var(--ck-cobalt)',
-          }}
-        >
-          صحتين
-        </div>
-      </footer>
-    </div>
+    </>
   )
 }
 
@@ -820,7 +589,7 @@ function HeroSection({ event }: { event: CinemaEvent }) {
           )}
 
           <Link
-            to={`/events/${event.id}`}
+            to={`/cinema/events/${event.id}`}
             style={{
               padding: '14px 22px',
               border: '2px solid var(--ck-ink)',
@@ -1227,7 +996,7 @@ function CalendarSection({
           </div>
         </div>
         <Link
-          to="/calendar"
+          to="/cinema/calendar"
           style={{
             fontFamily: 'var(--ck-mono)',
             fontSize: 11,
@@ -1295,7 +1064,7 @@ function CalendarRow({
   // Whole row is a Link to the event detail page.
   return (
     <Link
-      to={`/events/${event.id}`}
+      to={`/cinema/events/${event.id}`}
       className="ck-cal-row"
       style={{
         display: 'grid',
