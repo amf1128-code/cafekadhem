@@ -1,9 +1,8 @@
 -- ============================================================
--- 029: Canonical (guest, event) state selector.
+-- 035: Hot-fix migration 029 — events column is `is_published`
+-- (BOOLEAN), not `status`. Replaces the get_guest_event_state body.
 --
--- Returns the data needed to drive the next_step decision tree
--- (USER_FLOWS_SPEC.md §5). Public; ticket_token is only returned
--- when the calling guest's id matches the row owner.
+-- Identical to 029 except the SELECT and the closed-event check.
 -- ============================================================
 
 CREATE OR REPLACE FUNCTION get_guest_event_state(
@@ -32,7 +31,6 @@ BEGIN
     RETURN jsonb_build_object('error', 'event_not_found');
   END IF;
 
-  -- Capacity remaining (NULL = unlimited)
   IF v_event.capacity IS NOT NULL THEN
     SELECT COUNT(*) INTO v_yes_count
       FROM rsvps
@@ -42,7 +40,6 @@ BEGIN
     v_capacity_remain := NULL;
   END IF;
 
-  -- Caller's RSVP for this event (parent only — plus_one_of IS NULL)
   SELECT id, status, waitlist_position, payment_status, ticket_token,
          checked_in_at
     INTO v_rsvp
@@ -51,7 +48,6 @@ BEGIN
      AND guest_id = p_guest_id
      AND plus_one_of IS NULL;
 
-  -- Plus-one's first_name, if any. plus_one_of points to the parent RSVP id.
   IF v_rsvp.id IS NOT NULL THEN
     SELECT g.first_name
       INTO v_plus_one_name
@@ -61,12 +57,10 @@ BEGIN
      LIMIT 1;
   END IF;
 
-  -- Food order total across this event for this guest
   SELECT SUM(total) INTO v_order_total
     FROM orders
    WHERE event_id = p_event_id AND guest_id = p_guest_id;
 
-  -- next_step decision tree (mirrors USER_FLOWS_SPEC.md §5 exactly)
   IF NOT v_event.is_published THEN
     v_next_step := 'closed';
   ELSIF v_rsvp.status IS NULL THEN
@@ -86,7 +80,6 @@ BEGIN
       v_next_step := 'edit_rsvp';
     END IF;
   ELSE
-    -- yes/maybe/no/waitlisted (non-ticketed-yes branch)
     v_next_step := 'edit_rsvp';
   END IF;
 
@@ -103,7 +96,7 @@ BEGIN
     'has_food_order',      (v_order_total IS NOT NULL),
     'food_order_total',    v_order_total,
     'capacity_remaining',  v_capacity_remain,
-    'invited_by',          NULL,  -- wired up in Commit 4 (?as= / ?ref= resolution)
+    'invited_by',          NULL,
     'next_step',           v_next_step
   );
 END;

@@ -36,6 +36,9 @@ const FindTickets = lazy(() =>
 const MyTickets = lazy(() =>
   import('./pages/MyTickets').then(m => ({ default: m.MyTickets }))
 )
+const VerifyMerge = lazy(() =>
+  import('./pages/VerifyMerge').then(m => ({ default: m.VerifyMerge }))
+)
 
 const AdminLogin = lazy(() =>
   import('./pages/admin/Login').then(m => ({ default: m.AdminLogin }))
@@ -128,6 +131,7 @@ export const router = createBrowserRouter([
       { path: 'invite/:token', element: <InviteLanding /> },
       { path: 'find-tickets', element: <FindTickets /> },
       { path: 'my-tickets', element: <MyTickets /> },
+      { path: 'verify-merge', element: <VerifyMerge /> },
     ],
   },
   {

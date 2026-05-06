@@ -2,11 +2,11 @@
 
 > **Goal:** implement spec §3.4 cross-channel reconciliation. After this commit, the identity model is robust against guests who use different channels in different sessions, with auto-merge for unambiguous collisions and verify-then-merge for ambiguous ones.
 
-**Status:** ⬜ not started
+**Status:** 🟢 committed (pending user verification)
 **Prerequisites:** Commit 1 ✅ user-verified
-**Estimated migration files:** 3 (`035` through `037`)
-**SHA on commit:** —
-**User-verified:** —
+**Estimated migration files:** 3 (renumbered to `036`/`037`/`038` due to Commit 1 hot-fix)
+**SHA on commit:** *(see git log)*
+**User-verified:** ⬜ pending
 
 ---
 
@@ -735,25 +735,43 @@ Frontend: `git revert <sha>` of this commit.
 
 ## Status section
 
-**Last updated:** *(when implementation starts)*
+**Last updated:** 2026-05-06, end of Commit 2
 
 | Sub-item | Status | Notes |
 |---|---|---|
-| 035 — merge_guests | ⬜ | |
-| 036 — merge_verifications | ⬜ | |
-| 037 — upsert_guest collision detection | ⬜ | |
-| send-notification merge_verification handler | ⬜ | |
-| `src/pages/VerifyMerge.tsx` | ⬜ | |
-| `src/routes.tsx` route | ⬜ | |
-| Form handler updates (4 forms) | ⬜ | |
-| SQL tests (5) | ⬜ | |
-| Manual UI tests (4) | ⬜ | |
+| 036 — merge_guests | 🟢 | RSVP conflict resolution (paid > yes > waitlisted > maybe > no); plus-ones cascade via FK |
+| 037 — merge_verifications | 🟢 | Token + request/confirm RPCs |
+| 038 — upsert_guest collision detection | 🟢 | Return type changed to JSONB to carry `pending_merge`; verification token minted server-side |
+| send-notification merge_verification handler | 🟢 | New template + verify_url builder + channel override via `data.channel` |
+| `src/pages/VerifyMerge.tsx` | 🟢 | New page; handles success / already_consumed / expired / invalid |
+| `src/routes.tsx` route | 🟢 | `/verify-merge` added under PublicLayout |
+| Form handler updates | 🟢 | RSVPForm, Order, Pickup all dispatch verification on `pending_merge`. InviteForm doesn't call upsert_guest, no change needed |
+| `src/lib/identity/handlePendingMerge.ts` | 🟢 | New helper centralizing the dispatch |
+| SQL tests | ⬜ | Pending user verification |
+| Manual UI tests | ⬜ | Pending user verification |
 
 ### Result notes (post-commit)
 
-*(To be filled in.)*
-
-- Commit SHA:
-- Files changed:
-- Deviations from plan:
-- Open questions raised:
+- **Commit SHA:** *(see git log)*
+- **Migration numbers shifted by 1** (036/037/038 instead of plan's 035/036/037) because Commit 1 hot-fix took the 035 slot.
+- **Files actually changed:**
+  - `supabase/migrations/036_merge_guests.sql` (new)
+  - `supabase/migrations/037_merge_verifications.sql` (new)
+  - `supabase/migrations/038_upsert_guest_collision.sql` (new)
+  - `supabase/functions/send-notification/index.ts` (added merge_verification template, verify_url builder, channel override)
+  - `src/pages/VerifyMerge.tsx` (new)
+  - `src/routes.tsx` (route added)
+  - `src/lib/identity/handlePendingMerge.ts` (new helper)
+  - `src/components/events/RSVPForm.tsx` (pending_merge handler)
+  - `src/pages/Order.tsx` (pending_merge handler)
+  - `src/pages/Pickup.tsx` (pending_merge handler)
+- **Deviations from plan** (logged in `IMPLEMENTATION_PLAN.md` Open Questions):
+  1. `upsert_guest` returns JSONB now (was `guests` row).
+  2. `verification_token` minted in upsert_guest, not in send-notification.
+  3. `request_merge_verification` not granted to anon (only service_role/authenticated). The SECURITY DEFINER context of upsert_guest reaches it for anon callers.
+  4. `merge_guests` doesn't touch `rsvps.plus_one_of` (it's an RSVP id, not a guest id).
+  5. Channel override added to send-notification.
+  6. `'both'` preference deferred to Commit 3.
+  7. InviteForm doesn't call upsert_guest directly; no changes needed there.
+- **Open questions raised:** none.
+- **Build:** `npm run build` passes.
