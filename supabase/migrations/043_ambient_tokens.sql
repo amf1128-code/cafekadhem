@@ -24,8 +24,12 @@ CREATE TABLE IF NOT EXISTS ambient_tokens (
 CREATE INDEX IF NOT EXISTS ambient_tokens_guest_idx
   ON ambient_tokens (guest_id);
 
-CREATE INDEX IF NOT EXISTS ambient_tokens_active_idx
-  ON ambient_tokens (expires_at) WHERE expires_at > now();
+-- Index on expires_at for cleanup queries (DELETE WHERE expires_at < ...).
+-- Cannot use a partial WHERE expires_at > now() predicate — now() is
+-- STABLE not IMMUTABLE, and Postgres rejects non-IMMUTABLE functions
+-- in index predicates.
+CREATE INDEX IF NOT EXISTS ambient_tokens_expires_idx
+  ON ambient_tokens (expires_at);
 
 ALTER TABLE ambient_tokens ENABLE ROW LEVEL SECURITY;
 -- No public policies — RPC-only access.
