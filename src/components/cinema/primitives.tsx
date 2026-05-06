@@ -1,5 +1,3 @@
-import { useState, type CSSProperties } from 'react'
-
 export function RegMark({ size = 18, color = 'var(--ck-ink)' }: { size?: number; color?: string }) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" style={{ display: 'inline-block' }}>
@@ -99,42 +97,3 @@ export function Marquee({
   )
 }
 
-export function AudioToggle({
-  position = { bottom: 24, right: 24 },
-}: {
-  position?: { bottom?: number; right?: number; left?: number; top?: number }
-}) {
-  const [on, setOn] = useState(false)
-  return (
-    <button
-      type="button"
-      onClick={() => setOn(o => !o)}
-      title="Tarab radio"
-      aria-pressed={on}
-      style={{
-        position: 'fixed',
-        ...position,
-        zIndex: 60,
-        width: 64,
-        height: 64,
-        border: '2px solid var(--ck-ink)',
-        borderRadius: '50%',
-        background: on ? 'var(--ck-sun)' : 'var(--ck-cobalt)',
-        color: on ? 'var(--ck-ink)' : 'var(--ck-cream)',
-        cursor: 'pointer',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        flexDirection: 'column',
-        animation: on ? 'ck-spin 4s linear infinite' : 'none',
-        fontFamily: 'var(--ck-mono)',
-        fontSize: 9,
-        letterSpacing: '0.08em',
-        padding: 0,
-      } as CSSProperties}
-    >
-      <div style={{ fontSize: 18, lineHeight: 1 }}>{on ? '♫' : '♪'}</div>
-      <div>{on ? 'ON' : 'TARAB'}</div>
-    </button>
-  )
-}

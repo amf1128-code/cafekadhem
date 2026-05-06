@@ -24,6 +24,9 @@ const FALLBACK_EVENT: Event = {
   ticketing_enabled: true,
   ticket_price: 1500,
   theme: 'theme1',
+  display_arabic: null,
+  tagline: null,
+  highlights: null,
   created_at: '2026-05-01T12:00:00Z',
   updated_at: '2026-05-01T12:00:00Z',
 }

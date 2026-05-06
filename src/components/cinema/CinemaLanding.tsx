@@ -1,11 +1,21 @@
 import { useEffect, useMemo, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import type { Event, MenuItem } from '../../lib/types'
 import { isUpcoming } from '../../lib/utils/date'
 import { KadhemLockup, Marquee, RegMark } from './primitives'
-import { InlineRSVP, RSVPModal, type CinemaEventLite } from './RSVPModal'
 
-interface CinemaEvent extends CinemaEventLite {
+interface CinemaEvent {
+  id: string
+  no: string
+  title: string
+  short: string
+  day: string
+  date: string
+  time: string
+  loc: string
+  price: number
+  ar: string
   tagline: string
   bullets: string[]
   posterUrl: string | null
@@ -21,18 +31,23 @@ interface CinemaMenuItem {
 }
 
 const CONTACT = {
-  address: '91 E 3RD ST · NEW YORK',
-  email: 'HI@CAFEKADHEM.NYC',
-  ig: '@CAFE.KADHEM',
+  email: 'HI@CAFEKADHEM.COM',
+  ig: '@CAFEKADHEM',
 }
 
+// Phrases scrolling under the hero. Mix of English + Arabic.
+// Arabic: تفضل (tfadal — please come in / help yourself),
+//         بالعافية (bel3afia — to your strength / enjoy your meal),
+//         بالهنا والشفا (bel-hana wel-shifa — to your enjoyment + health),
+//         صحتين (sahteen — to your health), كافيه كاظم (Cafe Kadhem).
 const MARQUEE_ITEMS = [
-  'FRESH BAKES TUESDAYS',
+  'EVERYTHING FROM SCRATCH',
   'كافيه كاظم',
-  'KNAFEH CROISSANTS RETURN',
+  "BETTER THAN YOUR GRANDMA'S",
   'صحتين',
-  'EAST 3RD ST',
+  'تفضل',
   'بالهنا والشفا',
+  'بالعافية',
   'PISTACHIO BUNS HOT AT 9AM',
 ]
 
@@ -79,11 +94,19 @@ function formatCinemaTime(start: string, end: string | null): string {
   return `${display}${period} – ${endDisplay}${endPeriod}`
 }
 
-function splitBullets(description: string | null): string[] {
-  if (!description) return []
-  return description
+function splitBullets(text: string | null): string[] {
+  if (!text) return []
+  // Accept either explicit newlines (one bullet per line) or a paragraph
+  // of 2-3 sentences. Split on either, trim list markers if present.
+  const byLine = text
     .split(/\r?\n/)
     .map(line => line.trim().replace(/^[-•·*]\s*/, ''))
+    .filter(Boolean)
+  if (byLine.length > 1) return byLine.slice(0, 4)
+  // Single-line text → split by sentence terminators.
+  return text
+    .split(/(?<=[.!?])\s+/)
+    .map(s => s.trim())
     .filter(Boolean)
     .slice(0, 4)
 }
@@ -111,7 +134,9 @@ function makeDisplayTitle(title: string): string {
 
 function mapEvent(e: Event, idx: number, items: MenuItem[]): CinemaEvent {
   const display = makeDisplayTitle(e.title)
+  const taglineFallback = e.description?.split(/\r?\n/)[0]?.trim() ?? ''
   return {
+    id: e.id,
     no: padNo(e.gathering_number, String(14 + idx).padStart(3, '0')),
     title: display,
     short: e.title,
@@ -120,16 +145,18 @@ function mapEvent(e: Event, idx: number, items: MenuItem[]): CinemaEvent {
     time: formatCinemaTime(e.start_time, e.end_time),
     loc: [e.location_name, e.location].filter(Boolean).join(' · ') || e.location || 'TBA',
     price: Math.round(e.ticket_price ?? 0),
-    ar: FALLBACK_AR[idx % FALLBACK_AR.length],
-    tagline: e.description?.split(/\r?\n/)[0]?.trim() || 'Pop-up bakery + cafe series. Come hungry.',
-    bullets: splitBullets(e.description),
+    ar: e.display_arabic?.trim() || FALLBACK_AR[idx % FALLBACK_AR.length],
+    tagline: e.tagline?.trim() || taglineFallback || 'Pop-up cafe series. Come hungry.',
+    // Prefer the explicit highlights column; fall back to description if
+    // the admin hasn't filled highlights in yet.
+    bullets: splitBullets(e.highlights ?? e.description),
     posterUrl: e.home_flyer_url || e.flyer_url,
     menu: items.map(item => ({
       name: item.name,
       desc: item.description ?? '',
       price: Math.round(item.price ?? 0),
       cat: (item.category || 'BAKE').toUpperCase(),
-      ar: '',
+      ar: item.display_arabic?.trim() ?? '',
     })),
   }
 }
@@ -137,8 +164,6 @@ function mapEvent(e: Event, idx: number, items: MenuItem[]): CinemaEvent {
 export function CinemaLanding() {
   const [events, setEvents] = useState<CinemaEvent[]>([])
   const [loading, setLoading] = useState(true)
-  const [rsvpOpen, setRsvpOpen] = useState(false)
-  const [rsvpEvent, setRsvpEvent] = useState<CinemaEvent | null>(null)
   const [navOpen, setNavOpen] = useState(false)
 
   useEffect(() => {
@@ -175,11 +200,6 @@ export function CinemaLanding() {
       .toUpperCase()
     return `${m} / ${d} / ${dow} · صباح الخير`
   }, [])
-
-  const openRsvp = (ev: CinemaEvent) => {
-    setRsvpEvent(ev)
-    setRsvpOpen(true)
-  }
 
   return (
     <div className="cinema-root" style={{ minHeight: '100vh' }}>
@@ -260,27 +280,28 @@ export function CinemaLanding() {
             </a>
           ))}
         </nav>
-        <button
-          type="button"
-          onClick={() => next && openRsvp(next)}
-          disabled={!next}
-          className="ck-reserve"
-          style={{
-            padding: '12px 18px',
-            border: '2px solid var(--ck-ink)',
-            background: 'var(--ck-cobalt)',
-            color: 'var(--ck-cream)',
-            fontFamily: 'var(--ck-sans)',
-            fontWeight: 700,
-            fontSize: 12,
-            letterSpacing: '0.12em',
-            textTransform: 'uppercase',
-            cursor: next ? 'pointer' : 'not-allowed',
-            opacity: next ? 1 : 0.5,
-          }}
-        >
-          Save a Spot →
-        </button>
+        {next ? (
+          <Link
+            to={`/events/${next.id}`}
+            className="ck-reserve"
+            style={{
+              padding: '12px 18px',
+              border: '2px solid var(--ck-ink)',
+              background: 'var(--ck-cobalt)',
+              color: 'var(--ck-cream)',
+              fontFamily: 'var(--ck-sans)',
+              fontWeight: 700,
+              fontSize: 12,
+              letterSpacing: '0.12em',
+              textTransform: 'uppercase',
+              textDecoration: 'none',
+              display: 'inline-flex',
+              alignItems: 'center',
+            }}
+          >
+            Save a Spot →
+          </Link>
+        ) : null}
         <button
           type="button"
           className="ck-burger"
@@ -352,7 +373,7 @@ export function CinemaLanding() {
 
       {/* HERO */}
       {next ? (
-        <HeroSection event={next} onRsvp={() => openRsvp(next)} />
+        <HeroSection event={next} />
       ) : loading ? (
         <HeroSkeleton />
       ) : (
@@ -364,8 +385,9 @@ export function CinemaLanding() {
       {/* CURRENT MENU — only render if the next event has menu items */}
       {next && next.menu.length > 0 && <MenuSection event={next} />}
 
-      {/* CALENDAR */}
-      <CalendarSection events={events} loading={loading} onRsvp={openRsvp} />
+      {/* CALENDAR — small preview of the next 1-2 upcoming events
+          AFTER the hero one. Full calendar is its own page (TODO). */}
+      <CalendarSection events={events.slice(1, 3)} loading={loading} />
 
       {/* STORY */}
       <StorySection />
@@ -394,8 +416,6 @@ export function CinemaLanding() {
             textTransform: 'uppercase',
           }}
         >
-          {CONTACT.address}
-          <br />
           {CONTACT.email}
           <br />
           {CONTACT.ig}
@@ -411,13 +431,11 @@ export function CinemaLanding() {
           صحتين
         </div>
       </footer>
-
-      <RSVPModal open={rsvpOpen} onClose={() => setRsvpOpen(false)} event={rsvpEvent} />
     </div>
   )
 }
 
-function HeroSection({ event, onRsvp }: { event: CinemaEvent; onRsvp: () => void }) {
+function HeroSection({ event }: { event: CinemaEvent }) {
   return (
     <section
       className="ck-hero ck-section"
@@ -454,7 +472,7 @@ function HeroSection({ event, onRsvp }: { event: CinemaEvent; onRsvp: () => void
             color: 'var(--ck-ink)',
           }}
         >
-          Hi, hello — we throw pop-ups. Here's the next one.
+          We bake and then throw pop-ups.
         </div>
       </div>
 
@@ -778,7 +796,28 @@ function HeroSection({ event, onRsvp }: { event: CinemaEvent; onRsvp: () => void
             </ul>
           )}
 
-          <InlineRSVP event={event} onOpenFull={onRsvp} />
+          <Link
+            to={`/events/${event.id}`}
+            style={{
+              padding: '14px 22px',
+              border: '2px solid var(--ck-ink)',
+              background: 'var(--ck-cobalt)',
+              color: 'var(--ck-cream)',
+              fontFamily: 'var(--ck-sans)',
+              fontWeight: 700,
+              fontSize: 13,
+              letterSpacing: '0.12em',
+              textTransform: 'uppercase',
+              textDecoration: 'none',
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              width: '100%',
+            }}
+          >
+            <span>{event.price > 0 ? `Reserve · $${event.price}` : 'Save my seat'}</span>
+            <span aria-hidden>→</span>
+          </Link>
 
           <div
             style={{
@@ -1096,12 +1135,13 @@ function MenuSection({ event }: { event: CinemaEvent }) {
 function CalendarSection({
   events,
   loading,
-  onRsvp,
 }: {
   events: CinemaEvent[]
   loading: boolean
-  onRsvp: (e: CinemaEvent) => void
 }) {
+  // The cinema landing only previews the next 1-2 events that come AFTER
+  // the hero. The full calendar lives on its own page (TODO: /calendar);
+  // for now the "see all" link points back to the legacy event list at /.
   return (
     <section
       id="calendar"
@@ -1143,18 +1183,18 @@ function CalendarSection({
             <h2
               style={{
                 fontFamily: 'var(--ck-serif)',
-                fontSize: 'clamp(56px, 7vw, 96px)',
+                fontSize: 'clamp(48px, 6vw, 80px)',
                 lineHeight: 0.85,
                 fontWeight: 900,
                 margin: 0,
               }}
             >
-              THE CALENDAR.
+              ON THE BOOKS.
             </h2>
             <div
               style={{
                 fontFamily: 'var(--ck-arabic-display)',
-                fontSize: 72,
+                fontSize: 60,
                 direction: 'rtl',
                 color: 'var(--ck-cobalt)',
                 lineHeight: 0.9,
@@ -1164,13 +1204,27 @@ function CalendarSection({
             </div>
           </div>
         </div>
+        <Link
+          to="/"
+          style={{
+            fontFamily: 'var(--ck-mono)',
+            fontSize: 11,
+            letterSpacing: '0.16em',
+            textTransform: 'uppercase',
+            color: 'var(--ck-ink)',
+            textDecoration: 'underline',
+            textUnderlineOffset: 4,
+          }}
+        >
+          See full calendar →
+        </Link>
       </div>
 
       <div style={{ border: '2px solid var(--ck-ink)' }}>
         {loading ? (
           <div
             style={{
-              padding: 28,
+              padding: 24,
               fontFamily: 'var(--ck-mono)',
               fontSize: 11,
               letterSpacing: '0.18em',
@@ -1183,22 +1237,21 @@ function CalendarSection({
         ) : events.length === 0 ? (
           <div
             style={{
-              padding: 28,
+              padding: 24,
               fontFamily: 'var(--ck-serif-edit)',
               fontStyle: 'italic',
-              fontSize: 18,
+              fontSize: 17,
             }}
           >
-            No events on the calendar yet — check back soon.
+            That's all on the calendar for now — check back soon.
           </div>
         ) : (
           events.map((e, i) => (
             <CalendarRow
-              key={e.no + e.date}
+              key={e.id}
               event={e}
               alt={i % 2 === 1}
               last={i === events.length - 1}
-              onRsvp={() => onRsvp(e)}
             />
           ))
         )}
@@ -1211,165 +1264,85 @@ function CalendarRow({
   event,
   alt,
   last,
-  onRsvp,
 }: {
   event: CinemaEvent
   alt: boolean
   last: boolean
-  onRsvp: () => void
 }) {
+  // Slim two-column row: title (with optional Arabic) + date/time stack.
+  // Whole row is a Link to the event detail page.
   return (
-    <div
+    <Link
+      to={`/events/${event.id}`}
       className="ck-cal-row"
       style={{
         display: 'grid',
-        gridTemplateColumns: '70px 110px 1fr 200px 70px 130px',
-        gap: 20,
+        gridTemplateColumns: '1fr auto',
+        gap: 16,
         alignItems: 'center',
-        padding: '20px 24px',
+        padding: '18px 22px',
         background: alt ? 'var(--ck-paper)' : 'var(--ck-cream)',
         borderBottom: last ? 'none' : '2px solid var(--ck-ink)',
+        textDecoration: 'none',
+        color: 'var(--ck-ink)',
       }}
     >
       <div
-        className="ck-cal-no"
         style={{
-          fontFamily: 'var(--ck-mono)',
-          fontSize: 10,
-          letterSpacing: '0.18em',
-          color: 'var(--ck-cobalt)',
-          textTransform: 'uppercase',
+          display: 'flex',
+          alignItems: 'baseline',
+          gap: 12,
+          flexWrap: 'wrap',
         }}
       >
-        NO. {event.no}
-      </div>
-
-      <div className="ck-cal-date">
-        <div
-          className="ck-cal-date-num"
+        <span
           style={{
             fontFamily: 'var(--ck-serif)',
-            fontWeight: 900,
-            fontSize: 30,
-            lineHeight: 0.9,
+            fontWeight: 800,
+            fontSize: 24,
+            lineHeight: 1,
           }}
         >
-          {event.date.slice(0, 5)}
-        </div>
-        <div
-          className="ck-cal-date-day"
-          style={{
-            fontFamily: 'var(--ck-mono)',
-            fontSize: 10,
-            letterSpacing: '0.18em',
-            marginTop: 2,
-            textTransform: 'uppercase',
-          }}
-        >
-          {event.day}
-        </div>
-      </div>
-
-      <div className="ck-cal-title">
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'baseline',
-            gap: 12,
-            flexWrap: 'wrap',
-          }}
-        >
+          {event.short}
+        </span>
+        {event.ar && (
           <span
-            className="ck-cal-title-text"
             style={{
-              fontFamily: 'var(--ck-serif)',
-              fontWeight: 800,
-              fontSize: 26,
-              lineHeight: 1,
+              fontFamily: 'var(--ck-arabic-display)',
+              fontSize: 22,
+              direction: 'rtl',
+              color: 'var(--ck-cobalt)',
             }}
           >
-            {event.short}
+            {event.ar}
           </span>
-          {event.ar && (
-            <span
-              style={{
-                fontFamily: 'var(--ck-arabic-display)',
-                fontSize: 24,
-                direction: 'rtl',
-                color: 'var(--ck-cobalt)',
-              }}
-            >
-              {event.ar}
-            </span>
-          )}
-        </div>
-        <div
-          className="ck-cal-tagline"
-          style={{
-            fontFamily: 'var(--ck-serif-edit)',
-            fontStyle: 'italic',
-            fontSize: 14,
-            marginTop: 4,
-            lineHeight: 1.4,
-            opacity: 0.85,
-          }}
-        >
-          {event.tagline}
-        </div>
+        )}
       </div>
 
       <div
-        className="ck-cal-loc"
         style={{
-          fontFamily: 'var(--ck-mono)',
-          fontSize: 11,
-          letterSpacing: '0.14em',
-          lineHeight: 1.5,
-          textTransform: 'uppercase',
-        }}
-      >
-        {event.loc}
-        <br />
-        <span className="ck-cal-loc-time" style={{ opacity: 0.65 }}>
-          {event.time}
-        </span>
-      </div>
-
-      <div
-        className="ck-cal-price"
-        style={{
-          fontFamily: 'var(--ck-serif)',
-          fontWeight: 800,
-          fontSize: 22,
           textAlign: 'right',
-        }}
-      >
-        {event.price === 0 ? 'FREE' : `$${event.price}`}
-      </div>
-
-      <button
-        type="button"
-        onClick={onRsvp}
-        className="ck-cal-btn"
-        style={{
-          padding: '10px 14px',
-          border: '2px solid var(--ck-ink)',
-          background: 'var(--ck-ink)',
-          color: 'var(--ck-cream)',
           fontFamily: 'var(--ck-mono)',
           fontSize: 11,
           letterSpacing: '0.14em',
-          cursor: 'pointer',
           textTransform: 'uppercase',
+          lineHeight: 1.5,
         }}
       >
-        RSVP →
-      </button>
-    </div>
+        {event.day} {event.date.slice(0, 5)}
+        <br />
+        <span style={{ opacity: 0.65 }}>{event.time}</span>
+      </div>
+    </Link>
   )
 }
 
 function StorySection() {
+  // Photo is uploaded to /public/story/portrait.jpg via GitHub
+  // (see public/story/README.md). The <img> hides itself if the file
+  // 404s and the dark "Drop a photo" placeholder underneath shows
+  // through.
+  const [photoMissing, setPhotoMissing] = useState(false)
   return (
     <section
       id="story"
@@ -1411,14 +1384,12 @@ function StorySection() {
               margin: '8px 0 22px',
             }}
           >
-            I STARTED
+            FOR KADHEM
             <br />
-            BAKING TOO
-            <br />
-            MUCH, &
+            AL-SAHER, &
             <br />
             <span style={{ fontStyle: 'italic', fontFamily: 'var(--ck-serif-edit)' }}>
-              kept going
+              for the table
             </span>
           </h2>
           <div
@@ -1432,20 +1403,21 @@ function StorySection() {
             }}
           >
             <p style={{ marginTop: 0 }}>
-              Kadhem was my grandfather — he ran a tiny coffeehouse in Baghdad and fed
-              everyone who walked in. I'm not running a coffeehouse, I'm baking out of a
-              borrowed kitchen. But the part where you feed everyone who walks in, that
-              part I kept.
+              Cafe Kadhem is named for Kadhem Al-Saher — the Iraqi singer
+              whose voice plays in every taxi from Baghdad to Brooklyn. The
+              pop-ups are an excuse to put him on loud, cook Iraqi and Arab
+              food, and gather a room full of people who don't have to
+              explain themselves.
             </p>
             <p>
-              It started as one Saturday with way too many cardamom buns. Forty people
-              came, ate them all, and someone asked when I was doing it again. So I did it
-              again.
+              Each night is its own thing — a watch party, a concert, a long
+              dinner. The constant: too much food, real music, and a table
+              everyone gets a seat at.
             </p>
             <p>
-              Now it's a roving thing — sometimes a watch party, sometimes a birthday,
-              once a wedding (long story). Always too many cookies. Come hungry, bring a
-              friend.
+              Every dollar from these events goes to charity. So far we've
+              raised for Gaza, Sudan, and the Asiyah Women's Center here in
+              New York. Come hungry, bring a friend, stay for the music.
             </p>
           </div>
         </div>
@@ -1456,19 +1428,45 @@ function StorySection() {
             border: '3px solid var(--ck-cream)',
             overflow: 'hidden',
             background: 'var(--ck-ink)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
             color: 'var(--ck-cream)',
-            fontFamily: 'var(--ck-mono)',
-            fontSize: 10,
-            letterSpacing: '0.14em',
-            textTransform: 'uppercase',
-            textAlign: 'center',
-            padding: 24,
           }}
         >
-          Drop a photo (you, Kadhem, the kitchen)
+          {!photoMissing && (
+            <img
+              src="/story/portrait.jpg"
+              alt="Cafe Kadhem"
+              loading="lazy"
+              decoding="async"
+              onError={() => setPhotoMissing(true)}
+              style={{
+                position: 'absolute',
+                inset: 0,
+                width: '100%',
+                height: '100%',
+                objectFit: 'cover',
+                display: 'block',
+              }}
+            />
+          )}
+          {photoMissing && (
+            <div
+              style={{
+                position: 'absolute',
+                inset: 0,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontFamily: 'var(--ck-mono)',
+                fontSize: 10,
+                letterSpacing: '0.14em',
+                textTransform: 'uppercase',
+                textAlign: 'center',
+                padding: 24,
+              }}
+            >
+              Add /public/story/portrait.jpg in GitHub.
+            </div>
+          )}
         </div>
       </div>
     </section>
