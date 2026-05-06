@@ -2,10 +2,10 @@ import { useEffect, useMemo, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import type { Event, Guest } from '../../lib/types'
-import { sendInviteNotification } from '../../lib/notifications'
 import { useToast } from '../../components/ui/Toast'
 import { PageLoader } from '../../components/ui/LoadingSpinner'
 import { Button } from '../../components/ui/Button'
+import { Badge } from '../../components/ui/Badge'
 import { Input } from '../../components/ui/Input'
 import { Select } from '../../components/ui/Select'
 import { formatPhone } from '../../lib/utils/phone'
@@ -31,8 +31,28 @@ export function AdminEventBulkInvite() {
   const [search, setSearch] = useState('')
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [sending, setSending] = useState(false)
-  const [progress, setProgress] = useState<{ done: number; total: number } | null>(null)
   const [smsEnabled, setSmsEnabled] = useState(false)
+
+  // Preview/confirm/resume state. `phase` drives which section renders.
+  // 'browse' = guest picker visible.
+  // 'preview' = job created, categorization shown; admin can confirm or back out.
+  // 'sending' = confirm fired, polling recipients for progress.
+  // 'done' = job completed; summary + Retry Failed button if any failed.
+  type Phase = 'browse' | 'preview' | 'sending' | 'done'
+  type RecipientRow = {
+    id: string
+    guest_id: string | null
+    channel: 'sms' | 'email' | null
+    resolved_email: string | null
+    resolved_phone: string | null
+    status: 'pending' | 'will_send' | 'sent' | 'failed' | 'skipped'
+    skip_reason: string | null
+    error: string | null
+  }
+  const [phase, setPhase] = useState<Phase>('browse')
+  const [jobId, setJobId] = useState<string | null>(null)
+  const [recipients, setRecipients] = useState<RecipientRow[]>([])
+  const [pastJobs, setPastJobs] = useState<Array<{ id: string; status: string; total_recipients: number; created_at: string; completed_at: string | null }>>([])
 
   useEffect(() => {
     if (id) loadData()
@@ -42,14 +62,17 @@ export function AdminEventBulkInvite() {
   async function loadData() {
     setLoading(true)
 
-    const [eventRes, eventsRes, guestsRes, rsvpsRes, invitesRes, settingsRes] = await Promise.all([
+    const [eventRes, eventsRes, guestsRes, rsvpsRes, invitesRes, settingsRes, jobsRes] = await Promise.all([
       supabase.from('events').select('*').eq('id', id!).single(),
       supabase.from('events').select('*').neq('id', id!).order('date', { ascending: false }),
       supabase.from('guests').select('*').order('first_name'),
       supabase.from('rsvps').select('event_id, guest_id'),
       supabase.from('invites').select('invited_email, invited_phone').eq('event_id', id!),
       supabase.from('admin_settings').select('sms_enabled').limit(1).single(),
+      supabase.from('bulk_invite_jobs').select('id, status, total_recipients, created_at, completed_at').eq('event_id', id!).order('created_at', { ascending: false }).limit(10),
     ])
+
+    setPastJobs(jobsRes.data ?? [])
 
     setEvent(eventRes.data)
     setPastEvents(eventsRes.data || [])
@@ -137,81 +160,114 @@ export function AdminEventBulkInvite() {
     setSelected(new Set())
   }
 
-  async function handleSend() {
+  // New preview/confirm/resume flow.
+  // 1. handleStartPreview: invoke bulk-invite preview, show categorization.
+  // 2. handleConfirmSend: invoke bulk-invite confirm, poll for progress.
+  // 3. After completion: summary + retry-failed if any failed.
+
+  async function loadRecipients(jid: string): Promise<RecipientRow[]> {
+    const { data } = await supabase
+      .from('bulk_invite_job_recipients')
+      .select('id, guest_id, channel, resolved_email, resolved_phone, status, skip_reason, error')
+      .eq('job_id', jid)
+    return (data ?? []) as RecipientRow[]
+  }
+
+  async function handleStartPreview() {
     if (!event) return
-    const targets = guests.filter(g => selected.has(g.id) && isContactable(g))
+    const targets = Array.from(selected)
     if (targets.length === 0) {
-      addToast('No selected guests have contact info', 'error')
+      addToast('No guests selected', 'error')
       return
     }
-
-    if (!confirm(`Send invites to ${targets.length} guest${targets.length === 1 ? '' : 's'}?`)) {
-      return
-    }
-
     setSending(true)
-    setProgress({ done: 0, total: targets.length })
-    let okCount = 0
-    let failCount = 0
-
-    for (const guest of targets) {
-      try {
-        // Pick email if available, else phone, matching their preference if
-        // set. While SMS is disabled the phone branch is suppressed so an
-        // invite never goes to a phone-only guest.
-        const useEmail = guest.notification_preference === 'email'
-          ? !!guest.email
-          : guest.notification_preference === 'sms'
-          ? !smsEnabled && !!guest.email
-          : !!guest.email
-        const contactInfo = useEmail
-          ? { email: guest.email! }
-          : smsEnabled && guest.phone
-          ? { phone: guest.phone }
-          : guest.email
-          ? { email: guest.email }
-          : null
-        if (!contactInfo) {
-          failCount++
-          continue
-        }
-
-        const { data: invite } = await supabase
-          .from('invites')
-          .insert({
-            event_id: event.id,
-            invited_email: 'email' in contactInfo ? contactInfo.email : null,
-            invited_phone: 'phone' in contactInfo ? contactInfo.phone : null,
-          })
-          .select('token')
-          .single()
-
-        if (!invite) {
-          failCount++
-          continue
-        }
-
-        const result = await sendInviteNotification(event.id, contactInfo, invite.token)
-        if (result.success) okCount++
-        else failCount++
-      } catch {
-        failCount++
-      } finally {
-        setProgress(prev => prev ? { ...prev, done: prev.done + 1 } : null)
-      }
+    try {
+      const { data, error } = await supabase.functions.invoke('bulk-invite', {
+        body: { action: 'preview', event_id: event.id, guest_ids: targets },
+      })
+      if (error) throw error
+      const result = data as { job_id: string; will_send: number; total: number }
+      setJobId(result.job_id)
+      setRecipients(await loadRecipients(result.job_id))
+      setPhase('preview')
+    } catch (err) {
+      addToast(err instanceof Error ? err.message : 'Preview failed', 'error')
+    } finally {
+      setSending(false)
     }
+  }
 
-    setSending(false)
-    setProgress(null)
+  async function handleConfirmSend() {
+    if (!jobId) return
+    setSending(true)
+    setPhase('sending')
+    try {
+      // Fire confirm; the edge fn processes recipients sequentially.
+      // We don't await — we poll the recipients table for live progress
+      // and the edge fn will finalize the job row when done.
+      void supabase.functions.invoke('bulk-invite', {
+        body: { action: 'confirm', job_id: jobId },
+      })
+    } catch (err) {
+      addToast(err instanceof Error ? err.message : 'Send failed', 'error')
+      setSending(false)
+    }
+  }
+
+  // Poll the recipients table while the job is sending.
+  useEffect(() => {
+    if (phase !== 'sending' || !jobId) return
+    let cancelled = false
+    const tick = async () => {
+      if (cancelled) return
+      const fresh = await loadRecipients(jobId)
+      if (cancelled) return
+      setRecipients(fresh)
+      // Check job status
+      const { data: jobRow } = await supabase
+        .from('bulk_invite_jobs')
+        .select('status, completed_at')
+        .eq('id', jobId)
+        .single()
+      if (cancelled) return
+      if (jobRow?.status === 'completed' || jobRow?.status === 'failed') {
+        setPhase('done')
+        setSending(false)
+        return
+      }
+      setTimeout(tick, 1500)
+    }
+    tick()
+    return () => {
+      cancelled = true
+    }
+  }, [phase, jobId])
+
+  async function handleRetryFailed() {
+    if (!jobId) return
+    setSending(true)
+    try {
+      const { data, error } = await supabase.functions.invoke('bulk-invite', {
+        body: { action: 'retry_failed', job_id: jobId },
+      })
+      if (error) throw error
+      const result = data as { job_id: string; will_send: number }
+      setJobId(result.job_id)
+      setRecipients(await loadRecipients(result.job_id))
+      setPhase('preview')
+    } catch (err) {
+      addToast(err instanceof Error ? err.message : 'Retry failed', 'error')
+    } finally {
+      setSending(false)
+    }
+  }
+
+  function handleStartOver() {
+    setPhase('browse')
+    setJobId(null)
+    setRecipients([])
     setSelected(new Set())
-    addToast(
-      failCount === 0
-        ? `Sent ${okCount} invites`
-        : `Sent ${okCount} · Failed ${failCount}`,
-      failCount === 0 ? 'success' : 'error'
-    )
-    // Refresh the "already invited" set so the UI reflects the new sends.
-    loadData()
+    void loadData()
   }
 
   if (loading) return <PageLoader />
@@ -235,6 +291,40 @@ export function AdminEventBulkInvite() {
         <p className="text-sm text-ink/60">{formatDate(event.date)}</p>
       </div>
 
+      {phase !== 'browse' && (
+        <PhaseView
+          phase={phase}
+          recipients={recipients}
+          guests={guests}
+          sending={sending}
+          onConfirm={handleConfirmSend}
+          onRetryFailed={handleRetryFailed}
+          onStartOver={handleStartOver}
+          onBackToBrowse={() => setPhase('browse')}
+        />
+      )}
+
+      {phase === 'browse' && pastJobs.length > 0 && (
+        <div className="bg-white border border-warm rounded-lg p-4 mb-4">
+          <p className="text-[10px] tracking-[0.2em] uppercase text-ink/60 mb-2">
+            Previous bulk jobs
+          </p>
+          <div className="space-y-1">
+            {pastJobs.map(j => (
+              <div key={j.id} className="flex items-center gap-3 text-sm text-ink/70">
+                <Badge variant={j.status === 'completed' ? 'success' : j.status === 'failed' ? 'error' : j.status === 'sending' ? 'warning' : 'default'}>
+                  {j.status}
+                </Badge>
+                <span>{j.total_recipients} recipient{j.total_recipients === 1 ? '' : 's'}</span>
+                <span className="text-ink/50">·</span>
+                <span className="text-ink/50">{new Date(j.completed_at ?? j.created_at).toLocaleString()}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {phase === 'browse' && (<>
       <div className="bg-white border border-warm rounded-lg p-4 mb-4">
         <div className="flex flex-wrap gap-2 mb-4">
           <ModeButton current={mode} value="all" onClick={() => setMode('all')}>
@@ -344,15 +434,167 @@ export function AdminEventBulkInvite() {
 
       <div className="sticky bottom-4 flex justify-end">
         <div className="bg-white border border-warm rounded-lg shadow-lg p-3 flex items-center gap-3">
-          {progress && (
-            <span className="text-sm text-ink/70">
-              Sending {progress.done}/{progress.total}…
-            </span>
-          )}
-          <Button onClick={handleSend} disabled={sending || selected.size === 0} loading={sending}>
-            Send {selected.size > 0 ? `${selected.size} ` : ''}invite{selected.size === 1 ? '' : 's'}
+          <Button
+            onClick={handleStartPreview}
+            disabled={sending || selected.size === 0}
+            loading={sending}
+          >
+            Preview {selected.size > 0 ? `${selected.size} ` : ''}invite{selected.size === 1 ? '' : 's'}
           </Button>
         </div>
+      </div>
+      </>)}
+    </div>
+  )
+}
+
+// ============================================================
+// Phase: preview / sending / done. Renders categorized recipients
+// with their will_send / skipped / sent / failed status, replacing
+// the guest-picker table while a job is in flight.
+// ============================================================
+function PhaseView({
+  phase,
+  recipients,
+  guests,
+  sending,
+  onConfirm,
+  onRetryFailed,
+  onStartOver,
+  onBackToBrowse,
+}: {
+  phase: 'preview' | 'sending' | 'done'
+  recipients: Array<{
+    id: string
+    guest_id: string | null
+    channel: 'sms' | 'email' | null
+    resolved_email: string | null
+    resolved_phone: string | null
+    status: 'pending' | 'will_send' | 'sent' | 'failed' | 'skipped'
+    skip_reason: string | null
+    error: string | null
+  }>
+  guests: GuestRow[]
+  sending: boolean
+  onConfirm: () => void
+  onRetryFailed: () => void
+  onStartOver: () => void
+  onBackToBrowse: () => void
+}) {
+  const guestById = new Map(guests.map(g => [g.id, g]))
+  const willSend = recipients.filter(r => r.status === 'will_send').length
+  const skipped = recipients.filter(r => r.status === 'skipped')
+  const sent = recipients.filter(r => r.status === 'sent').length
+  const failed = recipients.filter(r => r.status === 'failed').length
+  const inFlight = recipients.filter(r => r.status === 'will_send' || r.status === 'pending').length
+
+  const headerLabel = phase === 'preview' ? 'Preview' : phase === 'sending' ? 'Sending…' : 'Done'
+
+  return (
+    <div className="space-y-4">
+      <div className="bg-white border border-warm rounded-lg p-4">
+        <div className="flex items-center justify-between flex-wrap gap-3">
+          <div>
+            <h2 className="font-serif text-lg text-forest-dark">{headerLabel}</h2>
+            <p className="text-sm text-ink/70 mt-1">
+              {phase === 'preview' && `${willSend} will send · ${skipped.length} skipped`}
+              {phase === 'sending' && `${sent} sent · ${failed} failed · ${inFlight} pending`}
+              {phase === 'done' && `${sent} sent · ${failed} failed${skipped.length > 0 ? ` · ${skipped.length} skipped` : ''}`}
+            </p>
+          </div>
+          <div className="flex gap-2 flex-wrap">
+            {phase === 'preview' && (
+              <>
+                <Button variant="ghost" onClick={onBackToBrowse}>
+                  Back
+                </Button>
+                <Button onClick={onConfirm} disabled={sending || willSend === 0} loading={sending}>
+                  Send {willSend} invite{willSend === 1 ? '' : 's'}
+                </Button>
+              </>
+            )}
+            {phase === 'done' && (
+              <>
+                {failed > 0 && (
+                  <Button variant="outline" onClick={onRetryFailed} loading={sending}>
+                    Retry {failed} failed
+                  </Button>
+                )}
+                <Button onClick={onStartOver}>Done</Button>
+              </>
+            )}
+          </div>
+        </div>
+      </div>
+
+      <div className="bg-white border border-warm rounded-lg overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b border-warm bg-warm/30">
+              <th className="text-left px-4 py-2 font-medium text-ink/70">Guest</th>
+              <th className="text-left px-4 py-2 font-medium text-ink/70">Channel</th>
+              <th className="text-left px-4 py-2 font-medium text-ink/70">Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            {recipients.map(r => {
+              const g = r.guest_id ? guestById.get(r.guest_id) : null
+              const skipLabel: Record<string, string> = {
+                guest_not_found: 'guest not found',
+                opted_out: 'opted out (notification_preference=none)',
+                no_reachable_channel: 'no reachable channel',
+                recently_invited: 'invited in the last 24h',
+              }
+              return (
+                <tr key={r.id} className="border-b border-warm/50 last:border-0">
+                  <td className="px-4 py-3">
+                    {g ? (
+                      <span>
+                        <span className="font-medium">{g.first_name}</span>
+                        {g.last_name && <span className="text-ink/70"> {g.last_name}</span>}
+                      </span>
+                    ) : (
+                      <span className="text-ink/50 italic">unknown guest</span>
+                    )}
+                  </td>
+                  <td className="px-4 py-3 text-ink/70">
+                    {r.channel === 'email' && r.resolved_email}
+                    {r.channel === 'sms' && r.resolved_phone}
+                    {!r.channel && '—'}
+                  </td>
+                  <td className="px-4 py-3">
+                    <Badge
+                      variant={
+                        r.status === 'sent' ? 'success'
+                        : r.status === 'failed' ? 'error'
+                        : r.status === 'skipped' ? 'default'
+                        : r.status === 'will_send' ? 'info'
+                        : 'warning'
+                      }
+                    >
+                      {r.status}
+                    </Badge>
+                    {r.skip_reason && (
+                      <p className="text-xs text-ink/60 italic mt-1">
+                        {skipLabel[r.skip_reason] ?? r.skip_reason}
+                      </p>
+                    )}
+                    {r.error && (
+                      <p className="text-xs text-red-700 italic mt-1">{r.error}</p>
+                    )}
+                  </td>
+                </tr>
+              )
+            })}
+            {recipients.length === 0 && (
+              <tr>
+                <td colSpan={3} className="px-4 py-6 text-center text-ink/50 italic">
+                  No recipients.
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
       </div>
     </div>
   )
