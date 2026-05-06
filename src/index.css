@@ -698,3 +698,35 @@ details[open] summary::before {
 @media (max-width: 720px) {
   .cinema-root .ck-page { padding: 32px 16px !important; }
 }
+
+/* Cursor sticker — small orange Arabic pill that follows the cursor on
+   the home page. See CursorSticker.tsx. Component manages the transform
+   imperatively via a ref so mousemove never triggers a React re-render.
+   Brand colors are written as literals so the sticker is self-contained
+   and doesn't depend on a containing scope's variables. */
+.ck-cursor-sticker {
+  position: fixed;
+  top: 0;
+  left: 0;
+  pointer-events: none;
+  z-index: 9999;
+  background: #ff8e2c;
+  color: #0d0d0f;
+  border: 2px solid #0d0d0f;
+  padding: 8px 14px;
+  border-radius: 999px;
+  box-shadow: 2px 2px 0 #0d0d0f;
+  font-family: "Rakkas", "Reem Kufi", serif;
+  font-size: 22px;
+  line-height: 1;
+  direction: rtl;
+  transition: opacity 200ms ease, transform 120ms ease-out;
+  will-change: transform;
+  user-select: none;
+}
+.ck-cursor-sticker--hidden {
+  opacity: 0;
+}
+@media (pointer: coarse) {
+  .ck-cursor-sticker { display: none; }
+}
