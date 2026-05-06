@@ -21,6 +21,7 @@ const FALLBACK_EVENT: Event = {
   event_type: null,
   rsvp_required: true,
   is_published: true,
+  is_rsvp_open: true,
   ticketing_enabled: true,
   ticket_price: 1500,
   theme: 'theme1',

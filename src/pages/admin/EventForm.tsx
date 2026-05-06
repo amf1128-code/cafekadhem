@@ -35,6 +35,7 @@ export function AdminEventForm() {
   const [donationInfo, setDonationInfo] = useState('')
   const [menuId, setMenuId] = useState('')
   const [isPublished, setIsPublished] = useState(false)
+  const [isRsvpOpen, setIsRsvpOpen] = useState(true)
   const [ticketingEnabled, setTicketingEnabled] = useState(false)
   const [ticketPrice, setTicketPrice] = useState('')
   const [flyerFile, setFlyerFile] = useState<File | null>(null)
@@ -113,6 +114,7 @@ export function AdminEventForm() {
         setDonationInfo(event.donation_info || '')
         setMenuId(event.menu_id || '')
         setIsPublished(event.is_published)
+        setIsRsvpOpen(event.is_rsvp_open ?? true)
         setTicketingEnabled(!!event.ticketing_enabled)
         setTicketPrice(event.ticket_price != null ? String(event.ticket_price) : '')
         setFlyerUrl(event.flyer_url)
@@ -182,6 +184,7 @@ export function AdminEventForm() {
         donation_info: donationInfo.trim() || null,
         menu_id: menuId || null,
         is_published: isPublished,
+        is_rsvp_open: isRsvpOpen,
         ticketing_enabled: ticketingEnabled,
         ticket_price: ticketingEnabled && ticketPrice ? parseFloat(ticketPrice) : null,
         flyer_url: uploadedFlyerUrl,
@@ -527,6 +530,24 @@ export function AdminEventForm() {
           />
           Published (visible to guests)
         </label>
+
+        <div>
+          <label className="flex items-center gap-2 text-sm">
+            <input
+              type="checkbox"
+              checked={isRsvpOpen}
+              onChange={e => setIsRsvpOpen(e.target.checked)}
+              className="rounded border-warm text-forest focus:ring-forest"
+            />
+            RSVP open
+          </label>
+          <p className="text-xs text-ink-muted mt-1 ml-6">
+            Uncheck to tease the event without taking RSVPs yet — the
+            public pages show the poster + details with a جاية ("Jaya")
+            tag and a "more details to come" panel instead of the RSVP /
+            ticket form.
+          </p>
+        </div>
 
         <div className="flex gap-3 pt-2">
           <Button type="submit" loading={saving}>
