@@ -1190,6 +1190,7 @@ function CalendarRow({
         borderBottom: last ? 'none' : '2px solid var(--ck-ink)',
         textDecoration: 'none',
         color: 'var(--ck-ink)',
+        position: 'relative',
       }}
     >
       <div
@@ -1222,7 +1223,6 @@ function CalendarRow({
             {event.ar}
           </span>
         )}
-        {!event.rsvpOpen && <JayaTag />}
       </div>
 
       <div
@@ -1239,6 +1239,23 @@ function CalendarRow({
         <br />
         <span style={{ opacity: 0.65 }}>{event.time}</span>
       </div>
+
+      {/* Coming-soon sticker — slapped over the date stack so the row
+          stays compact instead of growing a third inline line. */}
+      {!event.rsvpOpen && (
+        <span
+          style={{
+            position: 'absolute',
+            top: '50%',
+            right: 12,
+            transform: 'translateY(-50%)',
+            pointerEvents: 'none',
+            zIndex: 2,
+          }}
+        >
+          <JayaTag />
+        </span>
+      )}
     </Link>
   )
 }
