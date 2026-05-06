@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import type { PickupConfig, PickupSlot, MenuItem, AdminSettings, CartItem, MenuItemAvailability } from '../lib/types'
 import { getGuestToken, setGuestToken } from '../lib/utils/guest-token'
+import { dispatchMergeVerification, type PendingMerge } from '../lib/identity/handlePendingMerge'
 import { normalizePhone } from '../lib/utils/phone'
 import { formatTime } from '../lib/utils/date'
 import { getPaymentProvider } from '../lib/payment'
@@ -209,8 +210,14 @@ export function Pickup() {
       })
       if (guestErr) throw guestErr
       if (!guest) throw new Error('Failed to create guest')
-      const guestId = guest.id
+      const guestId = guest.id as string
       setGuestToken(guestId)
+
+      // Case B identity collision (USER_FLOWS_SPEC.md §3.4).
+      const pendingMerge = (guest as { pending_merge?: PendingMerge }).pending_merge
+      if (pendingMerge?.verification_token) {
+        void dispatchMergeVerification(pendingMerge)
+      }
 
       const venmoNote = `${firstName.trim()} - Pickup ${selectedDate}`
 

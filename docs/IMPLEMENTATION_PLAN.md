@@ -12,8 +12,8 @@
 
 | # | Commit | Status | SHA | User-verified | Doc |
 |---|---|---|---|---|---|
-| 1 | Foundations (additive schema, no behavior change) | 🟢 committed | *(see git log)* | ⬜ pending user verification | [01-foundations.md](commits/01-foundations.md) |
-| 2 | Identity merge & reconciliation | ⬜ not started | — | — | [02-identity-merge.md](commits/02-identity-merge.md) |
+| 1 | Foundations (additive schema, no behavior change) | ✅ verified | `4af91ba` + hot-fix `91181e7` | ✅ 2026-05-06 | [01-foundations.md](commits/01-foundations.md) |
+| 2 | Identity merge & reconciliation | 🟢 committed | *(see git log)* | ⬜ pending user verification | [02-identity-merge.md](commits/02-identity-merge.md) |
 | 3 | Notifications hardening (channel routing, dedup, consent, suppression) | ⬜ not started | — | — | [03-notifications.md](commits/03-notifications.md) |
 | 4 | Recognition & sharing (ambient `?as=`, header, ShareButton, `?ref=`) | ⬜ not started | — | — | [04-recognition-sharing.md](commits/04-recognition-sharing.md) |
 | 5 | State unification (`get_guest_event_state` consumed by all pages) | ⬜ not started | — | — | [05-state-unification.md](commits/05-state-unification.md) |
@@ -122,6 +122,16 @@ The list of functions modified is in each per-commit doc under **"User actions r
 5. **`useGuestEventState` hook** (planned in Commit 5) will type the response. The shape returned by 029 matches the plan's spec §5 shape exactly except for `invited_by` (see #4).
 6. **Hot-fix migration 035** added after user testing: `events.is_published BOOLEAN`, not `events.status TEXT` as the plan and 029 assumed. Migration 035 replaces `get_guest_event_state` body with the corrected SELECT and `IF NOT v_event.is_published` check.
 7. **Migration numbering for Commit 2 shifts by 1.** What the plan calls `035`/`036`/`037` (`merge_guests`, `merge_verifications`, `upsert_guest_collision`) becomes `036`/`037`/`038`. Subsequent commits' migration numbers also shift accordingly.
+
+### Commit 2 deviations from plan
+
+1. **`upsert_guest` return type changed from `guests` (row) to `JSONB`.** Required to carry `pending_merge`. The JSONB shape is `to_jsonb(guest_row) || {pending_merge}`, so callers that read `.id`, `.first_name`, `.email`, etc. continue to work. All three frontend callers (RSVPForm, Order, Pickup) updated to handle the new field.
+2. **`verification_token` minted server-side inside `upsert_guest`**, not by the frontend. Avoids an extra RPC round-trip and keeps the token-mint logic SECURITY DEFINER. The frontend just forwards the token to `send-notification`.
+3. **`request_merge_verification` granted to `service_role` and `authenticated` only**, not anon. The `upsert_guest` SECURITY DEFINER context invokes it transitively, so anon callers can still trigger Case B without having direct grant.
+4. **`merge_guests` notably does NOT touch `rsvps.plus_one_of`** — that column references `rsvps.id`, not `guests.id`. Plus-one rows whose parent gets deleted in conflict resolution are CASCADE-deleted via the existing FK.
+5. **Channel override** added to `send-notification`: when `data.channel` is `'sms'` or `'email'`, it overrides `guest.notification_preference`. Used by `merge_verification` to ensure the link goes to the channel that owns the matched row, not the guest's default.
+6. **`add_plus_one` not affected by merge.** The plus-one creation function uses parent RSVP id, not guest id, so plus-ones survive a merge of their parent guest.
+7. **`'both'` enum value** referenced in the plan's upsert_guest sketch is **not** added in Commit 2 — that's deferred to Commit 3 (migration 040). Migration 038 still validates against `('sms', 'email', 'none')` to match the existing CHECK constraint.
 
 ---
 

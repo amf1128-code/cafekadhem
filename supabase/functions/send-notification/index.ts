@@ -387,6 +387,44 @@ const messageTemplates: Record<string, (data: Record<string, string>) => { subje
       body: `Great news! A spot opened up at ${data.event_title || 'our event'} and you've been promoted from the waitlist. You're confirmed! See you there.`,
     }
   },
+  merge_verification: (data) => {
+    // verification_token is minted server-side by upsert_guest (Case B).
+    // The frontend passes it through; we render the link.
+    // verify_url is built in the request handler block above.
+    const url = data.verify_url || ''
+    const greeting = data.first_name ? `Hi ${data.first_name},` : 'Hi,'
+    const text = `${greeting}\n\nIt looks like you may already have an account with us under a different contact. Tap the link below to confirm and we'll combine them so your RSVPs and tickets all live in one place.\n\n${url}\n\nThis link expires in 30 minutes. If you didn't try to RSVP just now, ignore this message.`
+    const html = `<!doctype html>
+<html><body style="margin:0;padding:0;background:#fdfaf3;font-family:Georgia,'Times New Roman',serif;color:#1a2e1f;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#fdfaf3;padding:32px 16px;">
+    <tr><td align="center">
+      <table width="480" cellpadding="0" cellspacing="0" style="max-width:480px;background:#ffffff;border:1px solid #e7e0cf;padding:32px;">
+        <tr><td align="center" style="padding-bottom:8px;">
+          <p style="margin:0;letter-spacing:0.25em;text-transform:uppercase;font-size:11px;color:#6b6452;">Cafe Kadhem</p>
+        </td></tr>
+        <tr><td align="center" style="padding-bottom:24px;">
+          <h1 style="margin:8px 0 0;font-style:italic;font-weight:400;font-size:22px;color:#1a2e1f;">Confirm it's you</h1>
+        </td></tr>
+        <tr><td align="center" style="padding:16px 0 8px;">
+          <p style="margin:0;font-size:15px;line-height:1.5;color:#3a3a3a;">${escapeHtml(greeting)}</p>
+          <p style="margin:8px 0 0;font-size:15px;line-height:1.5;color:#3a3a3a;">It looks like you may already have an account with us under a different contact. Tap below to confirm and we'll combine them so your RSVPs and tickets all live in one place.</p>
+        </td></tr>
+        <tr><td align="center" style="padding:24px 0 8px;">
+          <a href="${escapeHtml(url)}" style="display:inline-block;background:#1a2e1f;color:#fdfaf3;text-decoration:none;padding:14px 28px;letter-spacing:0.2em;text-transform:uppercase;font-size:12px;">Confirm</a>
+        </td></tr>
+        <tr><td align="center" style="padding:8px 0;">
+          <p style="margin:0;font-size:12px;color:#6b6452;">This link expires in 30 minutes. If you didn't try to RSVP just now, ignore this message.</p>
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body></html>`
+    return {
+      subject: `Confirm it's you — Cafe Kadhem`,
+      body: text,
+      html,
+    }
+  },
   ticket_issued: (data) => {
     const eventTitle = data.event_title || 'Cafe Kadhem'
     const ticketUrl = data.ticket_url || ''
@@ -586,6 +624,17 @@ Deno.serve(async (req: Request) => {
       const qrImageUrl = await generateAndUploadQr(token, data.ticket_url)
       if (qrImageUrl) data.qr_image_url = qrImageUrl
     }
+    if (type === 'merge_verification') {
+      const token = data.verification_token as string | undefined
+      if (!token) {
+        return new Response(
+          JSON.stringify({ success: false, error: 'verification_token is required for merge_verification' }),
+          { status: 400, headers: jsonHeaders }
+        )
+      }
+      const siteUrl = await getSiteUrl()
+      data.verify_url = `${siteUrl}/verify-merge?token=${token}`
+    }
     if (type === 'order_confirmation' || type === 'pickup_order_confirmation') {
       // Mint a one-time magic link to /my-tickets so the guest lands on a
       // page showing this order alongside any other history they have.
@@ -624,7 +673,12 @@ Deno.serve(async (req: Request) => {
     }
 
     const { subject, body, html } = template(data)
-    const preference = guest.notification_preference || 'email'
+    // merge_verification requires sending to the specific channel that
+    // owns the matched row (per spec §3.4 Case B). Other types fall back
+    // to the guest's general preference.
+    const forcedChannel: 'sms' | 'email' | null =
+      data.channel === 'sms' || data.channel === 'email' ? data.channel : null
+    const preference = forcedChannel || guest.notification_preference || 'email'
     let success = false
     let channel: 'sms' | 'email' = 'email'
 

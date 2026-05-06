@@ -2,6 +2,7 @@ import { useState, useEffect, type FormEvent } from 'react'
 import { supabase } from '../../lib/supabase'
 import type { RSVP, Event, AdminSettings, PublicGuestProfile } from '../../lib/types'
 import { getGuestToken, setGuestToken } from '../../lib/utils/guest-token'
+import { dispatchMergeVerification, type PendingMerge } from '../../lib/identity/handlePendingMerge'
 import { normalizePhone, isValidPhone } from '../../lib/utils/phone'
 import { normalizeInstagram, isValidInstagram } from '../../lib/utils/instagram'
 import { sendNotification } from '../../lib/notifications'
@@ -201,8 +202,17 @@ export function RSVPForm({ eventId, event, existingRsvp, existingPlusOne, isFull
       })
       if (guestErr) throw guestErr
       if (!guest) throw new Error('Failed to create guest record')
-      const guestId = guest.id
+      const guestId = guest.id as string
       setGuestToken(guestId)
+
+      // Case B identity collision (USER_FLOWS_SPEC.md §3.4): the typed
+      // contact matched a different existing guest than the one in
+      // localStorage. Dispatch the verification link to the matched
+      // channel; the RSVP itself proceeds against the matched guest.
+      const pendingMerge = (guest as { pending_merge?: PendingMerge }).pending_merge
+      if (pendingMerge?.verification_token) {
+        void dispatchMergeVerification(pendingMerge)
+      }
 
       // Use safe_create_rsvp function for capacity enforcement
       const { data: rsvpResult, error: rsvpError } = await supabase.rpc('safe_create_rsvp', {
