@@ -62,8 +62,7 @@ Already implemented in `028_restore_upsert_guest.sql`:
 
 - **Email collision with different phone**: the email match wins; phone field is overwritten with the new value (since `p_fields` includes phone). This is intentional: the latest contact info supersedes.
 - **Phone collision with different email**: same logic in reverse.
-- **Cross-channel merge**: A guest who first RSVPs with email-only, then later submits with email + phone, gets the phone added to their existing row. ✅ already works.
-- **Cross-channel split** (rare): A guest first uses phone-only, then later uses email-only with no phone. The email lookup fails (no row has that email), the phone lookup also fails (no phone in payload to match), so a **new row is created** — identity splits. **This is accepted**; we do not attempt fuzzy/by-name merging. Admin can manually merge via Guest Directory if it matters.
+- **Cross-channel reconciliation** (merge / split / add a new channel): see §3.4 — the matching rules above are extended with explicit collision detection and a merge RPC.
 - **Plus-one**: created via `add_plus_one()` only. Plus-one rows are NEVER returned from `upsert_guest` matching, because they have NULL contact (the function requires email or phone, see `020:43-49`).
 
 ### 3.3 Guest_id persistence in the browser
@@ -71,6 +70,61 @@ Already implemented in `028_restore_upsert_guest.sql`:
 - After any successful `upsert_guest`, the page writes `localStorage.guest_id = id`.
 - All subsequent RPCs in the session pass `p_guest_id` so step 1 of §3.2 fires — this prevents a guest who edits their email mid-session from being silently merged into a stranger's row.
 - `localStorage.guest_id` is cleared by `/find-tickets` magic-link redemption (which sets it to the redeemed guest), and by an explicit "Not me" link on EventDetail so a shared device can re-identify.
+
+### 3.4 Cross-channel reconciliation
+
+The §3.2 match rules handle the common case (one channel, returning guest). Three additional cases need explicit handling so identity doesn't fragment over time.
+
+#### Case A — Both channels submitted, mapping to two existing rows (auto-merge)
+
+Strongest reconciliation signal possible: the user typed both their email and their phone in one form submission. If those two values resolve to **different** existing guest rows, we know they're the same person — the user just told us. Merge automatically, no verification.
+
+`upsert_guest` extension:
+
+```
+if email is provided AND phone is provided:
+  let row_e = SELECT id FROM guests WHERE lower(email) = lower(p_email) ORDER BY created_at DESC LIMIT 1
+  let row_p = SELECT id FROM guests WHERE phone = p_phone ORDER BY created_at DESC LIMIT 1
+  if row_e IS NOT NULL AND row_p IS NOT NULL AND row_e <> row_p:
+    let keep = older(row_e, row_p)
+    let drop = newer(row_e, row_p)
+    PERFORM merge_guests(keep, drop)
+    return keep with merged fields applied from p_fields
+```
+
+`merge_guests(keep_id, drop_id)` RPC (admin + SECURITY DEFINER, called inline from `upsert_guest`):
+
+1. Reassign FKs from `drop_id` to `keep_id`: `rsvps`, `orders`, `pickup_orders`, `invites.invited_by`, `invites.consumed_by_guest_id`, `notifications_log.guest_id`, `magic_links.guest_id`, `ambient_tokens.guest_id`, plus-one parent links.
+2. Conflict resolution: if both rows have an RSVP for the same event, keep the row with the more advanced status (`paid > yes > waitlisted > maybe > no`). Discard the other RSVP row (or move it to a `merged_rsvps_log` audit table — TBD).
+3. Suppression: if either row has `notification_preference = 'none'`, the merged row inherits `'none'` (unsubscribe is sticky). Otherwise the more recent submission wins.
+4. Field merge: copy non-null `keep` fields where `drop` has values `keep` doesn't (`first_name`, `last_name`, `instagram`).
+5. `dedup_key` collisions in `notifications_log`: append `:merged` suffix to the dropped row's keys to avoid the unique constraint failing.
+6. Delete `drop_id`. (Hard delete — FK constraints will surface anything we missed.)
+
+The function is idempotent: calling it twice with the same args is a no-op after the first call (`drop_id` no longer exists).
+
+#### Case B — One channel submitted, but it differs from the cached `localStorage.guest_id` (verify-then-merge)
+
+E.g. localStorage holds guest_id=X (a phone-only row), the form submission is email-only and matches a different existing row Y. Possibilities: (1) X and Y are the same person who's adding a new channel, (2) X and Y are two different people sharing a device.
+
+We can't auto-merge — we'd corrupt identity in case (2). Instead:
+
+1. `upsert_guest` returns Y (the email match wins per §3.2 precedence) along with a `pending_merge: { from: X, to: Y, verification_token }` flag.
+2. The page sends a **merge-verification magic link** to the email address (the channel that resolved to Y). Body: "Tap to confirm this is the same account you used before."
+3. If clicked within 30 minutes → `merge_guests(older, newer)` runs. Done.
+4. If not clicked → the verification token expires silently. localStorage is updated to Y. X stays as an orphaned phone-only row, recoverable later via Find Tickets.
+
+This is the only place we send a verification step in the whole app, and it only fires when there's genuine ambiguity. Most guests never see it.
+
+#### Case C — Adding a new channel to a known row (transparent)
+
+E.g. recognized as guest X (email-only), the guest types a phone number that doesn't match any other existing row. No collision, no merge, no verification. `upsert_guest` updates X with the new phone (per the §3.2 field-merge behavior). This is the common case.
+
+#### Resulting properties
+
+- Engaged guests (anyone who's clicked a notification or used the recovery flow) have their identity reconciled the next time they fill out a form with both channels.
+- The §3.2 "silent split" only persists for one-channel-only guests who never receive notifications and never use Find Tickets. That's acceptable; admin can still merge them manually.
+- Merge is non-destructive in user-facing behavior: their RSVPs, tickets, orders, and history all survive on the canonical row.
 
 ---
 
@@ -253,6 +307,42 @@ Each row is one realistic guest journey. "Recognized" means a `guest_id` was res
 2. Closes tab. No record created.
 3. This is the only path that produces no guest row, and that's correct — we don't want passive viewers cluttering the directory.
 
+### 3a.8 Sharing as a first-class affordance
+
+The notification system necessarily attaches `?as=` ambient tokens to every link it sends. If a guest forwards that email/SMS to a friend, the friend's first page load would briefly recognize them as the original recipient (see §3a.2 trust model). Mitigation: make sharing **easier than forwarding**, so forwarding becomes the rare path.
+
+#### Placement
+
+A prominent **Share** button appears in three places:
+
+1. **Post-RSVP confirmation card** (RSVPForm.tsx after successful submit). Primary CTA-styled, sits next to "View your details" or below the success summary. Copy: *"Tell your friends"*.
+2. **EventDetail header**, visible to any recognized guest who has RSVP'd `yes` (so the sharer is committed to attending). For non-RSVP'd or anon viewers, no share button — they should RSVP first or recognize themselves first.
+3. **Ticket page** (`/ticket/:token`) — small "Invite a friend" link below the QR. Useful for paid events where ticket holders sometimes want to bring others.
+
+#### Share URL shape
+
+The URL produced by Share **never contains an `?as=` token** under any circumstance. It is one of:
+
+- `https://cafekadhem.com/events/:id` — plain event link (default).
+- `https://cafekadhem.com/events/:id?ref=<inviter_guest_id>` — soft attribution: when the recipient RSVPs, set `rsvps.referred_by_guest_id = <inviter_guest_id>`. This is **not** the same as creating an `invites` row; it's a lightweight "Lina sent you" attribution that doesn't require a per-recipient invite token. (NEW column, see §11.)
+- `https://cafekadhem.com/invite/:token` — full invite path: only when the inviter explicitly enters a friend's email/phone via `InviteForm` (existing flow). This still creates an invite row and sends a notification to the friend, separate from sharing.
+
+The Share button's default action produces the `?ref=` form. The plain form is the fallback for guests with no `guest_id` (rare — they'd have to be sharing without RSVPing, which we don't expose).
+
+#### Mechanism
+
+1. Tap Share → check `navigator.canShare()`.
+2. If supported (mobile): call `navigator.share({ title: event.title, text: "I'm going to <event> at Cafe Kadhem — want to join?", url })`. The OS sheet handles routing to Messages, WhatsApp, IG DMs, etc.
+3. If not supported (desktop): open a small popover with three buttons: **Copy link**, **Email**, **Text**. Each prefills the appropriate handler with the same URL.
+4. No backend call. Sharing produces no record until the recipient acts on the link.
+
+#### Why this works
+
+- Forwarding raw notification emails is *technically* possible but requires opening the email client, hitting forward, retyping the recipient — friction.
+- Sharing is one tap from the confirmation card right when excitement is highest.
+- The shared URL contains no identity token, so the recipient is correctly anonymous on arrival, sees the event, and identifies themselves through the normal flow.
+- The `?ref=` parameter gives admin a clean attribution graph ("who's bringing whom") without any privacy cost — `ref` is a guest_id, not a contact, and only matters server-side.
+
 ---
 
 ## 4. Per-Flow Specs
@@ -434,13 +524,52 @@ Every action in §4 ends with: refetch state → render `next_step` → optional
 
 ### 7.1 Channel selection
 
+**Schema.** `guests.notification_preference` ∈ `{'sms', 'email', 'both', 'none'}`. The `'none'` value is system-set only (STOP webhooks, email unsubscribe) and never appears as a user-choosable option. The `'both'` value is added in a new migration (extend the existing enum / check constraint).
+
+**Inferred from fields, not chosen.** The public-facing forms (RSVP, Order, Pickup, InviteForm) **do not** show a channel-preference dropdown. Preference is inferred at `upsert_guest` time from which channels the guest provided:
+
+| Provided fields | Inferred preference |
+|---|---|
+| email + phone | `'both'` |
+| phone only | `'sms'` |
+| email only | `'email'` |
+
+Inference only fires when the guest is being created or when their existing preference is `null`. If a guest already has an explicit preference (set via `/my-tickets` settings or admin override), respect it — adding a second channel does not silently change their preference.
+
+**SMS is the default channel for new guests when both fields are filled.** With 10DLC approved, a guest who gives both email and phone receives transactional sends via SMS by default; "both" means SMS for time-sensitive sends (reminders, doors-open, ticket issued) and email for bulkier or less urgent sends (event updates, post-event recaps). The per-`type` channel routing table lives in `send-notification`:
+
+| Notification type | Preferred channel when `pref='both'` |
+|---|---|
+| `rsvp_confirmation` | SMS |
+| `ticket_issued` | SMS |
+| `order_confirmation` | email (longer body, item list) |
+| `pickup_order_confirmation` | email |
+| `invite` | SMS (more likely to be seen) |
+| `event_reminder` (24h, 2h) | SMS |
+| `event_update` | email |
+| `waitlist_promoted` | SMS |
+
+**Resolution table:**
+
 ```
-guest.notification_preference   admin.sms_enabled   → channel sent
-'sms'                           true                → SMS
-'sms'                           false               → fallback to email if guest.email present, else suppress
-'email'                         (any)               → email
-'none'                          (any)               → suppress (still log with status='suppressed')
+preference   admin.sms_enabled   → channel sent
+'sms'        true                → SMS
+'sms'        false               → email fallback if email present, else suppress (log status='suppressed')
+'email'      (any)               → email
+'both'       true                → per type-routing table above
+'both'       false               → email
+'none'       (any)               → suppress (log status='suppressed')
 ```
+
+**Admin override.** The Guest Directory exposes the preference as a select for any single guest (sms / email / both / none). This is the canonical way to handle a guest who calls in saying "stop texting me but keep emailing" — admin sets `'email'` directly.
+
+**Self-service.** `/my-tickets` "Your stuff" page exposes the preference for the recognized guest. They can switch between sms / email / both. They cannot pick `'none'` from the UI — that requires replying STOP or clicking the email unsubscribe link, both of which are also link-based magic-link flows that prove channel ownership.
+
+**Consent copy.** Every public form that captures contact info (RSVP, Order, Pickup, Invite) renders this fine print directly under the submit button — visible at the moment of submission, not behind a modal:
+
+> By RSVPing, you agree to receive SMS and/or email from Cafe Kadhem for event invites, reminders, tickets, and order updates. Reply STOP to opt out of SMS at any time.
+
+The exact text is centralized in `src/lib/notifications/consent.ts` so 10DLC compliance copy can be updated in one place. The verb adapts per form: "By RSVPing", "By placing your order", "By inviting a friend", "By placing a pickup order".
 
 ### 7.2 Idempotency
 
@@ -602,6 +731,15 @@ Tracked here so future work has a checklist; not all are blocking.
 15. Add `get_my_guest()` consumer logic to `PublicLayout` so every page header reflects recognition state ("Hi, Lina · not you?").
 16. Promote `/find-tickets` UX: add "I've been here before" link to Home and EventDetail headers, rename page copy away from "Find tickets" to "Pick up where you left off" (the page already does more than tickets).
 17. EventDetail: when invited via `/invite/:token`, prefill the contact field that matches `invited_email` or `invited_phone` (provisional identity, no `guest_id` written until RSVP submit).
+18. Migration: `merge_guests(keep_id, drop_id)` RPC — admin + SECURITY DEFINER. FK reassignment across rsvps, orders, pickup_orders, invites, notifications_log, magic_links, ambient_tokens. Conflict resolution per §3.4 Case A. Idempotent.
+19. Extend `upsert_guest`: detect dual-channel collision (Case A) → call `merge_guests` inline; detect single-channel collision against `localStorage.guest_id` (Case B) → return `pending_merge` payload with a verification token.
+20. Migration: extend `notification_preference` enum/check to include `'both'`. Backfill: any existing guest with both `email` and `phone` populated and `notification_preference IN (NULL, 'sms', 'email')` → leave existing preference alone (don't silently change preferences for known users).
+21. Remove the channel-preference dropdown from RSVPForm, Order, Pickup, InviteForm. Preference is now inferred from filled fields. Keep the dropdown only on `/my-tickets` settings.
+22. Update `send-notification` edge fn: implement the per-type channel routing table (§7.1) for guests with `preference='both'`.
+23. Add `<ConsentNote>` component (`src/lib/notifications/consent.ts` + component) rendered under every public submit button. Verb adapts per form context.
+24. Add `<ShareButton>` component. Renders `navigator.share()` on mobile, copy/email/text popover on desktop. Placement: post-RSVP confirmation, EventDetail header (if `rsvp='yes'`), Ticket page.
+25. Migration: `rsvps.referred_by_guest_id UUID REFERENCES guests(id)` — soft attribution from `?ref=<guest_id>` share URLs. Captured at RSVP creation, not edited later.
+26. Mark `admin_settings.sms_enabled = true` in production seed/config (10DLC approved as of 2026-05).
 
 ---
 
@@ -617,5 +755,5 @@ Tracked here so future work has a checklist; not all are blocking.
 | 6 | Capacity NULL semantics. | Unlimited. No waitlisted rows may exist; admin UI hides waitlist for these events. |
 | 7 | Plus-one status drift from parent. | Forbidden. Trigger keeps them aligned (§6 I3, §11 #7). |
 | 8 | Paid RSVP changing to `no`. | Blocked at the RPC layer. Refund first, then status change. |
-| 9 | Identity split when guest uses different channels in sequence. | Accepted; admin merges manually if needed. We do not fuzzy-match on names. |
+| 9 | Identity split when guest uses different channels in sequence. | Mitigated by §3.4: dual-channel auto-merge (Case A), verify-then-merge for single-channel collision (Case B). Residual splits only affect guests who use one channel forever and never receive notifications; admin merge remains the manual fallback. |
 | 10 | Reusable invite tokens. | Confirmed intentional. Tokens are convenience, not authentication. |
