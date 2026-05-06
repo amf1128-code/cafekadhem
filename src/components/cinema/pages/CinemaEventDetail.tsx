@@ -1,8 +1,24 @@
 import { useEffect, useState } from 'react'
 import { Link, useLocation, useParams } from 'react-router-dom'
 import { supabase } from '../../../lib/supabase'
-import type { Event, MenuItem, PublicGuestProfile, RSVP } from '../../../lib/types'
-import { getGuestToken } from '../../../lib/utils/guest-token'
+import type {
+  AdminSettings,
+  CartItem,
+  Event,
+  MenuItem,
+  MenuItemAvailability,
+  PublicGuestProfile,
+  RSVP,
+} from '../../../lib/types'
+import { getGuestToken, setGuestToken } from '../../../lib/utils/guest-token'
+import {
+  dispatchMergeVerification,
+  type PendingMerge,
+} from '../../../lib/identity/handlePendingMerge'
+import { getPaymentProvider } from '../../../lib/payment'
+import { sendNotification } from '../../../lib/notifications'
+import { normalizePhone } from '../../../lib/utils/phone'
+import { useToast } from '../../ui/Toast'
 import { RSVPForm } from '../../events/RSVPForm'
 import { CinemaPageLoader } from '../primitives'
 
@@ -25,6 +41,16 @@ export function CinemaEventDetail() {
   const [myRsvp, setMyRsvp] = useState<RSVP | null>(null)
   const [myPlusOne, setMyPlusOne] = useState<RsvpWithGuest | null>(null)
   const [loading, setLoading] = useState(true)
+  const [listOpen, setListOpen] = useState(false)
+  // Pre-order cart. Lives at the page level so the menu grid + sticky
+  // cart bar + checkout modal all share state. Guest info / Venmo /
+  // safe_create_order plumbing happens inside CartCheckoutModal below.
+  const [cart, setCart] = useState<CartItem[]>([])
+  const [availability, setAvailability] = useState<
+    Record<string, { max: number; sold: number }>
+  >({})
+  const [settings, setSettings] = useState<AdminSettings | null>(null)
+  const [cartOpen, setCartOpen] = useState(false)
 
   useEffect(() => {
     if (id) loadEvent()
@@ -42,13 +68,32 @@ export function CinemaEventDetail() {
       .single()
     setEvent(ev as Event | null)
 
+    // Admin settings: powers the Venmo handle + sms toggle the cart
+    // checkout needs.
+    const { data: settingsRow } = await supabase
+      .from('admin_settings')
+      .select('*')
+      .limit(1)
+      .single()
+    if (settingsRow) setSettings(settingsRow as AdminSettings)
+
     if (ev?.menu_id) {
-      const { data: menuItems } = await supabase
-        .from('public_menu_items')
-        .select('*')
-        .eq('menu_id', ev.menu_id)
-        .order('sort_order')
+      const [{ data: menuItems }, { data: avail }] = await Promise.all([
+        supabase
+          .from('public_menu_items')
+          .select('*')
+          .eq('menu_id', ev.menu_id)
+          .order('sort_order'),
+        supabase.rpc('event_menu_item_availability', { p_event_id: id }),
+      ])
       if (menuItems) setItems(menuItems as MenuItem[])
+      if (avail) {
+        const map: Record<string, { max: number; sold: number }> = {}
+        for (const row of avail as MenuItemAvailability[]) {
+          map[row.menu_item_id] = { max: row.max_quantity, sold: row.sold_quantity }
+        }
+        setAvailability(map)
+      }
     }
 
     const { data: rsvpRows } = await supabase
@@ -116,7 +161,66 @@ export function CinemaEventDetail() {
   const time = formatTime(event.start_time, event.end_time)
   const loc = [event.location_name, event.location].filter(Boolean).join(' · ')
   const price = Math.round(event.ticket_price ?? 0)
-  const yesCount = rsvps.filter(r => r.status === 'yes').length
+  // Group RSVPs into hosts (plus_one_of === null) + their plus-ones, plus
+  // separate maybe and waitlist buckets. The +1s collapse onto their host
+  // row as a "+1" suffix instead of rendering as standalone names.
+  const hosts = rsvps.filter(r => r.plus_one_of === null)
+  const plusOnes = rsvps.filter(r => r.plus_one_of !== null)
+  const plusOneCountByHost = new Map<string, number>()
+  for (const po of plusOnes) {
+    if (po.plus_one_of) {
+      plusOneCountByHost.set(
+        po.plus_one_of,
+        (plusOneCountByHost.get(po.plus_one_of) ?? 0) + 1,
+      )
+    }
+  }
+  const goingHosts = hosts.filter(r => r.status === 'yes')
+  const maybeHosts = hosts.filter(r => r.status === 'maybe')
+  const waitlistHosts = hosts.filter(r => r.status === 'waitlisted')
+  const goingSeatCount =
+    goingHosts.length +
+    goingHosts.reduce(
+      (sum, h) => sum + (plusOneCountByHost.get(h.id) ?? 0),
+      0,
+    )
+
+  // Cart total / count helpers + adjust handler. Caps a quantity to the
+  // remaining stock when an event_menu_item_limit has been set.
+  const cartTotal = cart.reduce(
+    (sum, c) => sum + (c.menuItem.price ?? 0) * c.quantity,
+    0,
+  )
+  const cartCount = cart.reduce((sum, c) => sum + c.quantity, 0)
+  function remainingFor(itemId: string): number | null {
+    const a = availability[itemId]
+    if (!a) return null
+    return Math.max(a.max - a.sold, 0)
+  }
+  function adjustCart(item: MenuItem, delta: number) {
+    setCart(prev => {
+      const existing = prev.find(c => c.menuItem.id === item.id)
+      if (existing) {
+        const nextQty = existing.quantity + delta
+        if (nextQty <= 0) {
+          return prev.filter(c => c.menuItem.id !== item.id)
+        }
+        const remaining = remainingFor(item.id)
+        if (delta > 0 && remaining !== null && nextQty > remaining) {
+          return prev
+        }
+        return prev.map(c =>
+          c.menuItem.id === item.id ? { ...c, quantity: nextQty } : c,
+        )
+      }
+      if (delta > 0) {
+        const remaining = remainingFor(item.id)
+        if (remaining !== null && remaining < 1) return prev
+        return [...prev, { menuItem: item, quantity: 1 }]
+      }
+      return prev
+    })
+  }
 
   return (
     <>
@@ -372,6 +476,52 @@ export function CinemaEventDetail() {
               onRsvpComplete={() => loadEvent({ silent: true })}
             />
           </div>
+
+          {/* Inline pre-order nudge — anchors down to the menu grid
+              where each item is tap-to-add. Only shown if the event has
+              a menu attached. */}
+          {items.length > 0 && (
+            <a
+              href="#menu"
+              style={{
+                marginTop: 14,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: 12,
+                padding: '14px 18px',
+                border: '2px solid var(--ck-ink)',
+                background: 'var(--ck-cobalt)',
+                color: 'var(--ck-cream)',
+                fontFamily: 'var(--ck-sans)',
+                fontWeight: 700,
+                fontSize: 12,
+                letterSpacing: '0.14em',
+                textTransform: 'uppercase',
+                textDecoration: 'none',
+                flexWrap: 'wrap',
+              }}
+            >
+              <span>
+                ✦ Pre-order food too?
+                <span
+                  style={{
+                    fontFamily: 'var(--ck-serif-edit)',
+                    fontStyle: 'italic',
+                    fontWeight: 400,
+                    fontSize: 13,
+                    letterSpacing: 0,
+                    textTransform: 'none',
+                    marginLeft: 10,
+                    opacity: 0.85,
+                  }}
+                >
+                  beat the line at the door
+                </span>
+              </span>
+              <span aria-hidden>↓</span>
+            </a>
+          )}
         </div>
       </section>
 
@@ -468,44 +618,44 @@ export function CinemaEventDetail() {
                     {it.description}
                   </div>
                 )}
-                <div
-                  style={{
-                    marginTop: 'auto',
-                    paddingTop: 8,
-                    borderTop: '1px dashed var(--ck-ink)',
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'baseline',
-                    fontFamily: 'var(--ck-serif)',
-                    fontWeight: 800,
-                    fontSize: 20,
-                  }}
-                >
-                  <span
-                    style={{
-                      fontFamily: 'var(--ck-mono)',
-                      fontSize: 10,
-                      letterSpacing: '0.14em',
-                      opacity: 0.55,
-                    }}
-                  >
-                    —— · —— · ——
-                  </span>
-                  <span>{it.price ? `$${Math.round(it.price)}` : '—'}</span>
-                </div>
+                <MenuCellControls
+                  item={it}
+                  cartQty={cart.find(c => c.menuItem.id === it.id)?.quantity ?? 0}
+                  remaining={remainingFor(it.id)}
+                  unavailable={!it.is_available}
+                  onAdd={() => adjustCart(it, 1)}
+                  onRemove={() => adjustCart(it, -1)}
+                />
               </div>
             ))}
           </div>
+          <p
+            style={{
+              fontFamily: 'var(--ck-mono)',
+              fontSize: 10,
+              letterSpacing: '0.16em',
+              textTransform: 'uppercase',
+              marginTop: 14,
+              opacity: 0.65,
+            }}
+          >
+            Tap an item to add it to your cart. Pay one tab at the end.
+          </p>
         </section>
       )}
 
-      {/* RSVP roster (lightweight). The full RSVP form still lives at
-          /events/:id; the cinema 'RSVP' button above links there. */}
-      {rsvps.length > 0 && (
+      {/* RSVP roster — summary counts + "See full list" modal. The
+          page itself only shows totals so it scales to events with
+          hundreds of RSVPs. The modal opens a scrollable, sectioned
+          list (Going / Maybe / Waitlist). Plus-ones collapse onto
+          their host as a "+1" suffix. */}
+      {hosts.length > 0 && (
         <section className="ck-page" style={{ borderBottom: 'none' }}>
           <div className="ck-eyebrow">Who&apos;s in</div>
           <div className="ck-section-head-row" style={{ marginTop: 6 }}>
-            <h2 className="ck-h2">{yesCount} ON THE LIST.</h2>
+            <h2 className="ck-h2">
+              {goingSeatCount} ON THE LIST.
+            </h2>
             <span
               style={{
                 fontFamily: 'var(--ck-arabic-display)',
@@ -520,42 +670,1034 @@ export function CinemaEventDetail() {
           </div>
           <div
             style={{
-              marginTop: 18,
+              marginTop: 14,
               display: 'flex',
+              gap: 22,
               flexWrap: 'wrap',
+              fontFamily: 'var(--ck-mono)',
+              fontSize: 11,
+              letterSpacing: '0.16em',
+              textTransform: 'uppercase',
+            }}
+          >
+            <span>
+              <span style={{ color: 'var(--ck-cobalt)' }}>{goingSeatCount}</span>{' '}
+              going
+            </span>
+            {maybeHosts.length > 0 && (
+              <span>
+                <span style={{ color: 'var(--ck-cobalt)' }}>{maybeHosts.length}</span>{' '}
+                maybe
+              </span>
+            )}
+            {waitlistHosts.length > 0 && (
+              <span>
+                <span style={{ color: 'var(--ck-cobalt)' }}>{waitlistHosts.length}</span>{' '}
+                waitlist
+              </span>
+            )}
+          </div>
+          <button
+            type="button"
+            className="ck-btn"
+            onClick={() => setListOpen(true)}
+            style={{ marginTop: 22 }}
+          >
+            See the list →
+          </button>
+        </section>
+      )}
+
+      {listOpen && (
+        <RsvpListModal
+          onClose={() => setListOpen(false)}
+          goingHosts={goingHosts}
+          maybeHosts={maybeHosts}
+          waitlistHosts={waitlistHosts}
+          plusOneCountByHost={plusOneCountByHost}
+        />
+      )}
+
+      {cart.length > 0 && (
+        <StickyCartBar
+          count={cartCount}
+          total={cartTotal}
+          onCheckout={() => setCartOpen(true)}
+        />
+      )}
+
+      {cartOpen && (
+        <CartCheckoutModal
+          cart={cart}
+          event={event}
+          settings={settings}
+          onClose={() => setCartOpen(false)}
+          onAdjust={adjustCart}
+          onClearCart={() => {
+            setCart([])
+            loadEvent({ silent: true })
+          }}
+        />
+      )}
+    </>
+  )
+}
+
+/** Modal that lists every RSVP grouped by status. Plus-ones collapse
+ *  onto their host with a +1 suffix. Scrollable for events with many
+ *  RSVPs. */
+function RsvpListModal({
+  onClose,
+  goingHosts,
+  maybeHosts,
+  waitlistHosts,
+  plusOneCountByHost,
+}: {
+  onClose: () => void
+  goingHosts: RsvpWithGuest[]
+  maybeHosts: RsvpWithGuest[]
+  waitlistHosts: RsvpWithGuest[]
+  plusOneCountByHost: Map<string, number>
+}) {
+  // Lock body scroll while the modal is open + close on Escape.
+  useEffect(() => {
+    const prev = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    function onKey(e: KeyboardEvent) {
+      if (e.key === 'Escape') onClose()
+    }
+    document.addEventListener('keydown', onKey)
+    return () => {
+      document.body.style.overflow = prev
+      document.removeEventListener('keydown', onKey)
+    }
+  }, [onClose])
+
+  return (
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-label="Who's coming"
+      onClick={onClose}
+      style={{
+        position: 'fixed',
+        inset: 0,
+        background: 'rgba(13, 13, 15, 0.7)',
+        zIndex: 200,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: 24,
+      }}
+    >
+      <div
+        onClick={e => e.stopPropagation()}
+        style={{
+          background: 'var(--ck-cream)',
+          border: '3px solid var(--ck-ink)',
+          width: 'min(560px, 100%)',
+          maxHeight: '85vh',
+          display: 'flex',
+          flexDirection: 'column',
+          boxShadow: '8px 8px 0 var(--ck-ink)',
+        }}
+      >
+        <div
+          style={{
+            padding: '18px 22px',
+            borderBottom: '2px solid var(--ck-ink)',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            background: 'var(--ck-cream)',
+          }}
+        >
+          <div>
+            <div
+              style={{
+                fontFamily: 'var(--ck-mono)',
+                fontSize: 10,
+                letterSpacing: '0.18em',
+                textTransform: 'uppercase',
+                color: 'var(--ck-cobalt)',
+              }}
+            >
+              ✦ Who&apos;s coming
+            </div>
+            <div
+              style={{
+                fontFamily: 'var(--ck-serif)',
+                fontWeight: 900,
+                fontSize: 26,
+                lineHeight: 1,
+                marginTop: 4,
+              }}
+            >
+              The list.
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Close"
+            style={{
+              background: 'transparent',
+              border: 'none',
+              fontSize: 28,
+              lineHeight: 1,
+              cursor: 'pointer',
+              color: 'var(--ck-ink)',
+              padding: 0,
+            }}
+          >
+            ×
+          </button>
+        </div>
+        <div
+          style={{
+            padding: 22,
+            overflowY: 'auto',
+            flex: 1,
+            background: 'var(--ck-cream)',
+          }}
+        >
+          <RsvpListGroup
+            label="Going"
+            ar="قادم"
+            hosts={goingHosts}
+            plusOneCountByHost={plusOneCountByHost}
+            emptyText="Nobody yet — be the first."
+          />
+          {maybeHosts.length > 0 && (
+            <RsvpListGroup
+              label="Maybe"
+              ar="ربما"
+              hosts={maybeHosts}
+              plusOneCountByHost={plusOneCountByHost}
+              emptyText=""
+            />
+          )}
+          {waitlistHosts.length > 0 && (
+            <RsvpListGroup
+              label="Waitlist"
+              ar="قائمة الانتظار"
+              hosts={waitlistHosts}
+              plusOneCountByHost={plusOneCountByHost}
+              emptyText=""
+            />
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function RsvpListGroup({
+  label,
+  ar,
+  hosts,
+  plusOneCountByHost,
+  emptyText,
+}: {
+  label: string
+  ar: string
+  hosts: RsvpWithGuest[]
+  plusOneCountByHost: Map<string, number>
+  emptyText: string
+}) {
+  return (
+    <div style={{ marginBottom: 22 }}>
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'baseline',
+          paddingBottom: 6,
+          marginBottom: 10,
+          borderBottom: '1px dashed var(--ck-ink)',
+          fontFamily: 'var(--ck-mono)',
+          fontSize: 10,
+          letterSpacing: '0.18em',
+          textTransform: 'uppercase',
+        }}
+      >
+        <span>
+          {label} ({hosts.length})
+        </span>
+        <span
+          style={{
+            fontFamily: 'var(--ck-arabic-display)',
+            fontSize: 18,
+            direction: 'rtl',
+            color: 'var(--ck-cobalt)',
+            letterSpacing: 0,
+          }}
+        >
+          {ar}
+        </span>
+      </div>
+      {hosts.length === 0 && emptyText ? (
+        <p
+          className="ck-italic"
+          style={{ fontSize: 14, opacity: 0.7, margin: 0 }}
+        >
+          {emptyText}
+        </p>
+      ) : (
+        <ul
+          style={{
+            listStyle: 'none',
+            padding: 0,
+            margin: 0,
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 6,
+          }}
+        >
+          {hosts.map(h => {
+            const plusOnes = plusOneCountByHost.get(h.id) ?? 0
+            return (
+              <li
+                key={h.id}
+                style={{
+                  fontFamily: 'var(--ck-sans)',
+                  fontSize: 15,
+                  lineHeight: 1.35,
+                }}
+              >
+                <span style={{ fontWeight: 600 }}>
+                  {h.guest?.first_name ?? 'Guest'}
+                </span>
+                {plusOnes > 0 && (
+                  <span
+                    style={{
+                      marginLeft: 8,
+                      padding: '2px 8px',
+                      border: '1px solid var(--ck-ink)',
+                      background: 'var(--ck-paper)',
+                      fontFamily: 'var(--ck-mono)',
+                      fontSize: 10,
+                      letterSpacing: '0.14em',
+                      textTransform: 'uppercase',
+                    }}
+                  >
+                    +{plusOnes}
+                  </span>
+                )}
+              </li>
+            )
+          })}
+        </ul>
+      )}
+    </div>
+  )
+}
+
+/**
+ * Bottom strip on every menu cell. When the item isn't in the cart,
+ * shows the price and an "Add" pill. When it's in the cart, swaps in
+ * a − / qty / + stepper. Disables when sold out / unavailable.
+ */
+function MenuCellControls({
+  item,
+  cartQty,
+  remaining,
+  unavailable,
+  onAdd,
+  onRemove,
+}: {
+  item: MenuItem
+  cartQty: number
+  remaining: number | null
+  unavailable: boolean
+  onAdd: () => void
+  onRemove: () => void
+}) {
+  const soldOut =
+    !!unavailable || (remaining !== null && remaining <= 0 && cartQty === 0)
+  const atCap = remaining !== null && cartQty >= remaining
+  const price = item.price ? `$${Math.round(item.price)}` : '—'
+
+  return (
+    <div
+      style={{
+        marginTop: 'auto',
+        paddingTop: 8,
+        borderTop: '1px dashed var(--ck-ink)',
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        gap: 10,
+      }}
+    >
+      <span
+        style={{
+          fontFamily: 'var(--ck-serif)',
+          fontWeight: 800,
+          fontSize: 22,
+          lineHeight: 1,
+        }}
+      >
+        {price}
+      </span>
+
+      {soldOut ? (
+        <span
+          style={{
+            fontFamily: 'var(--ck-mono)',
+            fontSize: 10,
+            letterSpacing: '0.16em',
+            textTransform: 'uppercase',
+            padding: '4px 10px',
+            border: '2px solid var(--ck-ink)',
+            background: 'var(--ck-ink)',
+            color: 'var(--ck-cream)',
+          }}
+        >
+          Sold out
+        </span>
+      ) : cartQty === 0 ? (
+        <button
+          type="button"
+          onClick={onAdd}
+          disabled={!item.price}
+          aria-label={`Add ${item.name} to cart`}
+          style={{
+            padding: '8px 14px',
+            border: '2px solid var(--ck-ink)',
+            background: 'var(--ck-cobalt)',
+            color: 'var(--ck-cream)',
+            fontFamily: 'var(--ck-sans)',
+            fontWeight: 700,
+            fontSize: 11,
+            letterSpacing: '0.14em',
+            textTransform: 'uppercase',
+            cursor: item.price ? 'pointer' : 'not-allowed',
+            opacity: item.price ? 1 : 0.45,
+          }}
+        >
+          + Add
+        </button>
+      ) : (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <button
+            type="button"
+            onClick={onRemove}
+            aria-label={`Remove one ${item.name}`}
+            style={cartStepBtnStyle}
+          >
+            −
+          </button>
+          <span
+            style={{
+              fontFamily: 'var(--ck-serif)',
+              fontWeight: 800,
+              fontSize: 18,
+              minWidth: 22,
+              textAlign: 'center',
+            }}
+          >
+            {cartQty}
+          </span>
+          <button
+            type="button"
+            onClick={onAdd}
+            disabled={atCap}
+            aria-label={`Add another ${item.name}`}
+            style={{
+              ...cartStepBtnStyle,
+              opacity: atCap ? 0.4 : 1,
+              cursor: atCap ? 'not-allowed' : 'pointer',
+            }}
+          >
+            +
+          </button>
+        </div>
+      )}
+    </div>
+  )
+}
+
+const cartStepBtnStyle: React.CSSProperties = {
+  width: 30,
+  height: 30,
+  border: '2px solid var(--ck-ink)',
+  background: 'var(--ck-cream)',
+  color: 'var(--ck-ink)',
+  fontFamily: 'var(--ck-serif)',
+  fontWeight: 800,
+  fontSize: 16,
+  lineHeight: 1,
+  cursor: 'pointer',
+  padding: 0,
+}
+
+/**
+ * Sticky bar pinned to the bottom of the viewport whenever the cart
+ * has items. Total + count + Checkout button.
+ */
+function StickyCartBar({
+  count,
+  total,
+  onCheckout,
+}: {
+  count: number
+  total: number
+  onCheckout: () => void
+}) {
+  return (
+    <div
+      style={{
+        position: 'fixed',
+        left: 0,
+        right: 0,
+        bottom: 0,
+        zIndex: 100,
+        background: 'var(--ck-ink)',
+        color: 'var(--ck-cream)',
+        borderTop: '2px solid var(--ck-ink)',
+        boxShadow: '0 -6px 20px rgba(13, 13, 15, 0.25)',
+        padding: '14px 22px',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        gap: 14,
+      }}
+    >
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'baseline',
+          gap: 14,
+          flexWrap: 'wrap',
+        }}
+      >
+        <span
+          style={{
+            fontFamily: 'var(--ck-mono)',
+            fontSize: 11,
+            letterSpacing: '0.18em',
+            textTransform: 'uppercase',
+            opacity: 0.75,
+          }}
+        >
+          ✦ Cart · {count} {count === 1 ? 'item' : 'items'}
+        </span>
+        <span
+          style={{
+            fontFamily: 'var(--ck-serif)',
+            fontWeight: 900,
+            fontSize: 24,
+            lineHeight: 1,
+          }}
+        >
+          ${total.toFixed(2)}
+        </span>
+      </div>
+      <button
+        type="button"
+        onClick={onCheckout}
+        style={{
+          padding: '12px 18px',
+          border: '2px solid var(--ck-cream)',
+          background: 'var(--ck-cobalt)',
+          color: 'var(--ck-cream)',
+          fontFamily: 'var(--ck-sans)',
+          fontWeight: 700,
+          fontSize: 12,
+          letterSpacing: '0.14em',
+          textTransform: 'uppercase',
+          cursor: 'pointer',
+        }}
+      >
+        Checkout →
+      </button>
+    </div>
+  )
+}
+
+/**
+ * Cinema-styled cart checkout. Mirrors the legacy /events/:id/order
+ * flow (upsert_guest, safe_create_order, Venmo deep link, order
+ * confirmation notification) — wrapped in an overlay + inline guest
+ * info form. On success replaces the body with a confirmation
+ * pointing to /cinema/my-tickets.
+ */
+function CartCheckoutModal({
+  cart,
+  event,
+  settings,
+  onClose,
+  onAdjust,
+  onClearCart,
+}: {
+  cart: CartItem[]
+  event: Event
+  settings: AdminSettings | null
+  onClose: () => void
+  onAdjust: (item: MenuItem, delta: number) => void
+  onClearCart: () => void
+}) {
+  const { addToast } = useToast()
+  const [firstName, setFirstName] = useState('')
+  const [email, setEmail] = useState('')
+  const [phone, setPhone] = useState('')
+  const [submitting, setSubmitting] = useState(false)
+  const [submitted, setSubmitted] = useState(false)
+
+  const smsEnabled = !!settings?.sms_enabled
+  const total = cart.reduce(
+    (sum, c) => sum + (c.menuItem.price ?? 0) * c.quantity,
+    0,
+  )
+
+  // Pre-fill from localStorage guest if signed in.
+  useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      const token = getGuestToken()
+      if (!token) return
+      const { data } = await supabase.rpc('get_my_guest', { p_guest_id: token })
+      if (cancelled || !data) return
+      setFirstName(data.first_name ?? '')
+      if (data.email) setEmail(data.email)
+      if (data.phone) setPhone(data.phone)
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  // Lock body scroll + Escape closes.
+  useEffect(() => {
+    const prev = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    function onKey(e: KeyboardEvent) {
+      if (e.key === 'Escape' && !submitting) onClose()
+    }
+    document.addEventListener('keydown', onKey)
+    return () => {
+      document.body.style.overflow = prev
+      document.removeEventListener('keydown', onKey)
+    }
+  }, [onClose, submitting])
+
+  async function handleSubmit() {
+    if (cart.length === 0) return
+    if (!firstName.trim()) {
+      addToast('What name should we put on it?', 'error')
+      return
+    }
+    if (smsEnabled ? !email.trim() && !phone.trim() : !email.trim()) {
+      addToast(
+        smsEnabled
+          ? 'Email or phone, please — we send a confirmation.'
+          : 'Email, please — we send a confirmation.',
+        'error',
+      )
+      return
+    }
+    if (!settings?.venmo_handle) {
+      addToast('Venmo handle not configured. Tell the host.', 'error')
+      return
+    }
+
+    setSubmitting(true)
+    try {
+      const fields: Record<string, unknown> = {
+        first_name: firstName.trim(),
+        email: email.trim() || null,
+      }
+      if (smsEnabled) {
+        fields.phone = phone.trim() ? normalizePhone(phone.trim()) : null
+      }
+      const { data: guest, error: guestErr } = await supabase.rpc(
+        'upsert_guest',
+        { p_fields: fields, p_guest_id: getGuestToken() },
+      )
+      if (guestErr) throw guestErr
+      if (!guest) throw new Error('Failed to create guest')
+      const guestId = guest.id as string
+      setGuestToken(guestId)
+
+      const pendingMerge = (guest as { pending_merge?: PendingMerge }).pending_merge
+      if (pendingMerge?.verification_token) {
+        void dispatchMergeVerification(pendingMerge)
+      }
+
+      const venmoNote = `${firstName.trim()} - ${event.title}`
+      const { data: order, error: orderErr } = await supabase.rpc(
+        'safe_create_order',
+        {
+          p_event_id: event.id,
+          p_guest_id: guestId,
+          p_total: total,
+          p_venmo_note: venmoNote,
+          p_payment_method: 'venmo',
+          p_items: cart.map(c => ({
+            menu_item_id: c.menuItem.id,
+            quantity: c.quantity,
+            unit_price: c.menuItem.price,
+          })),
+        },
+      )
+      if (orderErr) {
+        const msg = orderErr.message || ''
+        if (msg.includes('OUT_OF_STOCK')) {
+          throw new Error(msg.replace(/.*OUT_OF_STOCK:\s*/, ''))
+        }
+        throw orderErr
+      }
+      if (!order) throw new Error('Failed to create order')
+
+      const provider = getPaymentProvider('venmo')
+      const paymentGuest = { id: guestId, first_name: firstName.trim() } as never
+      const paymentLink = provider.generatePaymentLink(
+        order,
+        paymentGuest,
+        event,
+        settings.venmo_handle,
+      )
+      // Same-tab Venmo deep-link works on iOS/Android natively. For web
+      // fallback the provider URL also works.
+      window.open(paymentLink.url, '_blank')
+
+      sendNotification({
+        guestId,
+        eventId: event.id,
+        type: 'order_confirmation',
+      })
+
+      setSubmitted(true)
+    } catch (err) {
+      addToast(err instanceof Error ? err.message : 'Failed to submit order', 'error')
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  return (
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-label="Pre-order checkout"
+      onClick={() => {
+        if (!submitting) onClose()
+      }}
+      style={{
+        position: 'fixed',
+        inset: 0,
+        background: 'rgba(13, 13, 15, 0.78)',
+        zIndex: 200,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: 24,
+      }}
+    >
+      <div
+        onClick={e => e.stopPropagation()}
+        style={{
+          background: 'var(--ck-cream)',
+          border: '3px solid var(--ck-ink)',
+          width: 'min(560px, 100%)',
+          maxHeight: '88vh',
+          display: 'flex',
+          flexDirection: 'column',
+          boxShadow: '8px 8px 0 var(--ck-ink)',
+          color: 'var(--ck-ink)',
+        }}
+      >
+        <div
+          style={{
+            padding: '18px 22px',
+            borderBottom: '2px solid var(--ck-ink)',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+          }}
+        >
+          <div>
+            <div
+              style={{
+                fontFamily: 'var(--ck-mono)',
+                fontSize: 10,
+                letterSpacing: '0.18em',
+                textTransform: 'uppercase',
+                color: 'var(--ck-cobalt)',
+              }}
+            >
+              ✦ Pre-order
+            </div>
+            <div
+              style={{
+                fontFamily: 'var(--ck-serif)',
+                fontWeight: 900,
+                fontSize: 26,
+                lineHeight: 1,
+                marginTop: 4,
+              }}
+            >
+              {submitted ? 'You’re set.' : 'Your cart.'}
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={submitting}
+            aria-label="Close"
+            style={{
+              background: 'transparent',
+              border: 'none',
+              fontSize: 28,
+              lineHeight: 1,
+              cursor: submitting ? 'not-allowed' : 'pointer',
+              color: 'var(--ck-ink)',
+              padding: 0,
+              opacity: submitting ? 0.5 : 1,
+            }}
+          >
+            ×
+          </button>
+        </div>
+        <div style={{ overflowY: 'auto', flex: 1, padding: 22 }}>
+          {submitted ? (
+            <div style={{ textAlign: 'center', padding: '12px 0' }}>
+              <div
+                style={{
+                  fontFamily: 'var(--ck-arabic-display)',
+                  fontSize: 56,
+                  color: 'var(--ck-cobalt)',
+                  direction: 'rtl',
+                  lineHeight: 1,
+                }}
+              >
+                صحتين
+              </div>
+              <h3
+                style={{
+                  fontFamily: 'var(--ck-serif)',
+                  fontWeight: 900,
+                  fontSize: 28,
+                  lineHeight: 1,
+                  margin: '12px 0 8px',
+                }}
+              >
+                ORDER CAPTURED.
+              </h3>
+              <p
+                className="ck-italic"
+                style={{ fontSize: 16, lineHeight: 1.5, margin: '0 auto', maxWidth: 380 }}
+              >
+                Venmo just opened in another tab — finish payment there. We
+                emailed a confirmation; the host marks it paid.
+              </p>
+              <div
+                style={{
+                  marginTop: 16,
+                  padding: 12,
+                  border: '2px solid var(--ck-ink)',
+                  background: 'var(--ck-paper)',
+                  fontFamily: 'var(--ck-mono)',
+                  fontSize: 11,
+                  letterSpacing: '0.14em',
+                  textTransform: 'uppercase',
+                }}
+              >
+                Anytime: see this order at{' '}
+                <Link
+                  to="/cinema/my-tickets"
+                  style={{ color: 'var(--ck-cobalt)', textDecoration: 'underline' }}
+                >
+                  /my-tickets
+                </Link>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  onClearCart()
+                  onClose()
+                }}
+                className="ck-btn"
+                style={{ marginTop: 22 }}
+              >
+                Close
+              </button>
+            </div>
+          ) : (
+            <>
+              <div style={{ marginBottom: 18 }}>
+                {cart.map(c => (
+                  <div
+                    key={c.menuItem.id}
+                    style={{
+                      display: 'grid',
+                      gridTemplateColumns: '1fr auto auto',
+                      gap: 10,
+                      alignItems: 'center',
+                      padding: '10px 0',
+                      borderBottom: '1px dashed var(--ck-ink)',
+                    }}
+                  >
+                    <div>
+                      <div
+                        style={{
+                          fontFamily: 'var(--ck-serif)',
+                          fontWeight: 800,
+                          fontSize: 16,
+                          lineHeight: 1.2,
+                        }}
+                      >
+                        {c.menuItem.name}
+                      </div>
+                      <div
+                        style={{
+                          fontFamily: 'var(--ck-mono)',
+                          fontSize: 10,
+                          letterSpacing: '0.14em',
+                          textTransform: 'uppercase',
+                          opacity: 0.65,
+                          marginTop: 2,
+                        }}
+                      >
+                        ${(c.menuItem.price ?? 0).toFixed(2)} each
+                      </div>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <button
+                        type="button"
+                        onClick={() => onAdjust(c.menuItem, -1)}
+                        aria-label={`Remove one ${c.menuItem.name}`}
+                        style={cartStepBtnStyle}
+                      >
+                        −
+                      </button>
+                      <span
+                        style={{
+                          fontFamily: 'var(--ck-serif)',
+                          fontWeight: 800,
+                          fontSize: 16,
+                          minWidth: 22,
+                          textAlign: 'center',
+                        }}
+                      >
+                        {c.quantity}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => onAdjust(c.menuItem, 1)}
+                        aria-label={`Add another ${c.menuItem.name}`}
+                        style={cartStepBtnStyle}
+                      >
+                        +
+                      </button>
+                    </div>
+                    <div
+                      style={{
+                        fontFamily: 'var(--ck-serif)',
+                        fontWeight: 800,
+                        fontSize: 16,
+                        textAlign: 'right',
+                        minWidth: 60,
+                      }}
+                    >
+                      ${((c.menuItem.price ?? 0) * c.quantity).toFixed(2)}
+                    </div>
+                  </div>
+                ))}
+                <div
+                  style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    paddingTop: 12,
+                    fontFamily: 'var(--ck-serif)',
+                    fontWeight: 900,
+                    fontSize: 20,
+                  }}
+                >
+                  <span>Total</span>
+                  <span>${total.toFixed(2)}</span>
+                </div>
+              </div>
+
+              <div
+                style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: 12,
+                }}
+              >
+                <div>
+                  <label className="ck-label">Name</label>
+                  <input
+                    className="ck-input"
+                    value={firstName}
+                    onChange={e => setFirstName(e.target.value)}
+                    placeholder="Your first name"
+                  />
+                </div>
+                <div>
+                  <label className="ck-label">Email</label>
+                  <input
+                    className="ck-input"
+                    type="email"
+                    value={email}
+                    onChange={e => setEmail(e.target.value)}
+                    placeholder="you@example.com"
+                  />
+                </div>
+                {smsEnabled && (
+                  <div>
+                    <label className="ck-label">Phone (optional)</label>
+                    <input
+                      className="ck-input"
+                      type="tel"
+                      value={phone}
+                      onChange={e => setPhone(e.target.value)}
+                      placeholder="(555) 555-5555"
+                    />
+                  </div>
+                )}
+              </div>
+            </>
+          )}
+        </div>
+        {!submitted && (
+          <div
+            style={{
+              padding: '16px 22px',
+              borderTop: '2px solid var(--ck-ink)',
+              background: 'var(--ck-paper)',
+              display: 'flex',
+              flexDirection: 'column',
               gap: 8,
             }}
           >
-            {rsvps.map(r => (
-              <span
-                key={r.id}
-                style={{
-                  padding: '6px 14px',
-                  border: '2px solid var(--ck-ink)',
-                  background:
-                    r.status === 'yes'
-                      ? 'var(--ck-cream)'
-                      : r.status === 'waitlisted'
-                        ? 'var(--ck-paper)'
-                        : 'transparent',
-                  fontFamily: 'var(--ck-sans)',
-                  fontSize: 13,
-                  fontWeight: 600,
-                }}
-              >
-                {r.guest?.first_name ?? 'Guest'}
-                {r.status === 'maybe' && (
-                  <span style={{ opacity: 0.55, marginLeft: 6 }}>· maybe</span>
-                )}
-                {r.status === 'waitlisted' && (
-                  <span style={{ opacity: 0.55, marginLeft: 6 }}>· waitlist</span>
-                )}
-              </span>
-            ))}
+            <button
+              type="button"
+              onClick={handleSubmit}
+              disabled={submitting || cart.length === 0}
+              className="ck-btn ck-btn--primary ck-btn--block"
+            >
+              {submitting ? 'Sending you to Venmo…' : `Pay $${total.toFixed(2)} with Venmo →`}
+            </button>
+            <p
+              style={{
+                fontFamily: 'var(--ck-mono)',
+                fontSize: 9,
+                letterSpacing: '0.14em',
+                textTransform: 'uppercase',
+                textAlign: 'center',
+                opacity: 0.65,
+                margin: 0,
+              }}
+            >
+              Venmo opens in a new tab. We email you a confirmation.
+            </p>
           </div>
-        </section>
-      )}
-    </>
+        )}
+      </div>
+    </div>
   )
 }
 
