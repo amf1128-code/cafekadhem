@@ -59,6 +59,29 @@ async function getSiteUrl(): Promise<string> {
   return (data?.site_url || 'https://cafekadhem.com').replace(/\/$/, '')
 }
 
+// Append ?as=<ambient_token> to URLs on our own domain so a recipient
+// who taps the link is recognized server-side and silently identified
+// in localStorage. Skips:
+//   - off-domain URLs (never leak our token to third parties)
+//   - URLs that already carry an ?as= (idempotent on retry)
+//   - the /verify-merge URL (single-use credential; recognition is
+//     handled by the verify flow itself)
+// USER_FLOWS_SPEC.md §3a.2.
+function injectAmbientToken(rawUrl: string, ambientToken: string, siteHost: string): string {
+  if (!rawUrl) return rawUrl
+  let parsed: URL
+  try {
+    parsed = new URL(rawUrl)
+  } catch {
+    return rawUrl
+  }
+  if (parsed.host !== siteHost) return rawUrl
+  if (parsed.searchParams.has('as')) return rawUrl
+  if (parsed.pathname.startsWith('/verify-merge')) return rawUrl
+  parsed.searchParams.set('as', ambientToken)
+  return parsed.toString()
+}
+
 // The DB stores events as DATE + TIME without a timezone. The cafe is in
 // NYC, so we render every guest-facing date string in America/New_York.
 // We avoid `new Date(\`${date}T${time}\`)` (which interprets in the runtime
@@ -662,6 +685,30 @@ Deno.serve(async (req: Request) => {
         const qrImageUrl = await generateAndUploadQr(data.pickup_token, data.pickup_url)
         if (qrImageUrl) data.qr_image_url = qrImageUrl
       }
+    }
+
+    // Mint an ambient token for this guest and append ?as=<token> to
+    // every same-domain URL we built above. Recipients who tap any link
+    // in the body are recognized silently — no form, no friction.
+    // USER_FLOWS_SPEC.md §3a.2.
+    try {
+      const { data: tokenRow } = await supabase.rpc('mint_ambient_token', {
+        p_guest_id: guestId,
+      })
+      const ambientToken: string | null = typeof tokenRow === 'string' ? tokenRow : null
+      if (ambientToken) {
+        const siteUrl = await getSiteUrl()
+        const siteHost = new URL(siteUrl).host
+        for (const key of ['event_url', 'ticket_url', 'history_url', 'pickup_url']) {
+          if (typeof data[key] === 'string') {
+            data[key] = injectAmbientToken(data[key], ambientToken, siteHost)
+          }
+        }
+      }
+    } catch (err) {
+      // Token mint failure is non-fatal — links still work, just without
+      // recognition. Log so admin can spot a degraded state.
+      console.error('mint_ambient_token failed:', err)
     }
 
     const template = messageTemplates[type]
