@@ -30,21 +30,35 @@ interface CinemaMenuItem {
   ar: string
 }
 
-// Phrases scrolling between hero and the menu section. Mix of EN + AR.
-// Arabic: تفضل (tfadal — please come in / help yourself),
-//         بالعافية (bel3afia — to your strength / enjoy your meal),
-//         بالهنا والشفا (bel-hana wel-shifa — to your enjoyment + health),
-//         صحتين (sahteen — to your health), كافيه كاظم (Cafe Kadhem).
-const HERO_MARQUEE_ITEMS = [
+// Phrases scrolling between hero and the menu section. Strictly
+// alternates EN ↔ AR. Arabic glosses:
+//   كافيه كاظم — Cafe Kadhem
+//   صحتين      — sahteen ("to your health")
+//   تفضل       — tfadal ("please come in / help yourself")
+//   بالعافية    — bel3afia ("enjoy your meal")
+const HERO_MARQUEE_EN = [
   'EVERYTHING FROM SCRATCH',
-  'كافيه كاظم',
   "BETTER THAN YOUR GRANDMA'S",
-  'صحتين',
-  'تفضل',
-  'بالهنا والشفا',
-  'بالعافية',
   'PISTACHIO BUNS HOT AT 9AM',
+  'COME HUNGRY',
 ]
+const HERO_MARQUEE_AR = ['كافيه كاظم', 'صحتين', 'تفضل', 'بالعافية']
+const HERO_MARQUEE_ITEMS = interleaveAlternating(HERO_MARQUEE_EN, HERO_MARQUEE_AR)
+
+/**
+ * Zips two lists so the output strictly alternates between them.
+ * If the lists are uneven the longer one's leftover entries get
+ * appended at the end (acceptable for a marquee that loops).
+ */
+function interleaveAlternating<T>(a: T[], b: T[]): T[] {
+  const out: T[] = []
+  const max = Math.max(a.length, b.length)
+  for (let i = 0; i < max; i++) {
+    if (i < a.length) out.push(a[i])
+    if (i < b.length) out.push(b[i])
+  }
+  return out
+}
 
 // Designer-supplied fallback copy when the live event row is missing the
 // optional cinema fields (Arabic display word, tagline, bullets). This
@@ -276,13 +290,19 @@ function HeroSection({ event }: { event: CinemaEvent }) {
         }}
       >
         {/* LEFT — POSTER */}
+        {/* Wrap is transparent so any space below the caption (when the
+            right RSVP rail is taller than poster + caption) shows the
+            page bg, not a stranded cobalt band. The 4:3 inner frame
+            still has cobalt as its placeholder color. */}
         <div
           className="ck-poster-wrap"
           style={{
             position: 'relative',
-            background: 'var(--ck-cobalt)',
+            background: 'transparent',
             overflow: 'hidden',
             borderRight: '3px solid var(--ck-ink)',
+            display: 'flex',
+            flexDirection: 'column',
           }}
         >
           <div

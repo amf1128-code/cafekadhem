@@ -25,6 +25,7 @@ export function CinemaEventDetail() {
   const [myRsvp, setMyRsvp] = useState<RSVP | null>(null)
   const [myPlusOne, setMyPlusOne] = useState<RsvpWithGuest | null>(null)
   const [loading, setLoading] = useState(true)
+  const [listOpen, setListOpen] = useState(false)
 
   useEffect(() => {
     if (id) loadEvent()
@@ -116,7 +117,29 @@ export function CinemaEventDetail() {
   const time = formatTime(event.start_time, event.end_time)
   const loc = [event.location_name, event.location].filter(Boolean).join(' · ')
   const price = Math.round(event.ticket_price ?? 0)
-  const yesCount = rsvps.filter(r => r.status === 'yes').length
+  // Group RSVPs into hosts (plus_one_of === null) + their plus-ones, plus
+  // separate maybe and waitlist buckets. The +1s collapse onto their host
+  // row as a "+1" suffix instead of rendering as standalone names.
+  const hosts = rsvps.filter(r => r.plus_one_of === null)
+  const plusOnes = rsvps.filter(r => r.plus_one_of !== null)
+  const plusOneCountByHost = new Map<string, number>()
+  for (const po of plusOnes) {
+    if (po.plus_one_of) {
+      plusOneCountByHost.set(
+        po.plus_one_of,
+        (plusOneCountByHost.get(po.plus_one_of) ?? 0) + 1,
+      )
+    }
+  }
+  const goingHosts = hosts.filter(r => r.status === 'yes')
+  const maybeHosts = hosts.filter(r => r.status === 'maybe')
+  const waitlistHosts = hosts.filter(r => r.status === 'waitlisted')
+  const goingSeatCount =
+    goingHosts.length +
+    goingHosts.reduce(
+      (sum, h) => sum + (plusOneCountByHost.get(h.id) ?? 0),
+      0,
+    )
 
   return (
     <>
@@ -499,13 +522,18 @@ export function CinemaEventDetail() {
         </section>
       )}
 
-      {/* RSVP roster (lightweight). The full RSVP form still lives at
-          /events/:id; the cinema 'RSVP' button above links there. */}
-      {rsvps.length > 0 && (
+      {/* RSVP roster — summary counts + "See full list" modal. The
+          page itself only shows totals so it scales to events with
+          hundreds of RSVPs. The modal opens a scrollable, sectioned
+          list (Going / Maybe / Waitlist). Plus-ones collapse onto
+          their host as a "+1" suffix. */}
+      {hosts.length > 0 && (
         <section className="ck-page" style={{ borderBottom: 'none' }}>
           <div className="ck-eyebrow">Who&apos;s in</div>
           <div className="ck-section-head-row" style={{ marginTop: 6 }}>
-            <h2 className="ck-h2">{yesCount} ON THE LIST.</h2>
+            <h2 className="ck-h2">
+              {goingSeatCount} ON THE LIST.
+            </h2>
             <span
               style={{
                 fontFamily: 'var(--ck-arabic-display)',
@@ -520,42 +548,304 @@ export function CinemaEventDetail() {
           </div>
           <div
             style={{
-              marginTop: 18,
+              marginTop: 14,
               display: 'flex',
+              gap: 22,
               flexWrap: 'wrap',
-              gap: 8,
+              fontFamily: 'var(--ck-mono)',
+              fontSize: 11,
+              letterSpacing: '0.16em',
+              textTransform: 'uppercase',
             }}
           >
-            {rsvps.map(r => (
-              <span
-                key={r.id}
-                style={{
-                  padding: '6px 14px',
-                  border: '2px solid var(--ck-ink)',
-                  background:
-                    r.status === 'yes'
-                      ? 'var(--ck-cream)'
-                      : r.status === 'waitlisted'
-                        ? 'var(--ck-paper)'
-                        : 'transparent',
-                  fontFamily: 'var(--ck-sans)',
-                  fontSize: 13,
-                  fontWeight: 600,
-                }}
-              >
-                {r.guest?.first_name ?? 'Guest'}
-                {r.status === 'maybe' && (
-                  <span style={{ opacity: 0.55, marginLeft: 6 }}>· maybe</span>
-                )}
-                {r.status === 'waitlisted' && (
-                  <span style={{ opacity: 0.55, marginLeft: 6 }}>· waitlist</span>
-                )}
+            <span>
+              <span style={{ color: 'var(--ck-cobalt)' }}>{goingSeatCount}</span>{' '}
+              going
+            </span>
+            {maybeHosts.length > 0 && (
+              <span>
+                <span style={{ color: 'var(--ck-cobalt)' }}>{maybeHosts.length}</span>{' '}
+                maybe
               </span>
-            ))}
+            )}
+            {waitlistHosts.length > 0 && (
+              <span>
+                <span style={{ color: 'var(--ck-cobalt)' }}>{waitlistHosts.length}</span>{' '}
+                waitlist
+              </span>
+            )}
           </div>
+          <button
+            type="button"
+            className="ck-btn"
+            onClick={() => setListOpen(true)}
+            style={{ marginTop: 22 }}
+          >
+            See the list →
+          </button>
         </section>
       )}
+
+      {listOpen && (
+        <RsvpListModal
+          onClose={() => setListOpen(false)}
+          goingHosts={goingHosts}
+          maybeHosts={maybeHosts}
+          waitlistHosts={waitlistHosts}
+          plusOneCountByHost={plusOneCountByHost}
+        />
+      )}
     </>
+  )
+}
+
+/** Modal that lists every RSVP grouped by status. Plus-ones collapse
+ *  onto their host with a +1 suffix. Scrollable for events with many
+ *  RSVPs. */
+function RsvpListModal({
+  onClose,
+  goingHosts,
+  maybeHosts,
+  waitlistHosts,
+  plusOneCountByHost,
+}: {
+  onClose: () => void
+  goingHosts: RsvpWithGuest[]
+  maybeHosts: RsvpWithGuest[]
+  waitlistHosts: RsvpWithGuest[]
+  plusOneCountByHost: Map<string, number>
+}) {
+  // Lock body scroll while the modal is open + close on Escape.
+  useEffect(() => {
+    const prev = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    function onKey(e: KeyboardEvent) {
+      if (e.key === 'Escape') onClose()
+    }
+    document.addEventListener('keydown', onKey)
+    return () => {
+      document.body.style.overflow = prev
+      document.removeEventListener('keydown', onKey)
+    }
+  }, [onClose])
+
+  return (
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-label="Who's coming"
+      onClick={onClose}
+      style={{
+        position: 'fixed',
+        inset: 0,
+        background: 'rgba(13, 13, 15, 0.7)',
+        zIndex: 200,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: 24,
+      }}
+    >
+      <div
+        onClick={e => e.stopPropagation()}
+        style={{
+          background: 'var(--ck-cream)',
+          border: '3px solid var(--ck-ink)',
+          width: 'min(560px, 100%)',
+          maxHeight: '85vh',
+          display: 'flex',
+          flexDirection: 'column',
+          boxShadow: '8px 8px 0 var(--ck-ink)',
+        }}
+      >
+        <div
+          style={{
+            padding: '18px 22px',
+            borderBottom: '2px solid var(--ck-ink)',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            background: 'var(--ck-cream)',
+          }}
+        >
+          <div>
+            <div
+              style={{
+                fontFamily: 'var(--ck-mono)',
+                fontSize: 10,
+                letterSpacing: '0.18em',
+                textTransform: 'uppercase',
+                color: 'var(--ck-cobalt)',
+              }}
+            >
+              ✦ Who&apos;s coming
+            </div>
+            <div
+              style={{
+                fontFamily: 'var(--ck-serif)',
+                fontWeight: 900,
+                fontSize: 26,
+                lineHeight: 1,
+                marginTop: 4,
+              }}
+            >
+              The list.
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Close"
+            style={{
+              background: 'transparent',
+              border: 'none',
+              fontSize: 28,
+              lineHeight: 1,
+              cursor: 'pointer',
+              color: 'var(--ck-ink)',
+              padding: 0,
+            }}
+          >
+            ×
+          </button>
+        </div>
+        <div
+          style={{
+            padding: 22,
+            overflowY: 'auto',
+            flex: 1,
+            background: 'var(--ck-cream)',
+          }}
+        >
+          <RsvpListGroup
+            label="Going"
+            ar="قادم"
+            hosts={goingHosts}
+            plusOneCountByHost={plusOneCountByHost}
+            emptyText="Nobody yet — be the first."
+          />
+          {maybeHosts.length > 0 && (
+            <RsvpListGroup
+              label="Maybe"
+              ar="ربما"
+              hosts={maybeHosts}
+              plusOneCountByHost={plusOneCountByHost}
+              emptyText=""
+            />
+          )}
+          {waitlistHosts.length > 0 && (
+            <RsvpListGroup
+              label="Waitlist"
+              ar="قائمة الانتظار"
+              hosts={waitlistHosts}
+              plusOneCountByHost={plusOneCountByHost}
+              emptyText=""
+            />
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function RsvpListGroup({
+  label,
+  ar,
+  hosts,
+  plusOneCountByHost,
+  emptyText,
+}: {
+  label: string
+  ar: string
+  hosts: RsvpWithGuest[]
+  plusOneCountByHost: Map<string, number>
+  emptyText: string
+}) {
+  return (
+    <div style={{ marginBottom: 22 }}>
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'baseline',
+          paddingBottom: 6,
+          marginBottom: 10,
+          borderBottom: '1px dashed var(--ck-ink)',
+          fontFamily: 'var(--ck-mono)',
+          fontSize: 10,
+          letterSpacing: '0.18em',
+          textTransform: 'uppercase',
+        }}
+      >
+        <span>
+          {label} ({hosts.length})
+        </span>
+        <span
+          style={{
+            fontFamily: 'var(--ck-arabic-display)',
+            fontSize: 18,
+            direction: 'rtl',
+            color: 'var(--ck-cobalt)',
+            letterSpacing: 0,
+          }}
+        >
+          {ar}
+        </span>
+      </div>
+      {hosts.length === 0 && emptyText ? (
+        <p
+          className="ck-italic"
+          style={{ fontSize: 14, opacity: 0.7, margin: 0 }}
+        >
+          {emptyText}
+        </p>
+      ) : (
+        <ul
+          style={{
+            listStyle: 'none',
+            padding: 0,
+            margin: 0,
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 6,
+          }}
+        >
+          {hosts.map(h => {
+            const plusOnes = plusOneCountByHost.get(h.id) ?? 0
+            return (
+              <li
+                key={h.id}
+                style={{
+                  fontFamily: 'var(--ck-sans)',
+                  fontSize: 15,
+                  lineHeight: 1.35,
+                }}
+              >
+                <span style={{ fontWeight: 600 }}>
+                  {h.guest?.first_name ?? 'Guest'}
+                </span>
+                {plusOnes > 0 && (
+                  <span
+                    style={{
+                      marginLeft: 8,
+                      padding: '2px 8px',
+                      border: '1px solid var(--ck-ink)',
+                      background: 'var(--ck-paper)',
+                      fontFamily: 'var(--ck-mono)',
+                      fontSize: 10,
+                      letterSpacing: '0.14em',
+                      textTransform: 'uppercase',
+                    }}
+                  >
+                    +{plusOnes}
+                  </span>
+                )}
+              </li>
+            )
+          })}
+        </ul>
+      )}
+    </div>
   )
 }
 

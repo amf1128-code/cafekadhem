@@ -11,16 +11,21 @@ const NAV_LINKS = [
   { en: 'TICKETS', ar: 'تذاكر', href: '/cinema/my-tickets' },
 ]
 
-const FOOTER_MARQUEE = [
+// Phrases scrolling at the bottom of every cinema page. Same set as
+// the hero marquee — kept in sync intentionally so the chrome reads
+// consistent. Strictly alternates EN ↔ AR.
+const FOOTER_MARQUEE_EN = [
   'EVERYTHING FROM SCRATCH',
-  'كافيه كاظم',
   "BETTER THAN YOUR GRANDMA'S",
-  'صحتين',
-  'تفضل',
-  'بالهنا والشفا',
-  'بالعافية',
   'PISTACHIO BUNS HOT AT 9AM',
+  'COME HUNGRY',
 ]
+const FOOTER_MARQUEE_AR = ['كافيه كاظم', 'صحتين', 'تفضل', 'بالعافية']
+const FOOTER_MARQUEE: string[] = []
+for (let i = 0; i < Math.max(FOOTER_MARQUEE_EN.length, FOOTER_MARQUEE_AR.length); i++) {
+  if (i < FOOTER_MARQUEE_EN.length) FOOTER_MARQUEE.push(FOOTER_MARQUEE_EN[i])
+  if (i < FOOTER_MARQUEE_AR.length) FOOTER_MARQUEE.push(FOOTER_MARQUEE_AR[i])
+}
 
 const CONTACT = {
   email: 'HI@CAFEKADHEM.COM',
