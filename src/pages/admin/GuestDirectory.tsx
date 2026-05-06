@@ -14,10 +14,40 @@ export function AdminGuestDirectory() {
   const [guests, setGuests] = useState<(Guest & { event_count: number })[]>([])
   const [search, setSearch] = useState('')
   const [loading, setLoading] = useState(true)
+  const [nukingId, setNukingId] = useState<string | null>(null)
 
   useEffect(() => {
     loadGuests()
   }, [])
+
+  async function handleNuke(guest: Guest) {
+    const label = `${guest.first_name}${guest.last_name ? ' ' + guest.last_name : ''}`
+    if (!confirm(
+      `Permanently delete ${label} and every RSVP, order, ticket, and notification tied to them?\n\nThis cannot be undone.`
+    )) return
+
+    setNukingId(guest.id)
+    try {
+      const { data, error } = await supabase.rpc('nuke_guest', { p_guest_id: guest.id })
+      if (error) throw error
+      if (!data?.guest_found) {
+        addToast('Guest already gone', 'error')
+      } else {
+        const parts: string[] = []
+        if (data.rsvps) parts.push(`${data.rsvps} RSVP${data.rsvps === 1 ? '' : 's'}`)
+        if (data.orders) parts.push(`${data.orders} order${data.orders === 1 ? '' : 's'}`)
+        if (data.pickup_orders) parts.push(`${data.pickup_orders} pickup`)
+        if (data.notifications) parts.push(`${data.notifications} notif`)
+        if (data.invites_sent) parts.push(`${data.invites_sent} invite${data.invites_sent === 1 ? '' : 's'}`)
+        addToast(`Nuked ${label}${parts.length ? ' — ' + parts.join(', ') : ''}`)
+      }
+      setGuests(prev => prev.filter(g => g.id !== guest.id))
+    } catch (err) {
+      addToast(err instanceof Error ? err.message : 'Failed to delete guest', 'error')
+    } finally {
+      setNukingId(null)
+    }
+  }
 
   async function loadGuests() {
     const { data } = await supabase
@@ -96,6 +126,7 @@ export function AdminGuestDirectory() {
               <th className="text-left px-4 py-2 font-medium text-ink/70">Instagram</th>
               <th className="text-left px-4 py-2 font-medium text-ink/70">Pref</th>
               <th className="text-left px-4 py-2 font-medium text-ink/70">Events</th>
+              <th className="text-right px-4 py-2 font-medium text-ink/70"></th>
             </tr>
           </thead>
           <tbody>
@@ -123,6 +154,17 @@ export function AdminGuestDirectory() {
                 </td>
                 <td className="px-4 py-3 text-ink/60">{guest.notification_preference}</td>
                 <td className="px-4 py-3 text-ink/60">{guest.event_count}</td>
+                <td className="px-4 py-3 text-right">
+                  <Button
+                    variant="danger"
+                    size="sm"
+                    loading={nukingId === guest.id}
+                    disabled={nukingId !== null && nukingId !== guest.id}
+                    onClick={() => handleNuke(guest)}
+                  >
+                    Delete
+                  </Button>
+                </td>
               </tr>
             ))}
           </tbody>
