@@ -21,19 +21,23 @@ interface RSVPFormProps {
   onRsvpComplete: () => void
 }
 
-function UnderlineInput({
+function CinemaField({
   label,
+  optional,
   ...props
-}: { label: string } & React.InputHTMLAttributes<HTMLInputElement>) {
+}: {
+  label: string
+  optional?: boolean
+} & React.InputHTMLAttributes<HTMLInputElement>) {
   return (
-    <div className="flex items-baseline gap-4">
-      <label className="text-[10px] tracking-[0.2em] uppercase text-ink-muted whitespace-nowrap min-w-[80px]">
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+      <label className="ck-label">
         {label}
+        {optional && (
+          <span style={{ opacity: 0.5, marginLeft: 6 }}>· optional</span>
+        )}
       </label>
-      <input
-        className="flex-1 border-0 border-b border-warm bg-transparent py-2 font-script text-lg text-ink italic placeholder:text-stone-dark placeholder:italic outline-none focus:border-ink transition-colors"
-        {...props}
-      />
+      <input className="ck-input" {...props} />
     </div>
   )
 }
@@ -378,97 +382,163 @@ export function RSVPForm({ eventId, event, existingRsvp, existingPlusOne, isFull
     const isMobile = typeof navigator !== 'undefined' && /iPhone|iPad|iPod|Android/i.test(navigator.userAgent)
 
     return (
-      <div className="text-center py-4">
-        <p className="font-serif text-xl text-ink italic mb-1">
-          Your RSVP: <span className={isWaitlisted ? 'text-accent' : 'text-forest'}>
-            {statusLabels[existingRsvp.status] || existingRsvp.status}
-          </span>
-        </p>
+      <div style={{ textAlign: 'center', padding: '8px 0' }}>
+        <div className="ck-label" style={{ marginBottom: 6 }}>
+          Your RSVP
+        </div>
+        <div
+          style={{
+            fontFamily: 'var(--ck-serif)',
+            fontWeight: 900,
+            fontSize: 32,
+            lineHeight: 1,
+            color: isWaitlisted ? 'var(--ck-magenta)' : 'var(--ck-cobalt)',
+          }}
+        >
+          {(statusLabels[existingRsvp.status] || existingRsvp.status).toUpperCase()}
+        </div>
         {isWaitlisted && existingRsvp.waitlist_position && (
-          <p className="text-sm text-ink-muted mb-3">Position #{existingRsvp.waitlist_position} on the waitlist</p>
+          <div className="ck-mono" style={{ marginTop: 6, opacity: 0.7 }}>
+            Position #{existingRsvp.waitlist_position} on the waitlist
+          </div>
         )}
         {existingPlusOne && (
-          <p className="text-sm text-ink-muted mb-3">
-            Bringing a +1: <span className="text-ink">{existingPlusOne.guest.first_name}</span>
-          </p>
+          <div className="ck-mono" style={{ marginTop: 8, opacity: 0.75 }}>
+            Bringing{' '}
+            <span style={{ color: 'var(--ck-cobalt)' }}>
+              {existingPlusOne.guest.first_name}
+            </span>{' '}
+            +1
+          </div>
         )}
 
         {showPaymentFlow && (
-          <div className="mt-6 mb-4 border border-warm rounded-lg p-5 text-left bg-cream/40">
-            <p className="text-[10px] tracking-[0.2em] uppercase text-ink-muted mb-2">Ticket Payment</p>
+          <div
+            className="ck-card ck-card--paper"
+            style={{ marginTop: 22, padding: 20, textAlign: 'left' }}
+          >
+            <div className="ck-label" style={{ color: 'var(--ck-cobalt)' }}>
+              ✦ Ticket payment
+            </div>
             {existingRsvp.payment_status === 'pending' ? (
               <>
-                <p className="font-serif text-lg text-ink italic mb-2">
+                <p
+                  className="ck-italic"
+                  style={{ fontSize: 17, marginTop: 8, lineHeight: 1.4 }}
+                >
                   Payment received — awaiting confirmation.
                 </p>
-                <p className="text-sm text-ink-muted">
-                  Your host will verify the Venmo and send your QR-code ticket. If you haven't actually sent it yet, you can resend below.
+                <p
+                  style={{
+                    fontFamily: 'var(--ck-sans)',
+                    fontSize: 13,
+                    lineHeight: 1.5,
+                    marginTop: 8,
+                    opacity: 0.75,
+                  }}
+                >
+                  Your host will verify the Venmo and send your QR-code ticket.
+                  If you haven&apos;t sent it yet, resend below.
                 </p>
               </>
             ) : (
               <>
-                <p className="font-serif text-lg text-ink italic mb-3">
-                  Send <span className="font-medium not-italic">${amount}</span> via Venmo to confirm your seat.
+                <p
+                  className="ck-italic"
+                  style={{ fontSize: 17, marginTop: 8, lineHeight: 1.4 }}
+                >
+                  Send{' '}
+                  <span
+                    style={{
+                      fontStyle: 'normal',
+                      fontFamily: 'var(--ck-serif)',
+                      fontWeight: 800,
+                    }}
+                  >
+                    ${amount}
+                  </span>{' '}
+                  via Venmo to confirm your seat.
                 </p>
-                <p className="text-sm text-ink-muted mb-3">
-                  Note must include your name and the event title so your host can match the payment.
+                <p
+                  style={{
+                    fontFamily: 'var(--ck-sans)',
+                    fontSize: 13,
+                    lineHeight: 1.5,
+                    marginTop: 8,
+                    opacity: 0.75,
+                  }}
+                >
+                  The note must include your name and the event title so your
+                  host can match the payment.
                 </p>
               </>
             )}
-            {venmoHandle && (
-              <a
-                href={isMobile ? venmoMobileUrl : venmoWebUrl}
-                target={isMobile ? undefined : '_blank'}
-                rel="noopener noreferrer"
-                className="inline-block bg-forest text-cream px-6 py-3 text-xs tracking-[0.2em] uppercase hover:bg-forest-light transition-colors"
-              >
-                Pay ${amount} on Venmo
-              </a>
-            )}
-            <div className="mt-4">
+            <div
+              style={{
+                display: 'flex',
+                gap: 8,
+                marginTop: 14,
+                flexWrap: 'wrap',
+              }}
+            >
+              {venmoHandle && (
+                <a
+                  href={isMobile ? venmoMobileUrl : venmoWebUrl}
+                  target={isMobile ? undefined : '_blank'}
+                  rel="noopener noreferrer"
+                  className="ck-btn ck-btn--primary"
+                >
+                  Pay ${amount} on Venmo →
+                </a>
+              )}
               <button
+                type="button"
                 onClick={handleMarkPaymentPending}
                 disabled={markingPaid || existingRsvp.payment_status === 'pending'}
-                className="border border-warm px-5 py-2 text-xs tracking-[0.2em] uppercase text-ink-muted hover:border-ink hover:text-ink transition-colors disabled:opacity-50"
+                className="ck-btn"
               >
                 {existingRsvp.payment_status === 'pending'
-                  ? "[ Marked as Paid ]"
+                  ? 'Marked as paid'
                   : markingPaid
-                  ? '[ Recording... ]'
-                  : "[ I've Paid ]"}
+                    ? 'Recording…'
+                    : "I've paid"}
               </button>
             </div>
           </div>
         )}
 
         {showTicketLink && (
-          <div className="mt-6 mb-4">
+          <div style={{ marginTop: 22 }}>
             <a
               href={`/ticket/${existingRsvp.ticket_token}`}
-              className="inline-block bg-forest text-cream px-8 py-3 text-xs tracking-[0.2em] uppercase hover:bg-forest-light transition-colors"
+              className="ck-btn ck-btn--primary"
             >
-              View Your Ticket
+              View your ticket →
             </a>
-            <p className="text-xs text-ink-muted mt-2 italic">
-              Also sent via {existingRsvp.checked_in_at ? 'your preferred channel' : 'email or SMS'}.
+            <p
+              className="ck-mono"
+              style={{ marginTop: 10, opacity: 0.65 }}
+            >
+              Also sent via{' '}
+              {existingRsvp.checked_in_at ? 'your preferred channel' : 'email or SMS'}.
             </p>
           </div>
         )}
 
         <button
+          type="button"
           onClick={() => setShowForm(true)}
-          className="border border-warm px-6 py-2 text-xs tracking-[0.2em] uppercase text-ink-muted hover:border-ink hover:text-ink transition-colors"
+          className="ck-btn"
+          style={{ marginTop: 22 }}
         >
-          [ Change RSVP ]
+          Change RSVP
         </button>
 
-        {/* Share affordance. Shown only for confirmed yes-RSVPs (or
-            waitlisted, since the friend might still get in). The URL
-            carries ?ref=<sharer_guest_id> for soft attribution; never
-            ?as= (those are personal recognition tokens).
+        {/* Share affordance — shows on yes / waitlisted RSVPs.
+            URL carries ?ref=<sharer_guest_id> for soft attribution.
             USER_FLOWS_SPEC.md §3a.8. */}
         {event && (existingRsvp.status === 'yes' || existingRsvp.status === 'waitlisted') && (
-          <div className="mt-6">
+          <div style={{ marginTop: 22 }}>
             <ShareButton
               url={`${window.location.origin}/events/${eventId}?ref=${existingRsvp.guest_id}`}
               title={event.title}
@@ -482,29 +552,32 @@ export function RSVPForm({ eventId, event, existingRsvp, existingPlusOne, isFull
   }
 
   return (
-    <form onSubmit={(e: FormEvent) => e.preventDefault()} className="space-y-6">
-      <UnderlineInput
+    <form
+      onSubmit={(e: FormEvent) => e.preventDefault()}
+      style={{ display: 'flex', flexDirection: 'column', gap: 14 }}
+    >
+      <CinemaField
         label="Name"
         value={firstName}
         onChange={e => setFirstName(e.target.value)}
-        placeholder="Enter your first name"
+        placeholder="Your first name"
         required
       />
-      <UnderlineInput
-        label="Last Name"
+      <CinemaField
+        label="Last name"
+        optional
         value={lastName}
         onChange={e => setLastName(e.target.value)}
-        placeholder="Optional"
       />
-      <UnderlineInput
+      <CinemaField
         label="Email"
         type="email"
         value={email}
         onChange={e => setEmail(e.target.value)}
-        placeholder="email@address.com"
+        placeholder="you@example.com"
       />
       {smsEnabled && (
-        <UnderlineInput
+        <CinemaField
           label="Phone"
           type="tel"
           value={phone}
@@ -512,30 +585,50 @@ export function RSVPForm({ eventId, event, existingRsvp, existingPlusOne, isFull
           placeholder="Required if no email"
         />
       )}
-      <UnderlineInput
+      <CinemaField
         label="Instagram"
+        optional
         value={instagram}
         onChange={e => setInstagram(e.target.value)}
-        placeholder="Optional (without @)"
+        placeholder="(without @)"
       />
 
       {/* Plus-one toggle. Only shown for first-time RSVPs to non-ticketed
           events; the +1 is created when the user clicks Reserve a Seat. */}
       {showPlusOneToggle && (
-        <div className="space-y-3 pt-1">
-          <label className="flex items-center gap-3 cursor-pointer">
+        <div
+          style={{
+            marginTop: 4,
+            padding: 14,
+            border: '2px solid var(--ck-ink)',
+            background: 'var(--ck-paper)',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 10,
+          }}
+        >
+          <label
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 10,
+              cursor: 'pointer',
+              fontFamily: 'var(--ck-mono)',
+              fontSize: 11,
+              letterSpacing: '0.16em',
+              textTransform: 'uppercase',
+            }}
+          >
             <input
               type="checkbox"
               checked={plusOne}
               onChange={e => setPlusOne(e.target.checked)}
-              className="h-4 w-4"
+              style={{ width: 16, height: 16, accentColor: 'var(--ck-cobalt)' }}
             />
-            <span className="text-[10px] tracking-[0.2em] uppercase text-ink-muted">
-              Bringing a +1?
-            </span>
+            Bringing a +1?
           </label>
           {plusOne && (
-            <UnderlineInput
+            <CinemaField
               label="+1 Name"
               value={plusOneName}
               onChange={e => setPlusOneName(e.target.value)}
@@ -545,38 +638,48 @@ export function RSVPForm({ eventId, event, existingRsvp, existingPlusOne, isFull
         </div>
       )}
 
-      {/* RSVP buttons — bracket style.
+      {/* RSVP buttons.
           Server-side guard: safe_create_rsvp (migration 033) blocks
           status changes away from 'yes' on paid RSVPs. If a guest
-          tries, they'll get a toast — refund flow is handled by the
-          host out-of-band. */}
-      <div className="flex justify-center pt-4">
-        <div className="flex flex-wrap justify-center gap-3">
-          <button
-            type="button"
-            onClick={() => handleRSVP('yes')}
-            disabled={loading}
-            className="border border-forest px-8 py-3 text-xs tracking-[0.2em] uppercase text-forest hover:bg-forest hover:text-cream transition-colors disabled:opacity-50 whitespace-nowrap"
-          >
-            [ {isFull ? 'Join Waitlist' : 'Reserve a Seat'} ]
-          </button>
-          <button
-            type="button"
-            onClick={() => handleRSVP('maybe')}
-            disabled={loading}
-            className="border border-warm px-6 py-3 text-xs tracking-[0.2em] uppercase text-ink-muted hover:border-ink hover:text-ink transition-colors disabled:opacity-50 whitespace-nowrap"
-          >
-            [ Maybe ]
-          </button>
-          <button
-            type="button"
-            onClick={() => handleRSVP('no')}
-            disabled={loading}
-            className="px-4 py-3 text-xs tracking-[0.2em] uppercase text-stone-dark hover:text-ink transition-colors disabled:opacity-50"
-          >
-            Decline
-          </button>
-        </div>
+          tries, they'll get a toast — refund flow is host-managed. */}
+      <div
+        style={{
+          display: 'flex',
+          flexWrap: 'wrap',
+          gap: 8,
+          marginTop: 6,
+        }}
+      >
+        <button
+          type="button"
+          onClick={() => handleRSVP('yes')}
+          disabled={loading}
+          className="ck-btn ck-btn--primary"
+          style={{ flex: '1 1 200px' }}
+        >
+          {loading ? 'Saving…' : isFull ? 'Join waitlist →' : 'Reserve a seat →'}
+        </button>
+        <button
+          type="button"
+          onClick={() => handleRSVP('maybe')}
+          disabled={loading}
+          className="ck-btn"
+        >
+          Maybe
+        </button>
+        <button
+          type="button"
+          onClick={() => handleRSVP('no')}
+          disabled={loading}
+          className="ck-btn"
+          style={{
+            background: 'transparent',
+            border: '2px solid transparent',
+            opacity: 0.6,
+          }}
+        >
+          Decline
+        </button>
       </div>
       <ConsentNote verb="rsvp" />
     </form>
