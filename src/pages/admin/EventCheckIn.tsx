@@ -61,7 +61,7 @@ export function AdminEventCheckIn() {
       supabase.from('events').select('*').eq('id', id!).single(),
       supabase
         .from('rsvps')
-        .select('*, guest:guests(*)')
+        .select('*, guest:guests!guest_id(*)')
         .eq('event_id', id!)
         .eq('status', 'yes')
         .eq('payment_status', 'paid')

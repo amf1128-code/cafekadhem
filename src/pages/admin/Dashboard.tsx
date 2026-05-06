@@ -50,7 +50,7 @@ export function AdminDashboard() {
     // Load recent RSVPs
     const { data: rsvpData } = await supabase
       .from('rsvps')
-      .select('*, guest:public_guest_profiles(*)')
+      .select('*, guest:public_guest_profiles!guest_id(*)')
       .order('created_at', { ascending: false })
       .limit(20)
 
