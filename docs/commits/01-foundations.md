@@ -2,11 +2,11 @@
 
 > **Goal:** add the schema scaffolding every later commit depends on, without changing any user-visible behavior. After this commit ships, the app should look and behave identically to before; only the database has new columns, indexes, and helper functions.
 
-**Status:** ⬜ not started
+**Status:** 🟢 committed (pending user verification)
 **Prerequisites:** none (first commit)
-**Estimated migration files:** 6 (numbers `029` through `034`)
-**SHA on commit:** —
-**User-verified:** —
+**Estimated migration files:** 6 (numbers `029` through `034`) — all created
+**SHA on commit:** *(see git log on `claude/user-flow-consistency-ipcaU`)*
+**User-verified:** ⬜ pending
 
 ---
 
@@ -580,26 +580,36 @@ TRUNCATE TABLE rsvps, orders, order_items, pickup_orders, pickup_order_items,
 
 ## Status section (updated as work progresses)
 
-**Last updated:** *(when implementation starts)*
+**Last updated:** 2026-05-06, end of Commit 1
 
 | Sub-item | Status | Notes |
 |---|---|---|
-| 029 — get_guest_event_state | ⬜ | |
-| 030 — notifications dedup_key | ⬜ | |
-| 031 — orders idempotency | ⬜ | |
-| 032 — invites metadata | ⬜ | |
-| 033 — safe_create_rsvp lock | ⬜ | |
-| 034 — plus_one_sync trigger | ⬜ | |
-| `src/lib/utils/contact.ts` | ⬜ | |
-| RSVPForm/Order/Pickup imports | ⬜ | |
-| Manual tests (1–6 above) | ⬜ | |
+| 029 — get_guest_event_state | 🟢 | Returns `rsvps`-row-derived JSON; `invited_by` is NULL until Commit 4 |
+| 030 — notifications dedup_key | 🟢 | Column + partial unique index added |
+| 031 — orders idempotency | 🟢 | Both `orders` and `pickup_orders` |
+| 032 — invites metadata | 🟢 | `consumed_by_guest_id`, `send_attempt_n`, `last_sent_at`, partial unique index |
+| 033 — safe_create_rsvp lock | 🟢 | Advisory lock + paid-RSVP block. Return type preserved (`rsvps` row). Dedup from 025 retained |
+| 034 — plus_one_sync trigger | 🟢 | Uses `plus_one_of` (RSVP id), not `plus_one_of_guest_id` as in original plan |
+| `src/lib/utils/contact.ts` | 🟢 | Re-exports `normalizePhone` from `phone.ts`; adds `normalizeEmail` + `normalizeInstagram` |
+| RSVPForm/Order/Pickup imports | n/a | Already imported from `phone.ts`; no change needed |
+| Manual tests (1–6 above) | ⬜ | Pending user verification |
 
 ### Result notes (post-commit)
 
-*(To be filled in after committing.)*
-
-- Commit SHA:
-- Files actually changed:
-- Deviations from plan:
-- Open questions raised:
-- Time spent:
+- **Commit SHA:** *(see git log)*
+- **Files actually changed:**
+  - `supabase/migrations/029_get_guest_event_state.sql` (new)
+  - `supabase/migrations/030_notifications_dedup_key.sql` (new)
+  - `supabase/migrations/031_orders_idempotency.sql` (new)
+  - `supabase/migrations/032_invites_metadata.sql` (new)
+  - `supabase/migrations/033_safe_create_rsvp_lock.sql` (new)
+  - `supabase/migrations/034_plus_one_sync_trigger.sql` (new)
+  - `src/lib/utils/contact.ts` (new)
+- **Deviations from plan** (also logged in `IMPLEMENTATION_PLAN.md` Open Questions):
+  1. `normalizePhone` already centralized in `phone.ts` — `contact.ts` re-exports it instead of duplicating.
+  2. Plus-one column is `plus_one_of` (RSVP id), not `plus_one_of_guest_id`. Migrations 029 + 034 corrected accordingly.
+  3. `safe_create_rsvp` return type preserved as `rsvps` (was jsonb in the plan, would have broken callers).
+  4. `get_guest_event_state.invited_by` returns NULL pending Commit 4 token wiring.
+  5. `RSVPForm`/`Order`/`Pickup` imports unchanged — they already use the centralized phone util.
+- **Open questions raised:** none beyond the deviations above.
+- **Build:** `npm run build` passes (after `npm install` to populate node_modules).

@@ -12,7 +12,7 @@
 
 | # | Commit | Status | SHA | User-verified | Doc |
 |---|---|---|---|---|---|
-| 1 | Foundations (additive schema, no behavior change) | ⬜ not started | — | — | [01-foundations.md](commits/01-foundations.md) |
+| 1 | Foundations (additive schema, no behavior change) | 🟢 committed | *(see git log)* | ⬜ pending user verification | [01-foundations.md](commits/01-foundations.md) |
 | 2 | Identity merge & reconciliation | ⬜ not started | — | — | [02-identity-merge.md](commits/02-identity-merge.md) |
 | 3 | Notifications hardening (channel routing, dedup, consent, suppression) | ⬜ not started | — | — | [03-notifications.md](commits/03-notifications.md) |
 | 4 | Recognition & sharing (ambient `?as=`, header, ShareButton, `?ref=`) | ⬜ not started | — | — | [04-recognition-sharing.md](commits/04-recognition-sharing.md) |
@@ -113,7 +113,13 @@ The list of functions modified is in each per-commit doc under **"User actions r
 
 > Anything Claude discovers during implementation that deviates from spec or needs user input. Append here; do not silently resolve.
 
-*(none yet)*
+### Commit 1 deviations from plan
+
+1. **`normalizePhone` was already centralized** at `src/lib/utils/phone.ts` (with `formatPhone` and `isValidPhone`). The plan said to "hoist" it; the actual move was to add `src/lib/utils/contact.ts` that re-exports `normalizePhone` from `phone.ts` and adds `normalizeEmail` + `normalizeInstagram`. RSVPForm/Order/Pickup imports were not changed (they already use the centralized `phone.ts`).
+2. **Plus-one column is `plus_one_of` (RSVP id)**, not `plus_one_of_guest_id`. The plan's trigger sketch and `get_guest_event_state` shape both used the wrong name. Migrations 029 and 034 use the actual column, joining through `rsvps.plus_one_of → rsvps.id` to find a parent's plus-ones, then to `guests` for the name.
+3. **`safe_create_rsvp` returns `rsvps` (the row), not jsonb.** The plan's sketch returned jsonb, which would have broken every existing caller. Migration 033 preserves the original signature; the body adds the advisory lock and the paid→non-yes block, plus keeps the contact-dedup logic from migration 025.
+4. **`get_guest_event_state.invited_by` is currently `NULL`**. Wiring it up requires the ambient/invite token resolution from Commit 4.
+5. **`useGuestEventState` hook** (planned in Commit 5) will type the response. The shape returned by 029 matches the plan's spec §5 shape exactly except for `invited_by` (see #4).
 
 ---
 
