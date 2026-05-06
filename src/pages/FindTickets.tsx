@@ -71,7 +71,7 @@ export function FindTickets() {
           Cafe Kadhem
         </p>
         <h1 className="font-serif text-2xl md:text-3xl text-forest-dark italic text-center mb-6">
-          Find my tickets
+          Find me
         </h1>
 
         {alreadyKnown && (
@@ -81,26 +81,38 @@ export function FindTickets() {
               onClick={() => navigate('/my-tickets')}
               className="text-sm text-forest underline hover:text-forest-dark"
             >
-              We recognize this device — go to my tickets
+              We recognize this device — take me to my stuff
             </button>
           </div>
         )}
 
         {sent ? (
-          <div className="text-center py-6">
-            <p className="font-serif text-lg text-ink mb-3 italic">Check your messages.</p>
-            <p className="text-sm text-ink-muted">
-              If we have a record of this contact, a link to your RSVPs and tickets is on its way.
-              The link expires in 24 hours.
+          <div className="text-center py-6 space-y-3">
+            <p className="font-serif text-lg text-ink italic">Check your messages.</p>
+            <p className="text-sm text-ink-muted leading-relaxed">
+              If we have a record of this contact, we just sent a one-tap link.
+              Tap it from your phone or computer and you'll see all your RSVPs,
+              tickets, and pickup orders in one place — no password needed.
+            </p>
+            <p className="text-xs text-ink-muted opacity-70">
+              The link works for 24 hours. If you don't see it, check your spam
+              folder, or try the other contact you might have used with us.
             </p>
           </div>
         ) : (
           <form onSubmit={handleSubmit} className="space-y-5">
-            <p className="text-sm text-ink-muted text-center">
-              {smsEnabled
-                ? "Enter the email or phone you used when you RSVP'd. If you used both, just one is enough — we'll send the link there."
-                : "Enter the email you used when you RSVP'd, and we'll send the link there."}
-            </p>
+            <div className="text-sm text-ink-muted text-center space-y-2 leading-relaxed">
+              <p>
+                {smsEnabled
+                  ? "Type the email or phone you've used with us before."
+                  : "Type the email you've used with us before."}
+              </p>
+              <p>
+                We'll send you a one-tap link that opens your RSVPs, tickets,
+                and pickup orders. No password, no sign-up — just tap the link
+                from your phone or computer.
+              </p>
+            </div>
             <div>
               <label className="block text-[10px] tracking-[0.2em] uppercase text-ink-muted mb-2">
                 {smsEnabled ? 'Email or phone' : 'Email'}

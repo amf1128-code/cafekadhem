@@ -103,7 +103,33 @@ Deno.serve(async (req: Request) => {
     if (insertErr) throw insertErr
 
     const link = `${SITE_URL}/my-tickets?t=${token}`
-    const message = `Your Cafe Kadhem ticket lookup link (expires in 24h): ${link}`
+    const smsMessage = `Your Cafe Kadhem magic link (expires in 24h). Tap to see your RSVPs, tickets, and pickup orders — no password needed: ${link}`
+    const emailSubject = 'Your Cafe Kadhem magic link'
+    const emailText = `Tap the link below to see all your RSVPs, tickets, and pickup orders. No password needed.\n\n${link}\n\nThis link works for 24 hours. If you didn't request it, you can ignore this email.`
+    const emailHtml = `<!doctype html>
+<html><body style="margin:0;padding:0;background:#fdfaf3;font-family:Georgia,'Times New Roman',serif;color:#1a2e1f;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#fdfaf3;padding:32px 16px;">
+    <tr><td align="center">
+      <table width="480" cellpadding="0" cellspacing="0" style="max-width:480px;background:#ffffff;border:1px solid #e7e0cf;padding:32px;">
+        <tr><td align="center" style="padding-bottom:8px;">
+          <p style="margin:0;letter-spacing:0.25em;text-transform:uppercase;font-size:11px;color:#6b6452;">Cafe Kadhem</p>
+        </td></tr>
+        <tr><td align="center" style="padding-bottom:24px;">
+          <h1 style="margin:8px 0 0;font-style:italic;font-weight:400;font-size:24px;color:#1a2e1f;">Your magic link</h1>
+        </td></tr>
+        <tr><td align="center" style="padding:8px 0 16px;">
+          <p style="margin:0;font-size:15px;line-height:1.5;color:#3a3a3a;">Tap below to see all your RSVPs, tickets, and pickup orders. No password needed.</p>
+        </td></tr>
+        <tr><td align="center" style="padding:16px 0 8px;">
+          <a href="${link}" style="display:inline-block;background:#1a2e1f;color:#fdfaf3;text-decoration:none;padding:14px 28px;letter-spacing:0.2em;text-transform:uppercase;font-size:12px;">Open my stuff</a>
+        </td></tr>
+        <tr><td align="center" style="padding:16px 0 0;">
+          <p style="margin:0;font-size:12px;color:#6b6452;">This link works for 24 hours. If you didn't request it, you can ignore this email.</p>
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body></html>`
 
     let sent = false
     if (channel === 'sms' && TELNYX_API_KEY) {
@@ -116,7 +142,7 @@ Deno.serve(async (req: Request) => {
         body: JSON.stringify({
           from: TELNYX_FROM_NUMBER,
           to: trimmedPhone,
-          text: message,
+          text: smsMessage,
           messaging_profile_id: TELNYX_MESSAGING_PROFILE_ID,
         }),
       })
@@ -131,8 +157,9 @@ Deno.serve(async (req: Request) => {
         body: JSON.stringify({
           from: FROM_EMAIL,
           to: [trimmedEmail],
-          subject: 'Your Cafe Kadhem ticket lookup link',
-          text: message,
+          subject: emailSubject,
+          text: emailText,
+          html: emailHtml,
         }),
       })
       sent = r.ok

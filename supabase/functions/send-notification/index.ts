@@ -254,44 +254,54 @@ async function generateAndUploadQr(token: string, encodedUrl: string): Promise<s
 const messageTemplates: Record<string, (data: Record<string, string>) => { subject: string; body: string; html?: string }> = {
   rsvp_confirmation: (data) => {
     const title = data.event_title || 'Cafe Kadhem'
-    const greeting = data.first_name ? `Hi ${data.first_name},` : 'Hi,'
     const ticketed = data.is_ticketed === 'true'
 
-    // Per-status copy. `lead` is the opening sentence; `tail` is the
-    // outro that follows the event details block. Both are reused in
-    // the plain-text body and the HTML body so the two stay in sync.
+    // Two voices on purpose:
+    //   - SMS: punchy, one sentence, possessive event label.
+    //     "Hey Alice, you're going to Cafe Kadhem's <event>. <tail>"
+    //   - Email: traditional two-paragraph greeting kept as-is.
+    //     "Hi Alice,\n\nYou're going to <event>. ..."
+    const emailGreeting = data.first_name ? `Hi ${data.first_name},` : 'Hi,'
+    const smsGreeting = data.first_name ? `Hey ${data.first_name},` : 'Hey,'
+    const eventLabel = data.event_title ? `Cafe Kadhem's ${data.event_title}` : 'Cafe Kadhem'
+
     let subject: string
-    let lead: string
+    let emailLead: string  // capitalized, plain title (used in HTML body)
+    let smsLead: string    // lowercase, possessive event label (continues the greeting sentence)
     let tail: string
     if (data.status === 'waitlisted') {
       subject = `You're on the waitlist - ${title}`
-      lead = `You're on the waitlist for ${title}.`
+      emailLead = `You're on the waitlist for ${title}.`
+      smsLead = `you're on the waitlist for ${eventLabel}.`
       tail = `We'll follow up if a spot opens up.`
     } else if (ticketed && data.status === 'yes') {
       subject = `We got your RSVP - ${title}`
-      lead = `We got your RSVP for ${title}.`
+      emailLead = `We got your RSVP for ${title}.`
+      smsLead = `we got your RSVP for ${eventLabel}.`
       tail = `Make sure your Venmo went through — we'll send your ticket within 48 hours once payment is confirmed.`
     } else if (data.status === 'yes') {
       subject = `RSVP Confirmed - ${title}`
-      lead = `You're going to ${title}.`
+      emailLead = `You're going to ${title}.`
+      smsLead = `you're going to ${eventLabel}.`
       tail = `Looking forward to seeing you!`
     } else {
       // status === 'maybe'
       subject = `RSVP Received - ${title}`
-      lead = `You're on the maybe list for ${title}.`
+      emailLead = `You're on the maybe list for ${title}.`
+      smsLead = `you're on the maybe list for ${eventLabel}.`
       tail = `Hope you can make it.`
     }
 
-    // Plain-text body: greeting + lead + the event details + tail + link.
-    // SMS recipients see this verbatim, so it has to read well as one
-    // continuous message. Email clients fall back to it when HTML is
-    // disabled.
+    // SMS body: greeting + lead inline (one sentence), then tail,
+    // details, and link separated by blank lines. Email clients fall
+    // back to this when HTML is disabled, but the dominant target is
+    // SMS — the HTML branch below is what most email recipients see.
     const detailLines: string[] = []
     if (data.event_when) detailLines.push(`When: ${data.event_when}`)
     if (data.event_where) detailLines.push(`Where: ${data.event_where}`)
     const details = detailLines.length ? `\n\n${detailLines.join('\n')}` : ''
     const link = data.event_url ? `\n\nDetails: ${data.event_url}` : ''
-    const body = `${greeting}\n\n${lead} ${tail}${details}${link}`
+    const body = `${smsGreeting} ${smsLead} ${tail}${details}${link}`
 
     // HTML body: same content, styled to match the existing
     // ticket_issued / pickup_order_confirmation emails.
@@ -326,8 +336,8 @@ const messageTemplates: Record<string, (data: Record<string, string>) => { subje
           ${data.event_type ? `<p style="margin:6px 0 0;font-size:12px;letter-spacing:0.18em;text-transform:uppercase;color:#6b6452;">${escapeHtml(data.event_type)}</p>` : ''}
         </td></tr>
         <tr><td align="center" style="padding:16px 0 8px;">
-          <p style="margin:0;font-size:15px;line-height:1.5;color:#3a3a3a;">${escapeHtml(greeting)}</p>
-          <p style="margin:8px 0 0;font-size:15px;line-height:1.5;color:#3a3a3a;">${escapeHtml(lead)}</p>
+          <p style="margin:0;font-size:15px;line-height:1.5;color:#3a3a3a;">${escapeHtml(emailGreeting)}</p>
+          <p style="margin:8px 0 0;font-size:15px;line-height:1.5;color:#3a3a3a;">${escapeHtml(emailLead)}</p>
         </td></tr>
         ${detailsBlock}
         <tr><td align="center" style="padding:16px 0 0;">
