@@ -470,3 +470,231 @@ details[open] summary::before {
   .cinema-root .ck-section { padding: 28px 16px !important; }
   .cinema-root .ck-footer { padding: 22px 16px !important; flex-direction: column; align-items: flex-start !important; }
 }
+
+/* ============================================================
+ * Cinema utility classes — used by every public page so they
+ * inherit the same typography, borders, buttons, inputs, etc.
+ * Scoped under .cinema-root so admin views are unaffected.
+ * ============================================================
+ */
+.cinema-root .ck-page {
+  padding: 48px 28px;
+  border-bottom: 2px solid var(--ck-ink);
+}
+.cinema-root .ck-page--paper { background: var(--ck-paper); }
+.cinema-root .ck-page--cobalt {
+  background: var(--ck-cobalt);
+  color: var(--ck-cream);
+}
+.cinema-root .ck-page--ink {
+  background: var(--ck-ink);
+  color: var(--ck-cream);
+}
+
+.cinema-root .ck-eyebrow {
+  font-family: var(--ck-mono);
+  font-size: 11px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--ck-cobalt);
+}
+.cinema-root .ck-page--cobalt .ck-eyebrow,
+.cinema-root .ck-page--ink .ck-eyebrow {
+  color: var(--ck-cream);
+}
+
+.cinema-root .ck-h1 {
+  font-family: var(--ck-serif);
+  font-weight: 900;
+  font-size: clamp(48px, 7vw, 84px);
+  line-height: 0.85;
+  letter-spacing: -0.01em;
+  margin: 0;
+}
+.cinema-root .ck-h2 {
+  font-family: var(--ck-serif);
+  font-weight: 900;
+  font-size: clamp(36px, 5vw, 60px);
+  line-height: 0.9;
+  margin: 0;
+}
+.cinema-root .ck-h3 {
+  font-family: var(--ck-serif);
+  font-weight: 800;
+  font-size: 26px;
+  line-height: 1;
+  margin: 0;
+}
+.cinema-root .ck-italic {
+  font-family: var(--ck-serif-edit);
+  font-style: italic;
+  font-weight: 400;
+}
+
+.cinema-root .ck-mono {
+  font-family: var(--ck-mono);
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+.cinema-root .ck-arabic {
+  font-family: var(--ck-arabic-display);
+  direction: rtl;
+  color: var(--ck-cobalt);
+  line-height: 1;
+}
+
+/* Card — bordered container with cream background. */
+.cinema-root .ck-card {
+  border: 2px solid var(--ck-ink);
+  background: var(--ck-cream);
+  padding: 24px;
+}
+.cinema-root .ck-card--paper { background: var(--ck-paper); }
+
+/* Buttons. Hard corners, 2px ink border, mono caps. */
+.cinema-root .ck-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 12px 18px;
+  border: 2px solid var(--ck-ink);
+  background: var(--ck-cream);
+  color: var(--ck-ink);
+  font-family: var(--ck-sans);
+  font-weight: 700;
+  font-size: 12px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  cursor: pointer;
+  text-decoration: none;
+  transition: background 120ms ease, color 120ms ease;
+}
+.cinema-root .ck-btn:hover {
+  background: var(--ck-ink);
+  color: var(--ck-cream);
+}
+.cinema-root .ck-btn--primary {
+  background: var(--ck-cobalt);
+  color: var(--ck-cream);
+}
+.cinema-root .ck-btn--primary:hover {
+  background: var(--ck-ink);
+  color: var(--ck-cream);
+}
+.cinema-root .ck-btn--ink {
+  background: var(--ck-ink);
+  color: var(--ck-cream);
+}
+.cinema-root .ck-btn--ink:hover {
+  background: var(--ck-cobalt);
+  color: var(--ck-cream);
+}
+.cinema-root .ck-btn--block {
+  width: 100%;
+}
+.cinema-root .ck-btn:disabled,
+.cinema-root .ck-btn[aria-disabled="true"] {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+/* Inputs / textareas / selects. Same cinema treatment. */
+.cinema-root .ck-input,
+.cinema-root .ck-textarea,
+.cinema-root .ck-select {
+  width: 100%;
+  padding: 10px 12px;
+  border: 2px solid var(--ck-ink);
+  background: rgba(255, 255, 255, 0.4);
+  color: var(--ck-ink);
+  font-family: var(--ck-sans);
+  font-size: 14px;
+  outline: none;
+  border-radius: 0;
+  appearance: none;
+}
+.cinema-root .ck-textarea {
+  min-height: 80px;
+  font-family: var(--ck-sans);
+  resize: vertical;
+}
+.cinema-root .ck-input:focus,
+.cinema-root .ck-textarea:focus,
+.cinema-root .ck-select:focus {
+  background: rgba(255, 255, 255, 0.8);
+}
+.cinema-root .ck-page--cobalt .ck-input,
+.cinema-root .ck-page--cobalt .ck-textarea,
+.cinema-root .ck-page--cobalt .ck-select {
+  background: rgba(244, 236, 216, 0.15);
+  border-color: var(--ck-cream);
+  color: var(--ck-cream);
+}
+.cinema-root .ck-label {
+  display: block;
+  font-family: var(--ck-mono);
+  font-size: 10px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  margin-bottom: 4px;
+}
+
+/* Section header pattern — eyebrow + H1/H2 + arabic display. */
+.cinema-root .ck-section-head {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 24px;
+}
+.cinema-root .ck-section-head-row {
+  display: flex;
+  align-items: baseline;
+  gap: 18px;
+  flex-wrap: wrap;
+}
+.cinema-root .ck-section-head-arabic {
+  font-family: var(--ck-arabic-display);
+  font-size: clamp(40px, 5vw, 64px);
+  direction: rtl;
+  color: var(--ck-cobalt);
+  line-height: 0.9;
+}
+
+/* Dashed signoff strip used at the bottom of cards / sections. */
+.cinema-root .ck-signoff {
+  margin-top: auto;
+  padding-top: 14px;
+  border-top: 1px dashed var(--ck-ink);
+  font-family: var(--ck-mono);
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ck-ink);
+  opacity: 0.6;
+  display: flex;
+  justify-content: space-between;
+}
+
+/* Container width helpers. */
+.cinema-root .ck-narrow { max-width: 720px; margin-inline: auto; }
+.cinema-root .ck-mid { max-width: 960px; margin-inline: auto; }
+.cinema-root .ck-wide { max-width: 1240px; margin-inline: auto; }
+
+/* Link styling inside body copy. */
+.cinema-root .ck-prose a {
+  color: var(--ck-cobalt);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.cinema-root .ck-page--cobalt.ck-prose a,
+.cinema-root .ck-page--cobalt .ck-prose a,
+.cinema-root .ck-page--ink .ck-prose a {
+  color: var(--ck-sun);
+}
+
+/* Mobile: tighten section padding. */
+@media (max-width: 720px) {
+  .cinema-root .ck-page { padding: 32px 16px !important; }
+}

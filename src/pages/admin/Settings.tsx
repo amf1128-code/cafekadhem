@@ -2,7 +2,7 @@ import { useState, useEffect, type FormEvent } from 'react'
 import { supabase } from '../../lib/supabase'
 import type { AdminSettings as AdminSettingsType } from '../../lib/types'
 import { Button } from '../../components/ui/Button'
-import { Input } from '../../components/ui/Input'
+import { Input, Textarea } from '../../components/ui/Input'
 import { Select } from '../../components/ui/Select'
 import { useToast } from '../../components/ui/Toast'
 import { PageLoader } from '../../components/ui/LoadingSpinner'
@@ -36,6 +36,7 @@ export function AdminSettings() {
   const [siteUrl, setSiteUrl] = useState('')
   const [theme, setTheme] = useState<SiteThemeChoice>('default')
   const [smsEnabled, setSmsEnabled] = useState(false)
+  const [currentMenuBlurb, setCurrentMenuBlurb] = useState('')
 
   useEffect(() => {
     loadSettings()
@@ -50,6 +51,7 @@ export function AdminSettings() {
       setSiteUrl(data.site_url || '')
       setTheme(isValidSiteTheme(data.theme) ? data.theme : 'default')
       setSmsEnabled(!!data.sms_enabled)
+      setCurrentMenuBlurb(data.current_menu_blurb || '')
     }
     setLoading(false)
   }
@@ -64,6 +66,7 @@ export function AdminSettings() {
       site_url: siteUrl.trim().replace(/\/$/, '') || 'https://cafekadhem.com',
       theme,
       sms_enabled: smsEnabled,
+      current_menu_blurb: currentMenuBlurb.trim() || null,
     }
 
     console.log('[Settings Save] Payload:', payload, 'existing settings row:', settings)
@@ -146,6 +149,18 @@ export function AdminSettings() {
             next upcoming event's theme. The other options force the home page
             into that theme regardless of upcoming events. Each event's detail
             page always uses its own theme (set in the event editor).
+          </p>
+        </div>
+        <div>
+          <Textarea
+            label='"Current Menu" blurb'
+            value={currentMenuBlurb}
+            onChange={e => setCurrentMenuBlurb(e.target.value)}
+            placeholder="The menu rotates with the night. This one travels with the pop-up — small, snackable, easy to eat one-handed."
+          />
+          <p className="text-xs text-ink-muted mt-1">
+            Italic line shown under "CURRENT MENU." on the cinema landing
+            (/cinema). Leave blank for the default copy.
           </p>
         </div>
         <div>

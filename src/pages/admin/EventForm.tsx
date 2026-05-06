@@ -10,7 +10,6 @@ import { PageLoader } from '../../components/ui/LoadingSpinner'
 import { sendNotification } from '../../lib/notifications'
 import { THEMES, type ThemeId } from '../../lib/theme/themes'
 
-const MAX_FILE_SIZE = 5 * 1024 * 1024 // 5MB
 const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp']
 
 export function AdminEventForm() {
@@ -24,6 +23,9 @@ export function AdminEventForm() {
   const [eventType, setEventType] = useState('')
   const [rsvpRequired, setRsvpRequired] = useState(true)
   const [description, setDescription] = useState('')
+  const [tagline, setTagline] = useState('')
+  const [highlights, setHighlights] = useState('')
+  const [displayArabic, setDisplayArabic] = useState('')
   const [date, setDate] = useState('')
   const [startTime, setStartTime] = useState('')
   const [endTime, setEndTime] = useState('')
@@ -99,6 +101,9 @@ export function AdminEventForm() {
         setEventType(event.event_type || '')
         setRsvpRequired(event.rsvp_required ?? true)
         setDescription(event.description || '')
+        setTagline(event.tagline || '')
+        setHighlights(event.highlights || '')
+        setDisplayArabic(event.display_arabic || '')
         setDate(event.date)
         setStartTime(event.start_time)
         setEndTime(event.end_time || '')
@@ -124,9 +129,6 @@ export function AdminEventForm() {
   async function uploadFlyer(file: File): Promise<string> {
     if (!ALLOWED_TYPES.includes(file.type)) {
       throw new Error('Only JPG, PNG, and WebP files are allowed')
-    }
-    if (file.size > MAX_FILE_SIZE) {
-      throw new Error('File must be under 5MB')
     }
 
     const ext = file.name.split('.').pop()
@@ -168,6 +170,9 @@ export function AdminEventForm() {
         event_type: eventType.trim() || null,
         rsvp_required: rsvpRequired,
         description: description.trim() || null,
+        tagline: tagline.trim() || null,
+        highlights: highlights.trim() || null,
+        display_arabic: displayArabic.trim() || null,
         date,
         start_time: startTime,
         end_time: endTime || null,
@@ -299,6 +304,46 @@ export function AdminEventForm() {
         <Input label="Gathering Number" value={gatheringNumber} onChange={e => setGatheringNumber(e.target.value)} placeholder='e.g. "No. 01" (optional, shown on public page)' />
         <Textarea label="Description" value={description} onChange={e => setDescription(e.target.value)} />
 
+        {/* Cinema landing fields. All optional — the home page (/) falls
+            back to sane defaults when these are empty. */}
+        <div className="border border-warm rounded-lg p-4 bg-warm/10 space-y-3">
+          <div>
+            <p className="text-sm font-medium text-ink mb-1">Home page copy</p>
+            <p className="text-xs text-ink-muted">
+              Optional fields used by the home / poster landing. Leave blank
+              to fall back to the description above.
+            </p>
+          </div>
+          <Input
+            label="Tagline"
+            value={tagline}
+            onChange={e => setTagline(e.target.value)}
+            placeholder="One italic line under the title (e.g. Football, free knafeh croissants at halftime.)"
+          />
+          <Textarea
+            label="Highlights"
+            value={highlights}
+            onChange={e => setHighlights(e.target.value)}
+            placeholder={
+              "2–3 short sentences or bullet lines describing the event.\n" +
+              "Each line shows as a bullet in the hero. Example:\n" +
+              "Iraq v Norway · 6pm kickoff\n" +
+              "Pistachio buns out the oven all night\n" +
+              "Net proceeds → World Central Kitchen"
+            }
+          />
+          <Input
+            label="Arabic display word"
+            value={displayArabic}
+            onChange={e => setDisplayArabic(e.target.value)}
+            placeholder="e.g. الكأس · shown big over the poster"
+          />
+          <p className="text-xs text-ink-muted">
+            One short Arabic word/phrase. Renders in the orange display
+            face over the poster image and beside the calendar row.
+          </p>
+        </div>
+
         <div className="grid grid-cols-2 gap-3">
           <Input label="Date" type="date" value={date} onChange={e => setDate(e.target.value)} required />
           <Input label="Start Time" type="time" value={startTime} onChange={e => setStartTime(e.target.value)} required />
@@ -393,7 +438,7 @@ export function AdminEventForm() {
               className="sr-only"
             />
           </label>
-          <p className="text-xs text-ink/50 mt-1">JPG, PNG, or WebP. Max 5MB.</p>
+          <p className="text-xs text-ink/50 mt-1">JPG, PNG, or WebP. 4:3 aspect (e.g. 1600&times;1200) recommended.</p>
         </div>
 
         {/* Home Page Image — optional alternate cropped for the home card */}
@@ -426,7 +471,7 @@ export function AdminEventForm() {
               Remove
             </button>
           )}
-          <p className="text-xs text-ink/50 mt-1">JPG, PNG, or WebP. Max 5MB.</p>
+          <p className="text-xs text-ink/50 mt-1">JPG, PNG, or WebP. 4:3 aspect (e.g. 1600&times;1200) recommended.</p>
         </div>
 
         {/* Ticketing */}

@@ -9,6 +9,9 @@ export interface AdminSettings {
   // flows only accept email. Defaults to false until the operator's
   // 10DLC campaign is approved.
   sms_enabled: boolean
+  // Italic blurb under "CURRENT MENU." on the cinema landing. Editable
+  // from /admin/settings.
+  current_menu_blurb: string | null
   updated_at: string
 }
 
