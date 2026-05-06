@@ -31,8 +31,16 @@ export function EventDetail() {
     if (id) loadEvent()
   }, [id])
 
-  async function loadEvent() {
-    setLoading(true)
+  // Silent refetch: refresh the event + RSVPs in place without
+  // unmounting the page (and losing the user's scroll position).
+  // Used after RSVP / order submissions so the confirmation block
+  // appears below the form instead of forcing the user back to the top.
+  async function refetchEvent() {
+    return loadEvent({ silent: true })
+  }
+
+  async function loadEvent({ silent = false }: { silent?: boolean } = {}) {
+    if (!silent) setLoading(true)
 
     const { data: eventData } = await supabase
       .from('events')
@@ -41,7 +49,7 @@ export function EventDetail() {
       .single()
 
     if (!eventData) {
-      setLoading(false)
+      if (!silent) setLoading(false)
       return
     }
 
@@ -79,7 +87,7 @@ export function EventDetail() {
       if (myRsvpData) setMyRsvp(myRsvpData)
     }
 
-    setLoading(false)
+    if (!silent) setLoading(false)
   }
 
   if (loading) return <PageLoader />
@@ -224,7 +232,7 @@ export function EventDetail() {
           existingRsvp={myRsvp}
           existingPlusOne={myPlusOne}
           isFull={isFull}
-          onRsvpComplete={() => loadEvent()}
+          onRsvpComplete={refetchEvent}
         />
       </div>
 
