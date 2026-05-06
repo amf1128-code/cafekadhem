@@ -3,6 +3,7 @@ import { supabase } from '../../lib/supabase'
 import type { RSVP, Event, AdminSettings, PublicGuestProfile } from '../../lib/types'
 import { getGuestToken, setGuestToken } from '../../lib/utils/guest-token'
 import { dispatchMergeVerification, type PendingMerge } from '../../lib/identity/handlePendingMerge'
+import { ConsentNote } from '../ui/ConsentNote'
 import { normalizePhone, isValidPhone } from '../../lib/utils/phone'
 import { normalizeInstagram, isValidInstagram } from '../../lib/utils/instagram'
 import { sendNotification } from '../../lib/notifications'
@@ -43,7 +44,6 @@ export function RSVPForm({ eventId, event, existingRsvp, existingPlusOne, isFull
   const [email, setEmail] = useState('')
   const [phone, setPhone] = useState('')
   const [instagram, setInstagram] = useState('')
-  const [notifPref, setNotifPref] = useState('email')
   const [loading, setLoading] = useState(false)
   const [showForm, setShowForm] = useState(!existingRsvp)
   const [venmoHandle, setVenmoHandle] = useState<string>('')
@@ -113,18 +113,14 @@ export function RSVPForm({ eventId, event, existingRsvp, existingPlusOne, isFull
             setEmail(data.email || '')
             setPhone(data.phone || '')
             setInstagram(data.instagram || '')
-            setNotifPref(data.notification_preference)
+            // notification_preference is no longer user-set in the public
+            // form; it's inferred at upsert_guest time from filled fields
+            // (USER_FLOWS_SPEC.md §7.1). Existing values on the row are
+            // preserved by the server.
           }
         })
     }
   }, [])
-
-  // Force any stale 'sms' preference to 'email' as soon as we know SMS
-  // is disabled (covers both fresh loads with smsEnabled=false and the
-  // case where the admin flips SMS off mid-session).
-  useEffect(() => {
-    if (!smsEnabled && notifPref === 'sms') setNotifPref('email')
-  }, [smsEnabled, notifPref])
 
   async function handleRSVP(status: 'yes' | 'maybe' | 'no') {
     if (!firstName.trim()) {
@@ -134,10 +130,6 @@ export function RSVPForm({ eventId, event, existingRsvp, existingPlusOne, isFull
     if (smsEnabled) {
       if (!email.trim() && !phone.trim()) {
         addToast('Please provide an email or phone number.', 'error')
-        return
-      }
-      if (notifPref === 'sms' && !phone.trim()) {
-        addToast('Please provide a phone number to be notified by SMS.', 'error')
         return
       }
       if (phone.trim() && !isValidPhone(phone.trim())) {
@@ -150,10 +142,6 @@ export function RSVPForm({ eventId, event, existingRsvp, existingPlusOne, isFull
         addToast('Please provide an email address.', 'error')
         return
       }
-    }
-    if (notifPref === 'email' && !email.trim()) {
-      addToast('Please provide an email address to be notified by email.', 'error')
-      return
     }
     if (instagram && !isValidInstagram(instagram)) {
       addToast('Invalid Instagram handle format.', 'error')
@@ -183,7 +171,8 @@ export function RSVPForm({ eventId, event, existingRsvp, existingPlusOne, isFull
         last_name: lastName.trim() || null,
         email: email.trim() || null,
         instagram: instagram.trim() ? normalizeInstagram(instagram.trim()) : null,
-        notification_preference: notifPref,
+        // notification_preference omitted: server infers from filled
+        // fields per USER_FLOWS_SPEC.md §7.1.
       }
       if (smsEnabled) {
         fields.phone = phone.trim() ? normalizePhone(phone.trim()) : null
@@ -498,22 +487,6 @@ export function RSVPForm({ eventId, event, existingRsvp, existingPlusOne, isFull
         placeholder="Optional (without @)"
       />
 
-      {/* Notification preference */}
-      <div className="flex items-baseline gap-4">
-        <label className="text-[10px] tracking-[0.2em] uppercase text-ink-muted whitespace-nowrap min-w-[80px]">
-          Notify via
-        </label>
-        <select
-          value={notifPref}
-          onChange={e => setNotifPref(e.target.value)}
-          className="flex-1 border-0 border-b border-warm bg-transparent py-2 font-script text-lg text-ink italic outline-none focus:border-ink transition-colors appearance-none cursor-pointer"
-        >
-          <option value="email">Email</option>
-          {smsEnabled && <option value="sms">SMS</option>}
-          <option value="none">None</option>
-        </select>
-      </div>
-
       {/* Plus-one toggle. Only shown for first-time RSVPs to non-ticketed
           events; the +1 is created when the user clicks Reserve a Seat. */}
       {showPlusOneToggle && (
@@ -568,6 +541,7 @@ export function RSVPForm({ eventId, event, existingRsvp, existingPlusOne, isFull
             Decline
           </button>
         </div>
+        <ConsentNote verb="rsvp" />
       </div>
     </form>
   )

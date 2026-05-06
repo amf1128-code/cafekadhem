@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabase'
 import type { Event, MenuItem, AdminSettings, CartItem, MenuItemAvailability } from '../lib/types'
 import { getGuestToken, setGuestToken } from '../lib/utils/guest-token'
 import { dispatchMergeVerification, type PendingMerge } from '../lib/identity/handlePendingMerge'
+import { ConsentNote } from '../components/ui/ConsentNote'
 import { normalizePhone } from '../lib/utils/phone'
 import { getPaymentProvider } from '../lib/payment'
 import { sendNotification } from '../lib/notifications'
@@ -385,6 +386,7 @@ export function Order() {
         <p className="text-xs text-ink-muted mt-4">
           You will be redirected to Venmo to complete payment.
         </p>
+        <ConsentNote verb="order" />
       </div>
     </div>
   )

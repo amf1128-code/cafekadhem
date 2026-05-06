@@ -13,8 +13,8 @@
 | # | Commit | Status | SHA | User-verified | Doc |
 |---|---|---|---|---|---|
 | 1 | Foundations (additive schema, no behavior change) | ✅ verified | `4af91ba` + hot-fix `91181e7` | ✅ 2026-05-06 | [01-foundations.md](commits/01-foundations.md) |
-| 2 | Identity merge & reconciliation | 🟢 committed | *(see git log)* | ⬜ pending user verification | [02-identity-merge.md](commits/02-identity-merge.md) |
-| 3 | Notifications hardening (channel routing, dedup, consent, suppression) | ⬜ not started | — | — | [03-notifications.md](commits/03-notifications.md) |
+| 2 | Identity merge & reconciliation | ✅ verified | `ae873e0` | ✅ 2026-05-06 | [02-identity-merge.md](commits/02-identity-merge.md) |
+| 3 | Notifications hardening (channel routing, dedup, consent, suppression) | 🟢 committed | *(see git log)* | ⬜ pending user verification | [03-notifications.md](commits/03-notifications.md) |
 | 4 | Recognition & sharing (ambient `?as=`, header, ShareButton, `?ref=`) | ⬜ not started | — | — | [04-recognition-sharing.md](commits/04-recognition-sharing.md) |
 | 5 | State unification (`get_guest_event_state` consumed by all pages) | ⬜ not started | — | — | [05-state-unification.md](commits/05-state-unification.md) |
 | 6 | Bulk operations (mass invites, mass notifications, audience selectors) | ⬜ not started | — | — | [06-bulk-operations.md](commits/06-bulk-operations.md) |
@@ -122,6 +122,21 @@ The list of functions modified is in each per-commit doc under **"User actions r
 5. **`useGuestEventState` hook** (planned in Commit 5) will type the response. The shape returned by 029 matches the plan's spec §5 shape exactly except for `invited_by` (see #4).
 6. **Hot-fix migration 035** added after user testing: `events.is_published BOOLEAN`, not `events.status TEXT` as the plan and 029 assumed. Migration 035 replaces `get_guest_event_state` body with the corrected SELECT and `IF NOT v_event.is_published` check.
 7. **Migration numbering for Commit 2 shifts by 1.** What the plan calls `035`/`036`/`037` (`merge_guests`, `merge_verifications`, `upsert_guest_collision`) becomes `036`/`037`/`038`. Subsequent commits' migration numbers also shift accordingly.
+
+### Commit 3 deviations from plan
+
+1. **Migration numbering shifted by 1**: 039/040/041/042 instead of plan's 038/039/040/041 (Commit 1 hot-fix took 035; subsequent commits shifted).
+2. **`merge_guests` re-issued in migration 040** to add `unsubscribe_log` to its FK reassignment list (table didn't exist yet when 036 was written). Pure additive change; behavior identical otherwise.
+3. **`record_unsubscribe` always sets preference to `'none'`**, not channel-specific suppression. Spec mentions per-channel suppression but the existing schema has a single `notification_preference` column; multi-channel suppression would need a separate columns scheme. Keeping it simple: any STOP or unsubscribe → `'none'`. Admin can re-enable a specific channel via Guest Directory.
+4. **`send-notification` extension was surgical, not a rewrite**: kept all existing template / ICS / QR logic; only added channel routing for `'both'`, dedup_key handling, pre-send dedup check, and the `'none'` suppression-log path. The plan called for a rewrite; surgical is lower risk.
+5. **Pre-send dedup check** queries `notifications_log` once before the provider call. If a `status='sent'` row already exists with the same `dedup_key`, we return `{ skipped: true, reason: 'dedup' }` without sending. This is in addition to the partial unique index (which is the last-resort guard).
+6. **`webhook-sms` and `webhook-email` reject all requests until env vars are set**, by design. `TELNYX_PUBLIC_KEY` and `RESEND_WEBHOOK_SECRET` are required for signature verification; without them, the webhooks return 401. Avoids the security failure mode where unsigned requests could mass-unsubscribe guests.
+7. **`'both'` per-type routing table** (BOTH_PREFERS_SMS) lives inline in `send-notification`. Adding new notification types means updating that table; default for unknown types is `email`.
+8. **Channel override** (added in Commit 2 for `merge_verification`) is now used by `webhook-sms` indirectly: the override channel takes precedence over the guest's preference (so a STOP-blocked guest doesn't accidentally re-subscribe via a forced send).
+9. **`order_confirmation` and `pickup_order_confirmation` magic-link channel selection** in send-notification still uses the *old* `notification_preference === 'sms' && phone` check (not the new routing table) for which channel the magic link goes to. Acceptable: the magic link travels with the confirmation, so it goes to whatever channel the confirmation goes to. No bug, just a thing to know.
+10. **The `'none'` log row uses `status='queued'`** because the existing `notifications_log.status` CHECK only allows `(sent|failed|queued)`. The error column carries `'suppressed: notification_preference=none'`. A future migration could extend the CHECK to add `'suppressed'` for cleaner querying.
+11. **InviteForm consent note** rendered below the existing form rather than between fields and submit, because the InviteForm uses a horizontal flex layout. Visually consistent with the other forms (note appears immediately below the action area).
+12. **Existing RSVPForm validation** referenced `notifPref === 'sms' && !phone` and `notifPref === 'email' && !email`. Both removed since preference is now inferred. Replaced with: at least one of email or phone required when SMS is enabled; email-only required when SMS is disabled.
 
 ### Commit 2 deviations from plan
 

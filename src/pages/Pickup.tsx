@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabase'
 import type { PickupConfig, PickupSlot, MenuItem, AdminSettings, CartItem, MenuItemAvailability } from '../lib/types'
 import { getGuestToken, setGuestToken } from '../lib/utils/guest-token'
 import { dispatchMergeVerification, type PendingMerge } from '../lib/identity/handlePendingMerge'
+import { ConsentNote } from '../components/ui/ConsentNote'
 import { normalizePhone } from '../lib/utils/phone'
 import { formatTime } from '../lib/utils/date'
 import { getPaymentProvider } from '../lib/payment'
@@ -495,6 +496,7 @@ export function Pickup() {
         <p className="text-xs text-ink-muted mt-4">
           You will be redirected to Venmo to complete payment.
         </p>
+        <ConsentNote verb="pickup" />
       </div>
     </div>
   )
