@@ -1140,8 +1140,8 @@ function CalendarSection({
   loading: boolean
 }) {
   // The cinema landing only previews the next 1-2 events that come AFTER
-  // the hero. The full calendar lives on its own page (TODO: /calendar);
-  // for now the "see all" link points back to the legacy event list at /.
+  // the hero. The full event list (with the "Past Gatherings" archive)
+  // lives at /calendar.
   return (
     <section
       id="calendar"
@@ -1205,7 +1205,7 @@ function CalendarSection({
           </div>
         </div>
         <Link
-          to="/"
+          to="/calendar"
           style={{
             fontFamily: 'var(--ck-mono)',
             fontSize: 11,

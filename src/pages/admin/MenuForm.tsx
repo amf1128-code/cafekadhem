@@ -14,6 +14,7 @@ interface ItemDraft {
   price: string
   unit_cost: string
   category: string
+  display_arabic: string
   sort_order: number
   is_available: boolean
 }
@@ -24,6 +25,7 @@ const emptyItem: ItemDraft = {
   price: '',
   unit_cost: '',
   category: '',
+  display_arabic: '',
   sort_order: 0,
   is_available: true,
 }
@@ -71,6 +73,7 @@ export function AdminMenuForm() {
           price: item.price != null ? String(item.price) : '',
           unit_cost: item.unit_cost != null ? String(item.unit_cost) : '',
           category: item.category || '',
+          display_arabic: item.display_arabic || '',
           sort_order: item.sort_order,
           is_available: item.is_available,
         }))
@@ -167,6 +170,7 @@ export function AdminMenuForm() {
             price: item.price ? parseFloat(item.price) : null,
             unit_cost: item.unit_cost ? parseFloat(item.unit_cost) : null,
             category: item.category.trim() || null,
+            display_arabic: item.display_arabic.trim() || null,
             sort_order: index,
             is_available: item.is_available,
           })
@@ -186,6 +190,7 @@ export function AdminMenuForm() {
             price: item.price ? parseFloat(item.price) : null,
             unit_cost: item.unit_cost ? parseFloat(item.unit_cost) : null,
             category: item.category.trim() || null,
+            display_arabic: item.display_arabic.trim() || null,
             sort_order: index,
             is_available: item.is_available,
           }))
@@ -281,12 +286,20 @@ export function AdminMenuForm() {
                   onChange={e => updateItem(index, 'description', e.target.value)}
                   placeholder="Optional"
                 />
-                <Input
-                  label="Category"
-                  value={item.category}
-                  onChange={e => updateItem(index, 'category', e.target.value)}
-                  placeholder="e.g., Sweet, Savory, Drinks"
-                />
+                <div className="grid grid-cols-2 gap-3">
+                  <Input
+                    label="Category"
+                    value={item.category}
+                    onChange={e => updateItem(index, 'category', e.target.value)}
+                    placeholder="e.g., Sweet, Savory, Drinks"
+                  />
+                  <Input
+                    label="Arabic display word"
+                    value={item.display_arabic}
+                    onChange={e => updateItem(index, 'display_arabic', e.target.value)}
+                    placeholder="e.g. كنافة (optional)"
+                  />
+                </div>
                 <label className="flex items-center gap-2 text-sm">
                   <input
                     type="checkbox"

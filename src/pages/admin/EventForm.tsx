@@ -24,6 +24,9 @@ export function AdminEventForm() {
   const [eventType, setEventType] = useState('')
   const [rsvpRequired, setRsvpRequired] = useState(true)
   const [description, setDescription] = useState('')
+  const [tagline, setTagline] = useState('')
+  const [highlights, setHighlights] = useState('')
+  const [displayArabic, setDisplayArabic] = useState('')
   const [date, setDate] = useState('')
   const [startTime, setStartTime] = useState('')
   const [endTime, setEndTime] = useState('')
@@ -99,6 +102,9 @@ export function AdminEventForm() {
         setEventType(event.event_type || '')
         setRsvpRequired(event.rsvp_required ?? true)
         setDescription(event.description || '')
+        setTagline(event.tagline || '')
+        setHighlights(event.highlights || '')
+        setDisplayArabic(event.display_arabic || '')
         setDate(event.date)
         setStartTime(event.start_time)
         setEndTime(event.end_time || '')
@@ -168,6 +174,9 @@ export function AdminEventForm() {
         event_type: eventType.trim() || null,
         rsvp_required: rsvpRequired,
         description: description.trim() || null,
+        tagline: tagline.trim() || null,
+        highlights: highlights.trim() || null,
+        display_arabic: displayArabic.trim() || null,
         date,
         start_time: startTime,
         end_time: endTime || null,
@@ -298,6 +307,46 @@ export function AdminEventForm() {
         />
         <Input label="Gathering Number" value={gatheringNumber} onChange={e => setGatheringNumber(e.target.value)} placeholder='e.g. "No. 01" (optional, shown on public page)' />
         <Textarea label="Description" value={description} onChange={e => setDescription(e.target.value)} />
+
+        {/* Cinema landing fields. All optional — the home page (/) falls
+            back to sane defaults when these are empty. */}
+        <div className="border border-warm rounded-lg p-4 bg-warm/10 space-y-3">
+          <div>
+            <p className="text-sm font-medium text-ink mb-1">Home page copy</p>
+            <p className="text-xs text-ink-muted">
+              Optional fields used by the home / poster landing. Leave blank
+              to fall back to the description above.
+            </p>
+          </div>
+          <Input
+            label="Tagline"
+            value={tagline}
+            onChange={e => setTagline(e.target.value)}
+            placeholder="One italic line under the title (e.g. Football, free knafeh croissants at halftime.)"
+          />
+          <Textarea
+            label="Highlights"
+            value={highlights}
+            onChange={e => setHighlights(e.target.value)}
+            placeholder={
+              "2–3 short sentences or bullet lines describing the event.\n" +
+              "Each line shows as a bullet in the hero. Example:\n" +
+              "Iraq v Norway · 6pm kickoff\n" +
+              "Pistachio buns out the oven all night\n" +
+              "Net proceeds → World Central Kitchen"
+            }
+          />
+          <Input
+            label="Arabic display word"
+            value={displayArabic}
+            onChange={e => setDisplayArabic(e.target.value)}
+            placeholder="e.g. الكأس · shown big over the poster"
+          />
+          <p className="text-xs text-ink-muted">
+            One short Arabic word/phrase. Renders in the orange display
+            face over the poster image and beside the calendar row.
+          </p>
+        </div>
 
         <div className="grid grid-cols-2 gap-3">
           <Input label="Date" type="date" value={date} onChange={e => setDate(e.target.value)} required />

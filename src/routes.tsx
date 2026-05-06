@@ -39,8 +39,8 @@ const MyTickets = lazy(() =>
 const VerifyMerge = lazy(() =>
   import('./pages/VerifyMerge').then(m => ({ default: m.VerifyMerge }))
 )
-// Cinema landing — full-bleed preview at /cinema. Renders outside
-// PublicLayout because it ships its own top strip / nav / footer.
+// Cinema landing — primary home page (/). Renders outside PublicLayout
+// because it ships its own top strip / nav / footer.
 const CinemaLanding = lazy(() =>
   import('./components/cinema/CinemaLanding').then(m => ({ default: m.CinemaLanding }))
 )
@@ -126,11 +126,18 @@ const Option5SoukMaximalism = lazy(() =>
 )
 
 export const router = createBrowserRouter([
+  // Home is the cinema landing — full-bleed, ships its own chrome, so it
+  // sits outside PublicLayout. The legacy event-list home (with the
+  // "Past Gatherings" archive) lives at /calendar inside PublicLayout.
+  {
+    path: '/',
+    element: <Lazy><CinemaLanding /></Lazy>,
+  },
   {
     path: '/',
     element: <PublicLayout />,
     children: [
-      { index: true, element: <Home /> },
+      { path: 'calendar', element: <Home /> },
       { path: 'events/:id', element: <EventDetail /> },
       { path: 'events/:id/order', element: <Order /> },
       { path: 'pickup', element: <Pickup /> },
@@ -141,10 +148,6 @@ export const router = createBrowserRouter([
       { path: 'my-tickets', element: <MyTickets /> },
       { path: 'verify-merge', element: <VerifyMerge /> },
     ],
-  },
-  {
-    path: '/cinema',
-    element: <Lazy><CinemaLanding /></Lazy>,
   },
   {
     path: '/admin/login',
