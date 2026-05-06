@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { supabase } from '../../lib/supabase'
 import type { Event, MenuItem } from '../../lib/types'
 import { isUpcoming } from '../../lib/utils/date'
-import { AudioToggle, KadhemLockup, Marquee, RegMark } from './primitives'
+import { KadhemLockup, Marquee, RegMark } from './primitives'
 import { InlineRSVP, RSVPModal, type CinemaEventLite } from './RSVPModal'
 
 interface CinemaEvent extends CinemaEventLite {
@@ -412,7 +412,6 @@ export function CinemaLanding() {
         </div>
       </footer>
 
-      <AudioToggle position={{ bottom: 24, right: 24 }} />
       <RSVPModal open={rsvpOpen} onClose={() => setRsvpOpen(false)} event={rsvpEvent} />
     </div>
   )
