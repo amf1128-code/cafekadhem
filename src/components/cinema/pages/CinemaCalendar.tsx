@@ -250,6 +250,37 @@ function CalendarFullRow({
               {event.display_arabic}
             </span>
           )}
+          {!muted && event.is_rsvp_open === false && (
+            <span
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 5,
+                padding: '2px 8px',
+                border: '2px solid var(--ck-ink)',
+                background: 'var(--ck-sun)',
+                color: 'var(--ck-ink)',
+                fontFamily: 'var(--ck-mono)',
+                fontSize: 9,
+                letterSpacing: '0.16em',
+                textTransform: 'uppercase',
+                lineHeight: 1.2,
+              }}
+            >
+              <span
+                style={{
+                  fontFamily: 'var(--ck-arabic-display)',
+                  fontSize: 16,
+                  direction: 'rtl',
+                  letterSpacing: 0,
+                  lineHeight: 1,
+                }}
+              >
+                جاية
+              </span>
+              <span>Jaya</span>
+            </span>
+          )}
         </div>
         {event.tagline && (
           <div
@@ -294,7 +325,13 @@ function CalendarFullRow({
           textAlign: 'right',
         }}
       >
-        {muted ? '—' : price === 0 ? 'FREE' : `$${price}`}
+        {muted
+          ? '—'
+          : event.is_rsvp_open === false
+            ? 'TBA'
+            : price === 0
+              ? 'FREE'
+              : `$${price}`}
       </div>
     </Link>
   )

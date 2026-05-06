@@ -161,6 +161,10 @@ export function CinemaEventDetail() {
   const time = formatTime(event.start_time, event.end_time)
   const loc = [event.location_name, event.location].filter(Boolean).join(' · ')
   const price = Math.round(event.ticket_price ?? 0)
+  // Coming-soon mode: published event with RSVP locked. We still show
+  // poster + details, but swap the RSVP form (and pre-order menu) for
+  // a "more details to come" panel + Jaya (جاية) tag.
+  const rsvpOpen = event.is_rsvp_open ?? true
   // Group RSVPs into hosts (plus_one_of === null) + their plus-ones, plus
   // separate maybe and waitlist buckets. The +1s collapse onto their host
   // row as a "+1" suffix instead of rendering as standalone names.
@@ -243,8 +247,19 @@ export function CinemaEventDetail() {
           </div>
         )}
 
-        <div className="ck-eyebrow">
-          ✦ Pop-up{event.gathering_number ? ` · No. ${event.gathering_number.replace(/^\s*(no\.?|number|num\.?|#)\s*/i, '')}` : ''} · {day} {date}
+        <div
+          className="ck-eyebrow"
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 10,
+            flexWrap: 'wrap',
+          }}
+        >
+          <span>
+            ✦ {rsvpOpen ? 'Pop-up' : 'Coming soon'}{event.gathering_number ? ` · No. ${event.gathering_number.replace(/^\s*(no\.?|number|num\.?|#)\s*/i, '')}` : ''} · {day} {date}
+          </span>
+          {!rsvpOpen && <DetailJayaTag />}
         </div>
         <div
           className="ck-section-head-row"
@@ -418,22 +433,36 @@ export function CinemaEventDetail() {
                   fontSize: 28,
                 }}
               >
-                {price === 0 ? 'FREE' : `$${price}`}
+                {rsvpOpen ? (price === 0 ? 'FREE' : `$${price}`) : 'TBA'}
               </div>
-              <a
-                href="#rsvp"
-                className="ck-btn ck-btn--primary"
-              >
-                {event.ticketing_enabled ? 'Get a ticket' : 'RSVP'} →
-              </a>
+              {rsvpOpen ? (
+                <a href="#rsvp" className="ck-btn ck-btn--primary">
+                  {event.ticketing_enabled ? 'Get a ticket' : 'RSVP'} →
+                </a>
+              ) : (
+                <a href="#coming-soon" className="ck-btn">
+                  More details to come →
+                </a>
+              )}
             </div>
           </div>
         </div>
       </section>
 
-      {/* RSVP FORM — wraps the legacy form in a cinema-styled container.
-          The form's internals still use the existing tailwind palette;
-          cinema-tokenize follow-up. */}
+      {/* RSVP FORM / COMING-SOON — when is_rsvp_open is false the whole
+          form (and its pre-order nudge) gets swapped for a single
+          teaser panel with a Jaya tag. */}
+      {!rsvpOpen ? (
+        <section
+          id="coming-soon"
+          className="ck-page"
+          style={{ background: 'var(--ck-paper)' }}
+        >
+          <div className="ck-narrow">
+            <ComingSoonDetailPanel />
+          </div>
+        </section>
+      ) : (
       <section
         id="rsvp"
         className="ck-page"
@@ -524,9 +553,12 @@ export function CinemaEventDetail() {
           )}
         </div>
       </section>
+      )}
 
-      {/* Menu */}
-      {items.length > 0 && (
+      {/* Menu — pre-orders are scoped to events with RSVP open. While
+          coming-soon, taking payments would be premature, so we hide
+          the menu cells + sticky cart + checkout modal entirely. */}
+      {rsvpOpen && items.length > 0 && (
         <section id="menu" className="ck-page ck-page--paper">
           <div className="ck-eyebrow">On the menu</div>
           <div className="ck-section-head-row" style={{ marginTop: 6 }}>
@@ -648,8 +680,9 @@ export function CinemaEventDetail() {
           page itself only shows totals so it scales to events with
           hundreds of RSVPs. The modal opens a scrollable, sectioned
           list (Going / Maybe / Waitlist). Plus-ones collapse onto
-          their host as a "+1" suffix. */}
-      {hosts.length > 0 && (
+          their host as a "+1" suffix. Hidden in coming-soon mode —
+          there are no RSVPs to count yet. */}
+      {rsvpOpen && hosts.length > 0 && (
         <section className="ck-page" style={{ borderBottom: 'none' }}>
           <div className="ck-eyebrow">Who&apos;s in</div>
           <div className="ck-section-head-row" style={{ marginTop: 6 }}>
@@ -739,6 +772,130 @@ export function CinemaEventDetail() {
           }}
         />
       )}
+    </>
+  )
+}
+
+/** "JAYA" tag — small inline pill stamped on coming-soon events.
+ *  Pairs the colloquial Arabic جاية ("coming") with a Latin gloss in
+ *  the cinema mono. Uses the orange display face on a sun-yellow
+ *  ground so it reads as an active stamp, not chrome. */
+function DetailJayaTag() {
+  return (
+    <span
+      style={{
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: 6,
+        padding: '3px 10px',
+        border: '2px solid var(--ck-ink)',
+        background: 'var(--ck-sun)',
+        color: 'var(--ck-ink)',
+        fontFamily: 'var(--ck-mono)',
+        fontSize: 10,
+        letterSpacing: '0.16em',
+        textTransform: 'uppercase',
+        lineHeight: 1.2,
+      }}
+    >
+      <span
+        style={{
+          fontFamily: 'var(--ck-arabic-display)',
+          fontSize: 18,
+          direction: 'rtl',
+          letterSpacing: 0,
+          lineHeight: 1,
+        }}
+      >
+        جاية
+      </span>
+      <span>Jaya · Coming</span>
+    </span>
+  )
+}
+
+/** Replaces the RSVP form on the event detail page when an event is
+ *  published in coming-soon mode. */
+function ComingSoonDetailPanel() {
+  return (
+    <>
+      <div
+        className="ck-section-head-row"
+        style={{ alignItems: 'baseline' }}
+      >
+        <h2 className="ck-h2">SAVE THE DATE.</h2>
+        <span
+          style={{
+            fontFamily: 'var(--ck-arabic-display)',
+            fontSize: 'clamp(36px, 4vw, 56px)',
+            direction: 'rtl',
+            color: 'var(--ck-cobalt)',
+            lineHeight: 0.9,
+          }}
+        >
+          جاية
+        </span>
+      </div>
+      <div
+        className="ck-card"
+        style={{
+          marginTop: 22,
+          padding: 28,
+          background: 'var(--ck-cream)',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 14,
+        }}
+      >
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            gap: 10,
+            flexWrap: 'wrap',
+          }}
+        >
+          <div
+            style={{
+              fontFamily: 'var(--ck-mono)',
+              fontSize: 11,
+              letterSpacing: '0.18em',
+              textTransform: 'uppercase',
+              color: 'var(--ck-cobalt)',
+            }}
+          >
+            ✦ More details to come
+          </div>
+          <DetailJayaTag />
+        </div>
+        <p
+          className="ck-italic"
+          style={{
+            fontFamily: 'var(--ck-serif-edit)',
+            fontStyle: 'italic',
+            fontSize: 17,
+            lineHeight: 1.5,
+            margin: 0,
+          }}
+        >
+          RSVPs aren&apos;t open for this one yet — we&apos;re still
+          locking down the menu, the lineup, and a few other surprises.
+          Hold the date; we&apos;ll flip the door open soon.
+        </p>
+        <p
+          style={{
+            fontFamily: 'var(--ck-mono)',
+            fontSize: 10,
+            letterSpacing: '0.16em',
+            textTransform: 'uppercase',
+            margin: 0,
+            opacity: 0.65,
+          }}
+        >
+          Follow along on Instagram or check back next week.
+        </p>
+      </div>
     </>
   )
 }
@@ -1244,6 +1401,8 @@ function CartCheckoutModal({
   const [phone, setPhone] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [submitted, setSubmitted] = useState(false)
+  const [paymentUrl, setPaymentUrl] = useState<string | null>(null)
+  const [paymentLinkType, setPaymentLinkType] = useState<'deep_link' | 'web_url'>('web_url')
 
   const smsEnabled = !!settings?.sms_enabled
   const total = cart.reduce(
@@ -1358,9 +1517,6 @@ function CartCheckoutModal({
         event,
         settings.venmo_handle,
       )
-      // Same-tab Venmo deep-link works on iOS/Android natively. For web
-      // fallback the provider URL also works.
-      window.open(paymentLink.url, '_blank')
 
       sendNotification({
         guestId,
@@ -1368,6 +1524,12 @@ function CartCheckoutModal({
         type: 'order_confirmation',
       })
 
+      // Programmatic window.open(_blank) on a venmo:// URL doesn't hand off
+      // to the app on mobile — the new tab can't render a custom scheme.
+      // Stash the link and let the receipt render an <a href> the user taps,
+      // mirroring the RSVPForm ticket pattern that does work on mobile.
+      setPaymentUrl(paymentLink.url)
+      setPaymentLinkType(paymentLink.type)
       setSubmitted(true)
     } catch (err) {
       addToast(err instanceof Error ? err.message : 'Failed to submit order', 'error')
@@ -1489,12 +1651,23 @@ function CartCheckoutModal({
                 className="ck-italic"
                 style={{ fontSize: 16, lineHeight: 1.5, margin: '0 auto', maxWidth: 380 }}
               >
-                Venmo just opened in another tab — finish payment there. We
-                emailed a confirmation; the host marks it paid.
+                One last step — tap below to send payment via Venmo.
+                We emailed a confirmation; the host marks it paid.
               </p>
+              {paymentUrl && (
+                <a
+                  href={paymentUrl}
+                  target={paymentLinkType === 'deep_link' ? undefined : '_blank'}
+                  rel="noopener noreferrer"
+                  className="ck-btn ck-btn--primary"
+                  style={{ marginTop: 18, display: 'inline-block' }}
+                >
+                  Pay ${total.toFixed(2)} on Venmo →
+                </a>
+              )}
               <div
                 style={{
-                  marginTop: 16,
+                  marginTop: 18,
                   padding: 12,
                   border: '2px solid var(--ck-ink)',
                   background: 'var(--ck-paper)',
@@ -1502,14 +1675,15 @@ function CartCheckoutModal({
                   fontSize: 11,
                   letterSpacing: '0.14em',
                   textTransform: 'uppercase',
+                  lineHeight: 1.5,
                 }}
               >
-                Anytime: see this order at{' '}
+                See this order anytime at{' '}
                 <Link
                   to="/my-tickets"
                   style={{ color: 'var(--ck-cobalt)', textDecoration: 'underline' }}
                 >
-                  /my-tickets
+                  My Tickets &amp; Orders
                 </Link>
               </div>
               <button
@@ -1692,7 +1866,7 @@ function CartCheckoutModal({
                 margin: 0,
               }}
             >
-              Venmo opens in a new tab. We email you a confirmation.
+              We capture your order, then hand off to Venmo. Email confirmation included.
             </p>
           </div>
         )}

@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import type { Event, MenuItem } from '../../lib/types'
 import { isUpcoming } from '../../lib/utils/date'
+import { CursorSticker } from '../CursorSticker'
 import {
   formatCinemaDate,
   formatCinemaDay,
@@ -29,6 +30,9 @@ interface CinemaEvent {
   bullets: string[]
   posterUrl: string | null
   menu: CinemaMenuItem[]
+  // When false, the event is "coming soon" — RSVP/ticket CTAs are
+  // swapped for a teaser panel and a Jaya (جاية) tag is shown.
+  rsvpOpen: boolean
 }
 
 interface CinemaMenuItem {
@@ -84,6 +88,7 @@ function mapEvent(e: Event, idx: number, items: MenuItem[]): CinemaEvent {
       cat: (item.category || 'BAKE').toUpperCase(),
       ar: item.display_arabic?.trim() ?? '',
     })),
+    rsvpOpen: e.is_rsvp_open ?? true,
   }
 }
 
@@ -153,6 +158,10 @@ export function CinemaLanding() {
 
       {/* STORY */}
       <StorySection />
+
+      {/* Cursor sticker — orange Arabic pill that follows the cursor and
+          cycles phrases on click. Brand "personality moment". */}
+      <CursorSticker />
     </>
   )
 }
@@ -181,9 +190,16 @@ function HeroSection({ event }: { event: CinemaEvent }) {
             letterSpacing: '0.18em',
             color: 'var(--ck-cobalt)',
             textTransform: 'uppercase',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 10,
+            flexWrap: 'wrap',
           }}
         >
-          ✦ NEXT POP-UP · NO. {event.no} · {event.day} {event.date}
+          <span>
+            ✦ {event.rsvpOpen ? 'NEXT POP-UP' : 'COMING SOON'} · NO. {event.no} · {event.day} {event.date}
+          </span>
+          {!event.rsvpOpen && <JayaTag />}
         </div>
         <div
           className="ck-hide-mobile"
@@ -288,7 +304,9 @@ function HeroSection({ event }: { event: CinemaEvent }) {
               </div>
             )}
 
-            {/* Price seal bottom-right */}
+            {/* Price seal bottom-right — swaps to a Jaya seal when the
+                event is still in coming-soon mode (no RSVP yet, so the
+                price isn't a real commitment). */}
             <div
               style={{
                 position: 'absolute',
@@ -317,28 +335,57 @@ function HeroSection({ event }: { event: CinemaEvent }) {
               >
                 NO. {event.no}
               </div>
-              <div
-                style={{
-                  fontFamily: 'var(--ck-serif)',
-                  fontWeight: 900,
-                  fontSize: event.price > 0 ? 22 : 28,
-                  lineHeight: 1,
-                  marginTop: event.price > 0 ? 2 : 4,
-                }}
-              >
-                {event.price > 0 ? `$${event.price}` : 'FREE'}
-              </div>
-              {event.price > 0 && (
-                <div
-                  style={{
-                    fontFamily: 'var(--ck-mono)',
-                    fontSize: 7,
-                    letterSpacing: '0.16em',
-                    marginTop: 2,
-                  }}
-                >
-                  SEAT
-                </div>
+              {event.rsvpOpen ? (
+                <>
+                  <div
+                    style={{
+                      fontFamily: 'var(--ck-serif)',
+                      fontWeight: 900,
+                      fontSize: event.price > 0 ? 22 : 28,
+                      lineHeight: 1,
+                      marginTop: event.price > 0 ? 2 : 4,
+                    }}
+                  >
+                    {event.price > 0 ? `$${event.price}` : 'FREE'}
+                  </div>
+                  {event.price > 0 && (
+                    <div
+                      style={{
+                        fontFamily: 'var(--ck-mono)',
+                        fontSize: 7,
+                        letterSpacing: '0.16em',
+                        marginTop: 2,
+                      }}
+                    >
+                      SEAT
+                    </div>
+                  )}
+                </>
+              ) : (
+                <>
+                  <div
+                    style={{
+                      fontFamily: 'var(--ck-arabic-display)',
+                      direction: 'rtl',
+                      fontSize: 26,
+                      lineHeight: 1,
+                      marginTop: 4,
+                      color: 'var(--ck-sun)',
+                    }}
+                  >
+                    جاية
+                  </div>
+                  <div
+                    style={{
+                      fontFamily: 'var(--ck-mono)',
+                      fontSize: 7,
+                      letterSpacing: '0.16em',
+                      marginTop: 2,
+                    }}
+                  >
+                    SOON
+                  </div>
+                </>
               )}
             </div>
 
@@ -526,28 +573,32 @@ function HeroSection({ event }: { event: CinemaEvent }) {
             </ul>
           )}
 
-          <Link
-            to={`/events/${event.id}`}
-            style={{
-              padding: '14px 22px',
-              border: '2px solid var(--ck-ink)',
-              background: 'var(--ck-cobalt)',
-              color: 'var(--ck-cream)',
-              fontFamily: 'var(--ck-sans)',
-              fontWeight: 700,
-              fontSize: 13,
-              letterSpacing: '0.12em',
-              textTransform: 'uppercase',
-              textDecoration: 'none',
-              display: 'inline-flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              width: '100%',
-            }}
-          >
-            <span>{event.price > 0 ? `Reserve · $${event.price}` : 'Save my seat'}</span>
-            <span aria-hidden>→</span>
-          </Link>
+          {event.rsvpOpen ? (
+            <Link
+              to={`/events/${event.id}`}
+              style={{
+                padding: '14px 22px',
+                border: '2px solid var(--ck-ink)',
+                background: 'var(--ck-cobalt)',
+                color: 'var(--ck-cream)',
+                fontFamily: 'var(--ck-sans)',
+                fontWeight: 700,
+                fontSize: 13,
+                letterSpacing: '0.12em',
+                textTransform: 'uppercase',
+                textDecoration: 'none',
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                width: '100%',
+              }}
+            >
+              <span>{event.price > 0 ? `Reserve · $${event.price}` : 'Save my seat'}</span>
+              <span aria-hidden>→</span>
+            </Link>
+          ) : (
+            <ComingSoonPanel eventId={event.id} />
+          )}
 
           <div
             style={{
@@ -565,11 +616,128 @@ function HeroSection({ event }: { event: CinemaEvent }) {
             }}
           >
             <span>CK-{event.no}</span>
-            <span>RSVP / حجز</span>
+            <span>{event.rsvpOpen ? 'RSVP / حجز' : 'JAYA / جاية'}</span>
           </div>
         </div>
       </div>
     </section>
+  )
+}
+
+/** Small inline tag stamped over coming-soon events. Reads "JAYA"
+ *  (جاية, colloquial Arabic for "coming") in the orange display face
+ *  next to a tiny Latin label. */
+function JayaTag() {
+  return (
+    <span
+      style={{
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: 6,
+        padding: '3px 10px',
+        border: '2px solid var(--ck-ink)',
+        background: 'var(--ck-sun)',
+        color: 'var(--ck-ink)',
+        fontFamily: 'var(--ck-mono)',
+        fontSize: 10,
+        letterSpacing: '0.16em',
+        textTransform: 'uppercase',
+        lineHeight: 1.2,
+      }}
+    >
+      <span
+        style={{
+          fontFamily: 'var(--ck-arabic-display)',
+          fontSize: 18,
+          direction: 'rtl',
+          letterSpacing: 0,
+          lineHeight: 1,
+        }}
+      >
+        جاية
+      </span>
+      <span>Jaya · Coming</span>
+    </span>
+  )
+}
+
+/** Replaces the RSVP CTA on the cinema landing hero when an event is
+ *  published in coming-soon mode. Still links to the event detail
+ *  page so curious visitors can read whatever's there. */
+function ComingSoonPanel({ eventId }: { eventId: string }) {
+  return (
+    <div
+      style={{
+        padding: '16px 20px',
+        border: '2px solid var(--ck-ink)',
+        background: 'var(--ck-paper)',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 8,
+      }}
+    >
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          gap: 10,
+          flexWrap: 'wrap',
+        }}
+      >
+        <div
+          style={{
+            fontFamily: 'var(--ck-mono)',
+            fontSize: 10,
+            letterSpacing: '0.18em',
+            textTransform: 'uppercase',
+            color: 'var(--ck-cobalt)',
+          }}
+        >
+          ✦ Save the date
+        </div>
+        <JayaTag />
+      </div>
+      <div
+        style={{
+          fontFamily: 'var(--ck-serif)',
+          fontWeight: 900,
+          fontSize: 22,
+          lineHeight: 1,
+        }}
+      >
+        More details to come.
+      </div>
+      <p
+        className="ck-italic"
+        style={{
+          fontFamily: 'var(--ck-serif-edit)',
+          fontStyle: 'italic',
+          fontSize: 14,
+          lineHeight: 1.4,
+          margin: 0,
+          opacity: 0.85,
+        }}
+      >
+        RSVPs aren't open yet. Hold the date — we'll flip the door open
+        soon.
+      </p>
+      <Link
+        to={`/events/${eventId}`}
+        style={{
+          marginTop: 4,
+          fontFamily: 'var(--ck-mono)',
+          fontSize: 11,
+          letterSpacing: '0.16em',
+          textTransform: 'uppercase',
+          color: 'var(--ck-ink)',
+          textDecoration: 'underline',
+          textUnderlineOffset: 4,
+        }}
+      >
+        See what we know →
+      </Link>
+    </div>
   )
 }
 
@@ -1046,6 +1214,7 @@ function CalendarRow({
             {event.ar}
           </span>
         )}
+        {!event.rsvpOpen && <JayaTag />}
       </div>
 
       <div
