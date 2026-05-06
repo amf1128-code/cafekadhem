@@ -13,16 +13,13 @@ export function getPaymentProvider(method: string = 'venmo'): PaymentProvider {
   return provider
 }
 
-// venmo:// only hands off to the app on mobile when the current tab
-// navigates to it. window.open(_blank) opens a blank tab the OS can't
-// intercept and the user just sees a blank page. Web URLs use a new
-// tab so the cart/receipt stays put.
+// Same-tab navigation for both: on mobile, iOS/Android intercept the
+// venmo:// scheme during navigation; on desktop, the browser just goes
+// to venmo.com. Either way the user lands on Venmo, not on a receipt
+// page telling them to look at another tab. The receipt is preserved
+// in history (bfcache) for when they navigate back.
 export function openPaymentLink(link: PaymentLink): void {
-  if (link.type === 'deep_link') {
-    window.location.href = link.url
-  } else {
-    window.open(link.url, '_blank', 'noopener,noreferrer')
-  }
+  window.location.href = link.url
 }
 
 export type { PaymentProvider, PaymentLink } from './types'
