@@ -105,34 +105,6 @@ const AdminEventBulkInvite = lazy(() =>
 const AdminEventBlast = lazy(() =>
   import('./pages/admin/EventBlast').then(m => ({ default: m.AdminEventBlast }))
 )
-const DesignPreviewIndex = lazy(() =>
-  import('./pages/admin/design-preview').then(m => ({ default: m.DesignPreviewIndex }))
-)
-const Option1BirthdayPoster = lazy(() =>
-  import('./pages/admin/design-preview/Option1BirthdayPoster').then(m => ({
-    default: m.Option1BirthdayPoster,
-  }))
-)
-const Option2AlAroussa = lazy(() =>
-  import('./pages/admin/design-preview/Option2AlAroussa').then(m => ({
-    default: m.Option2AlAroussa,
-  }))
-)
-const Option3MagasinGeneral = lazy(() =>
-  import('./pages/admin/design-preview/Option3MagasinGeneral').then(m => ({
-    default: m.Option3MagasinGeneral,
-  }))
-)
-const Option4GroovyShowroom = lazy(() =>
-  import('./pages/admin/design-preview/Option4GroovyShowroom').then(m => ({
-    default: m.Option4GroovyShowroom,
-  }))
-)
-const Option5SoukMaximalism = lazy(() =>
-  import('./pages/admin/design-preview/Option5SoukMaximalism').then(m => ({
-    default: m.Option5SoukMaximalism,
-  }))
-)
 
 export const router = createBrowserRouter([
   // Public site. CinemaShell provides the top strip, nav, marquee, and
@@ -188,12 +160,6 @@ export const router = createBrowserRouter([
       { path: 'pickup', element: <AdminPickupConfig /> },
       { path: 'pickup/orders', element: <AdminPickupOrders /> },
       { path: 'settings', element: <AdminSettings /> },
-      { path: 'design-preview', element: <DesignPreviewIndex /> },
-      { path: 'design-preview/option-1', element: <Option1BirthdayPoster /> },
-      { path: 'design-preview/option-2', element: <Option2AlAroussa /> },
-      { path: 'design-preview/option-3', element: <Option3MagasinGeneral /> },
-      { path: 'design-preview/option-4', element: <Option4GroovyShowroom /> },
-      { path: 'design-preview/option-5', element: <Option5SoukMaximalism /> },
     ],
   },
 ])
