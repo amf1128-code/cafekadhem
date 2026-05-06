@@ -222,7 +222,6 @@ export function AdminDashboard() {
         <Link to="/admin/pickup"><Button variant="outline">Pickup Orders</Button></Link>
         <Link to="/admin/guests"><Button variant="outline">Guest Directory</Button></Link>
         <Link to="/admin/settings"><Button variant="outline">Settings</Button></Link>
-        <Link to="/admin/design-preview"><Button variant="outline">Design Previews</Button></Link>
       </div>
     </div>
   )
