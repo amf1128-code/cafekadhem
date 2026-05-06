@@ -39,6 +39,9 @@ export function Order() {
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
   const [submitted, setSubmitted] = useState(false)
+  const [paymentUrl, setPaymentUrl] = useState<string | null>(null)
+  const [paymentLinkType, setPaymentLinkType] = useState<'deep_link' | 'web_url'>('web_url')
+  const [paidAmount, setPaidAmount] = useState(0)
 
   const [firstName, setFirstName] = useState('')
   const [email, setEmail] = useState('')
@@ -214,7 +217,6 @@ export function Order() {
         event!,
         settings.venmo_handle,
       )
-      window.open(paymentLink.url, '_blank')
 
       sendNotification({
         guestId,
@@ -222,6 +224,12 @@ export function Order() {
         type: 'order_confirmation',
       })
 
+      // Show the Venmo handoff as a tappable anchor on the receipt; on
+      // mobile, programmatic window.open of a venmo:// URL doesn't launch
+      // the app. Anchor tags do (same pattern as the RSVP/ticket flow).
+      setPaymentUrl(paymentLink.url)
+      setPaymentLinkType(paymentLink.type)
+      setPaidAmount(total)
       setSubmitted(true)
       addToast('Order submitted!')
     } catch (err) {
@@ -277,20 +285,31 @@ export function Order() {
             className="ck-italic"
             style={{ fontSize: 18, marginTop: 18, lineHeight: 1.5 }}
           >
-            Venmo just opened in another tab — finish payment there. We
+            One last step — tap below to send payment via Venmo. We
             emailed a confirmation; the host marks it paid.
           </p>
+          {paymentUrl && (
+            <a
+              href={paymentUrl}
+              target={paymentLinkType === 'deep_link' ? undefined : '_blank'}
+              rel="noopener noreferrer"
+              className="ck-btn ck-btn--primary"
+              style={{ marginTop: 22, display: 'inline-block' }}
+            >
+              Pay ${paidAmount.toFixed(2)} on Venmo →
+            </a>
+          )}
           <div
             style={{
-              marginTop: 22,
+              marginTop: 18,
               display: 'flex',
               flexWrap: 'wrap',
               justifyContent: 'center',
               gap: 8,
             }}
           >
-            <Link to="/my-tickets" className="ck-btn ck-btn--primary">
-              See my orders →
+            <Link to="/my-tickets" className="ck-btn">
+              See my tickets &amp; orders →
             </Link>
             <Link to={`/events/${event.id}`} className="ck-btn">
               Back to event
@@ -653,7 +672,7 @@ export function Order() {
               marginTop: 10,
             }}
           >
-            Venmo opens in a new tab. We email you a confirmation.
+            We capture your order, then hand off to Venmo. Email confirmation included.
           </p>
           <ConsentNote verb="order" />
         </div>
