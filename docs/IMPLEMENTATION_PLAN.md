@@ -18,7 +18,7 @@
 | 4 | Recognition & sharing (ambient `?as=`, header, ShareButton, `?ref=`) | ✅ verified | `9b2cb16` (+ `f9ce5d8` hot-fix, `d3beb43`/`7e243f3`/`449d751` polish) | ✅ 2026-05-06 | [04-recognition-sharing.md](commits/04-recognition-sharing.md) |
 | 5 | State unification — **scoped down to Option A** (hook + paid-RSVP UI guard; full page rewrite deferred) | 🟢 committed | *(see git log)* | ⬜ pending user verification | [05-state-unification.md](commits/05-state-unification.md) |
 | 6a | Notification Blast (per-event admin comms to RSVPd guests) | 🟢 committed | *(see git log)* | ⬜ pending user verification | [06-bulk-operations.md](commits/06-bulk-operations.md) |
-| 6b | Bulk Invite enrichment (preview/confirm/resume + retry-failed) | ⬜ not started | — | — | [06-bulk-operations.md](commits/06-bulk-operations.md) |
+| 6b | Bulk Invite enrichment (preview/confirm/resume + retry-failed) | 🟢 committed | *(see git log)* | ⬜ pending user verification | [06-bulk-operations.md](commits/06-bulk-operations.md) |
 
 **Status legend:** ⬜ not started · 🟡 in progress · 🟢 committed · ✅ user-verified · 🔴 blocked
 
