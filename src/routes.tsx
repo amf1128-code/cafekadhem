@@ -108,6 +108,9 @@ const AdminEventBlast = lazy(() =>
 const DesignPreviewIndex = lazy(() =>
   import('./pages/admin/design-preview').then(m => ({ default: m.DesignPreviewIndex }))
 )
+const JayaPreviewPage = lazy(() =>
+  import('./pages/admin/JayaPreview').then(m => ({ default: m.JayaPreviewPage }))
+)
 const Option1BirthdayPoster = lazy(() =>
   import('./pages/admin/design-preview/Option1BirthdayPoster').then(m => ({
     default: m.Option1BirthdayPoster,
@@ -189,6 +192,7 @@ export const router = createBrowserRouter([
       { path: 'pickup/orders', element: <AdminPickupOrders /> },
       { path: 'settings', element: <AdminSettings /> },
       { path: 'design-preview', element: <DesignPreviewIndex /> },
+      { path: 'jaya-preview', element: <JayaPreviewPage /> },
       { path: 'design-preview/option-1', element: <Option1BirthdayPoster /> },
       { path: 'design-preview/option-2', element: <Option2AlAroussa /> },
       { path: 'design-preview/option-3', element: <Option3MagasinGeneral /> },
