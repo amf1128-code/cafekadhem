@@ -353,3 +353,120 @@ details summary::before {
 details[open] summary::before {
   transform: rotate(90deg);
 }
+
+/* ============================================================
+ * Cinema landing — vintage Egyptian-cinema-poster design system
+ * ============================================================
+ *
+ * Scoped to `.cinema-root`. Variables and utilities live under this scope
+ * so the rest of the app (admin, event detail in theme1/2/3) is untouched.
+ * The look is bold, retro, bilingual: Bodoni Moda + Big Shoulders for
+ * headlines, Inter for body, JetBrains Mono for eyebrows/labels, Rakkas
+ * for display Arabic, Reem Kufi for inline Arabic. Hard corners, ink
+ * borders, cobalt + sun accents.
+ */
+.cinema-root {
+  --ck-cream: #f4ecd8;
+  --ck-cream-2: #ece2c9;
+  --ck-paper: #efe6cf;
+  --ck-ink: #0d0d0f;
+  --ck-ink-soft: #1a1a1d;
+  --ck-cobalt: #1e2bd0;
+  --ck-cobalt-deep: #0e1a8a;
+  --ck-sea: #5ba88e;
+  --ck-sun: #ff8e2c;
+  --ck-magenta: #e8347d;
+  --ck-violet: #5b2a86;
+
+  --ck-serif: "Bodoni Moda", "Big Shoulders Display", serif;
+  --ck-serif-edit: "Bodoni Moda", "Big Shoulders Display", serif;
+  --ck-sans: "Inter", "Helvetica Neue", Helvetica, Arial, sans-serif;
+  --ck-mono: "JetBrains Mono", ui-monospace, "Menlo", monospace;
+  --ck-arabic: "Reem Kufi", "Cairo", serif;
+  --ck-arabic-display: "Rakkas", "Reem Kufi", serif;
+
+  background: var(--ck-cream);
+  color: var(--ck-ink);
+  font-family: var(--ck-sans);
+  position: relative;
+  isolation: isolate;
+}
+
+/* Grain noise overlay — sits above content, ignores pointer events. */
+.cinema-root::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 50;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='220' height='220'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 0.55 0'/></filter><rect width='100%25' height='100%25' filter='url(%23n)' opacity='0.55'/></svg>");
+  mix-blend-mode: multiply;
+  opacity: 0.18;
+}
+
+/* Marquee keyframes — used by the cinema marquee strip. */
+@keyframes ck-marquee {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+
+/* Audio toggle spin — only when the toggle is on. */
+@keyframes ck-spin {
+  from { transform: rotate(0); }
+  to { transform: rotate(360deg); }
+}
+
+/* Mobile collapse: viewport-driven. The original prototype used container
+   queries; in production we use a viewport breakpoint at 720px so the rules
+   apply naturally. */
+@media (max-width: 720px) {
+  .cinema-root .ck-hide-mobile { display: none !important; }
+  .cinema-root .ck-strip { padding: 8px 16px !important; font-size: 9px !important; }
+  .cinema-root .ck-nav { padding: 12px 16px !important; }
+  .cinema-root .ck-nav-links,
+  .cinema-root .ck-reserve { display: none !important; }
+  .cinema-root .ck-burger { display: flex !important; }
+
+  .cinema-root .ck-hero { padding: 16px 16px 18px !important; }
+  .cinema-root .ck-hero-strap { flex-direction: column; align-items: flex-start !important; margin-bottom: 12px !important; }
+  .cinema-root .ck-hero-grid { grid-template-columns: 1fr !important; }
+  .cinema-root .ck-poster-wrap { border-right: none !important; border-bottom: 3px solid var(--ck-ink) !important; }
+  .cinema-root .ck-rsvp-rail { padding: 18px !important; gap: 12px !important; }
+
+  .cinema-root .ck-bakes-grid { grid-template-columns: 1fr !important; }
+  .cinema-root .ck-bake-cell {
+    border-right: none !important;
+    min-height: 0 !important;
+    padding: 14px 16px !important;
+  }
+  .cinema-root .ck-menu-head,
+  .cinema-root .ck-cal-head { flex-direction: column; align-items: flex-start !important; gap: 10px !important; margin-bottom: 16px !important; }
+
+  .cinema-root .ck-story-grid { grid-template-columns: 1fr !important; gap: 22px !important; }
+  .cinema-root .ck-story-cols { column-count: 1 !important; }
+
+  /* Calendar row → tight 2-line stack on mobile */
+  .cinema-root .ck-cal-row {
+    grid-template-columns: 56px 1fr auto !important;
+    grid-template-areas:
+      "date title price"
+      "date loc btn" !important;
+    gap: 4px 12px !important;
+    padding: 12px 14px !important;
+    align-items: center !important;
+  }
+  .cinema-root .ck-cal-no { display: none !important; }
+  .cinema-root .ck-cal-date { grid-area: date !important; }
+  .cinema-root .ck-cal-date .ck-cal-date-num { font-size: 22px !important; }
+  .cinema-root .ck-cal-date .ck-cal-date-day { font-size: 9px !important; }
+  .cinema-root .ck-cal-title { grid-area: title !important; }
+  .cinema-root .ck-cal-title .ck-cal-title-text { font-size: 18px !important; }
+  .cinema-root .ck-cal-title .ck-cal-tagline { display: none !important; }
+  .cinema-root .ck-cal-loc { grid-area: loc !important; font-size: 9px !important; line-height: 1.3 !important; }
+  .cinema-root .ck-cal-loc .ck-cal-loc-time { display: none !important; }
+  .cinema-root .ck-cal-price { grid-area: price !important; font-size: 16px !important; text-align: right !important; }
+  .cinema-root .ck-cal-btn { grid-area: btn !important; padding: 6px 10px !important; font-size: 9px !important; }
+
+  .cinema-root .ck-section { padding: 28px 16px !important; }
+  .cinema-root .ck-footer { padding: 22px 16px !important; flex-direction: column; align-items: flex-start !important; }
+}

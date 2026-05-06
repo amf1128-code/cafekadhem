@@ -33,6 +33,11 @@ export interface Event {
   ticketing_enabled: boolean
   ticket_price: number | null
   theme: 'theme1' | 'theme2' | 'theme3'
+  // Cinema/poster landing fields. All optional; the cinema landing falls
+  // back to defaults when null. Set per event from the admin form.
+  display_arabic: string | null
+  tagline: string | null
+  highlights: string | null
   created_at: string
   updated_at: string
   // Joined fields
@@ -64,6 +69,9 @@ export interface MenuItem {
   sort_order: number
   image_url: string | null
   is_available: boolean
+  // Optional Arabic display word shown next to the item name on the
+  // cinema landing's menu grid. Null on rows authored before mig 049.
+  display_arabic: string | null
   created_at: string
 }
 

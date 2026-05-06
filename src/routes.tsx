@@ -39,6 +39,11 @@ const MyTickets = lazy(() =>
 const VerifyMerge = lazy(() =>
   import('./pages/VerifyMerge').then(m => ({ default: m.VerifyMerge }))
 )
+// Cinema landing — full-bleed preview at /cinema. Renders outside
+// PublicLayout because it ships its own top strip / nav / footer.
+const CinemaLanding = lazy(() =>
+  import('./components/cinema/CinemaLanding').then(m => ({ default: m.CinemaLanding }))
+)
 
 const AdminLogin = lazy(() =>
   import('./pages/admin/Login').then(m => ({ default: m.AdminLogin }))
@@ -136,6 +141,10 @@ export const router = createBrowserRouter([
       { path: 'my-tickets', element: <MyTickets /> },
       { path: 'verify-merge', element: <VerifyMerge /> },
     ],
+  },
+  {
+    path: '/cinema',
+    element: <Lazy><CinemaLanding /></Lazy>,
   },
   {
     path: '/admin/login',
