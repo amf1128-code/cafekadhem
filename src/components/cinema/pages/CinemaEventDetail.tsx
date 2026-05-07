@@ -797,7 +797,6 @@ function DetailJayaTag() {
         transformOrigin: 'center',
         whiteSpace: 'nowrap',
         lineHeight: 1,
-        opacity: 0.8,
       }}
     >
       <span

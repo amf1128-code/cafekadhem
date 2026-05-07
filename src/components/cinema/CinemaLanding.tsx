@@ -646,7 +646,6 @@ function JayaTag() {
         transformOrigin: 'center',
         whiteSpace: 'nowrap',
         lineHeight: 1,
-        opacity: 0.8,
       }}
     >
       <span
@@ -1248,7 +1247,9 @@ function CalendarRow({
 
       {/* Coming-soon sticker — anchored near the title baseline (not
           the row center) so it sits beside the event name instead of
-          floating over the date/time block. */}
+          floating over the date/time block. Held at 80% opacity here
+          (only on calendar rows) so it reads as a softer overlay
+          rather than a solid stamp. */}
       {!event.rsvpOpen && (
         <span
           style={{
@@ -1257,6 +1258,7 @@ function CalendarRow({
             right: 12,
             pointerEvents: 'none',
             zIndex: 2,
+            opacity: 0.8,
           }}
         >
           <JayaTag />
