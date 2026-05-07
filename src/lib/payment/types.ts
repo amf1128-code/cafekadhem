@@ -7,7 +7,7 @@ export interface PaymentLink {
 
 export interface PaymentUpdate {
   orderId: string
-  status: 'confirmed' | 'paid' | 'cancelled'
+  status: 'paid' | 'cancelled'
 }
 
 export interface PaymentStatus {

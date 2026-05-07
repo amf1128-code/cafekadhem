@@ -47,7 +47,7 @@ interface EventOrderItem {
 interface EventOrderRow {
   order_id: string
   event_id: string
-  status: 'pending' | 'confirmed' | 'paid' | 'cancelled'
+  status: 'pending' | 'paid' | 'cancelled'
   total: number | null
   venmo_note: string | null
   created_at: string
@@ -606,11 +606,9 @@ function OrderStatusBadge({ status }: { status: EventOrderRow['status'] }) {
   const label =
     status === 'paid'
       ? 'Paid'
-      : status === 'confirmed'
-        ? 'Confirmed'
-        : status === 'cancelled'
-          ? 'Cancelled'
-          : 'Pending'
+      : status === 'cancelled'
+        ? 'Cancelled'
+        : 'Pending'
   return (
     <span
       style={{
