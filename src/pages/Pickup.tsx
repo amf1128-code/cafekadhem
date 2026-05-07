@@ -795,16 +795,6 @@ export function Pickup() {
                 placeholder="Your first name"
               />
             </div>
-            <div>
-              <label className="ck-label">Email</label>
-              <input
-                className="ck-input"
-                type="email"
-                value={email}
-                onChange={e => setEmail(e.target.value)}
-                placeholder="you@example.com"
-              />
-            </div>
             {smsEnabled && (
               <div>
                 <label className="ck-label">Phone (optional)</label>
@@ -817,6 +807,16 @@ export function Pickup() {
                 />
               </div>
             )}
+            <div>
+              <label className="ck-label">Email</label>
+              <input
+                className="ck-input"
+                type="email"
+                value={email}
+                onChange={e => setEmail(e.target.value)}
+                placeholder="you@example.com"
+              />
+            </div>
             <div>
               <label className="ck-label">Notes (optional)</label>
               <input

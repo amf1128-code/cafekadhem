@@ -1889,16 +1889,6 @@ function CartCheckoutModal({
                     placeholder="Your first name"
                   />
                 </div>
-                <div>
-                  <label className="ck-label">Email</label>
-                  <input
-                    className="ck-input"
-                    type="email"
-                    value={email}
-                    onChange={e => setEmail(e.target.value)}
-                    placeholder="you@example.com"
-                  />
-                </div>
                 {smsEnabled && (
                   <div>
                     <label className="ck-label">Phone (optional)</label>
@@ -1911,6 +1901,16 @@ function CartCheckoutModal({
                     />
                   </div>
                 )}
+                <div>
+                  <label className="ck-label">Email</label>
+                  <input
+                    className="ck-input"
+                    type="email"
+                    value={email}
+                    onChange={e => setEmail(e.target.value)}
+                    placeholder="you@example.com"
+                  />
+                </div>
               </div>
 
               {/* RSVP guardrail (USER_FLOWS_SPEC.md §4.2). Hidden for
