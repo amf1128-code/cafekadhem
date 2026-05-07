@@ -174,7 +174,7 @@ export interface Order {
   id: string
   event_id: string
   guest_id: string
-  status: 'pending' | 'confirmed' | 'paid' | 'cancelled'
+  status: 'pending' | 'paid' | 'cancelled'
   payment_method: 'venmo' | 'stripe'
   total: number | null
   venmo_note: string | null
