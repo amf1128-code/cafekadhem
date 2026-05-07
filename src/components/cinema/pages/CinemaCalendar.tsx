@@ -190,6 +190,7 @@ function CalendarFullRow({
         textDecoration: 'none',
         color: 'var(--ck-ink)',
         opacity: muted ? 0.7 : 1,
+        position: 'relative',
       }}
     >
       <div className="ck-cal-date">
@@ -250,48 +251,6 @@ function CalendarFullRow({
               {event.display_arabic}
             </span>
           )}
-          {!muted && event.is_rsvp_open === false && (
-            <span
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: 7,
-                padding: '5px 12px',
-                border: '2px solid var(--ck-ink)',
-                background: 'var(--ck-sun)',
-                color: 'var(--ck-ink)',
-                borderRadius: 999,
-                boxShadow: '2px 2px 0 var(--ck-ink)',
-                transform: 'rotate(-10deg)',
-                transformOrigin: 'center',
-                whiteSpace: 'nowrap',
-                lineHeight: 1,
-              }}
-            >
-              <span
-                style={{
-                  fontFamily: 'var(--ck-arabic-display)',
-                  fontSize: 19,
-                  direction: 'rtl',
-                  letterSpacing: 0,
-                  lineHeight: 1,
-                }}
-              >
-                جاية
-              </span>
-              <span
-                style={{
-                  fontFamily: 'var(--ck-mono)',
-                  fontSize: 9,
-                  letterSpacing: '0.16em',
-                  textTransform: 'uppercase',
-                  fontWeight: 700,
-                }}
-              >
-                Coming soon
-              </span>
-            </span>
-          )}
         </div>
         {event.tagline && (
           <div
@@ -344,7 +303,73 @@ function CalendarFullRow({
               ? 'FREE'
               : `$${price}`}
       </div>
+
+      {/* Coming-soon sticker — slapped over the loc/price columns so
+          it reads as a stamp on top of the row chrome instead of
+          eating its own line in the title block. */}
+      {!muted && event.is_rsvp_open === false && (
+        <span
+          style={{
+            position: 'absolute',
+            top: '50%',
+            right: 70,
+            transform: 'translateY(-50%)',
+            pointerEvents: 'none',
+            zIndex: 2,
+          }}
+        >
+          <CalendarRowJayaSticker />
+        </span>
+      )}
     </Link>
+  )
+}
+
+/** Slapped-on coming-soon sticker for calendar rows. Same Cursor
+ *  Sticker treatment as the hero version (sun pill, ink shadow,
+ *  rotated) but a hair smaller so it doesn't dominate a row. */
+function CalendarRowJayaSticker() {
+  return (
+    <span
+      style={{
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: 7,
+        padding: '5px 12px',
+        border: '2px solid var(--ck-ink)',
+        background: 'var(--ck-sun)',
+        color: 'var(--ck-ink)',
+        borderRadius: 999,
+        boxShadow: '2px 2px 0 var(--ck-ink)',
+        transform: 'rotate(-10deg)',
+        transformOrigin: 'center',
+        whiteSpace: 'nowrap',
+        lineHeight: 1,
+      }}
+    >
+      <span
+        style={{
+          fontFamily: 'var(--ck-arabic-display)',
+          fontSize: 19,
+          direction: 'rtl',
+          letterSpacing: 0,
+          lineHeight: 1,
+        }}
+      >
+        جاية
+      </span>
+      <span
+        style={{
+          fontFamily: 'var(--ck-mono)',
+          fontSize: 9,
+          letterSpacing: '0.16em',
+          textTransform: 'uppercase',
+          fontWeight: 700,
+        }}
+      >
+        Coming soon
+      </span>
+    </span>
   )
 }
 
