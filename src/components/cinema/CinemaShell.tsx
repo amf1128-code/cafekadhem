@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Link, NavLink, Outlet, useLocation } from 'react-router-dom'
+import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { clearMyGuest, useMyGuest } from '../../lib/identity/useMyGuest'
 import { AmbientTokenHandler } from '../layout/AmbientTokenHandler'
 import { KadhemLockup, Marquee, RegMark } from './primitives'
@@ -44,11 +44,63 @@ const CONTACT = {
 export function CinemaShell() {
   const [navOpen, setNavOpen] = useState(false)
   const { pathname, hash } = useLocation()
+  const navigate = useNavigate()
 
   // Close mobile drawer whenever the route changes.
   useEffect(() => {
     setNavOpen(false)
   }, [pathname, hash])
+
+  // Tap handler for the mobile drawer. Closes the drawer and resolves
+  // the destination ourselves rather than letting the browser handle
+  // the click default. Two reasons:
+  //   1. The drawer unmounts on click (setNavOpen above). On Safari
+  //      that race cancels the browser's native anchor scroll, so
+  //      <a href="/#menu"> just lands on / with no scroll.
+  //   2. CinemaLanding (which owns #menu/#story) is lazy-loaded —
+  //      after a cross-page nav we have to wait for Suspense to
+  //      mount the section before scrollIntoView has a target.
+  function handleMobileNavClick(
+    e: React.MouseEvent<HTMLAnchorElement>,
+    href: string,
+  ) {
+    // Plain modifier-clicks (cmd/ctrl/middle) should keep their native
+    // "open in new tab" behavior — let the browser handle those.
+    if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0) {
+      setNavOpen(false)
+      return
+    }
+    e.preventDefault()
+    setNavOpen(false)
+    if (!href.includes('#')) {
+      navigate(href)
+      return
+    }
+    const [rawPath, anchor] = href.split('#')
+    const targetPath = rawPath || '/'
+    const scrollToAnchor = () => {
+      const el = document.getElementById(anchor)
+      if (!el) return false
+      el.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      return true
+    }
+    if (pathname === targetPath) {
+      scrollToAnchor()
+      if (hash !== `#${anchor}`) {
+        window.history.replaceState(null, '', `#${anchor}`)
+      }
+      return
+    }
+    navigate(`${targetPath}#${anchor}`)
+    // Poll for the target after the lazy chunk mounts. ~2s ceiling
+    // (120 frames at 60fps) covers a cold chunk fetch on slow links.
+    let attempts = 0
+    const tryScroll = () => {
+      if (scrollToAnchor()) return
+      if (++attempts < 120) requestAnimationFrame(tryScroll)
+    }
+    requestAnimationFrame(tryScroll)
+  }
 
   const todayLine = useMemo(() => {
     const now = new Date()
@@ -206,62 +258,37 @@ export function CinemaShell() {
             background: 'var(--ck-cream)',
           }}
         >
-          {NAV_LINKS.map(l => {
-            const linkStyle = {
-              padding: '16px 28px',
-              fontFamily: 'var(--ck-mono)',
-              fontSize: 12,
-              letterSpacing: '0.16em',
-              color: 'var(--ck-ink)',
-              textDecoration: 'none',
-              borderTop: '1px solid var(--ck-ink)',
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-            } as const
-            const inner = (
-              <>
-                <span>{l.en}</span>
-                <span
-                  style={{
-                    fontFamily: 'var(--ck-arabic-display)',
-                    fontSize: 22,
-                    direction: 'rtl',
-                    letterSpacing: 0,
-                  }}
-                >
-                  {l.ar}
-                </span>
-              </>
-            )
-            // Hash anchors (e.g. /#menu) need a real <a> so the browser
-            // performs native anchor scrolling — react-router's <Link>
-            // would only push history without scrolling. Always close the
-            // drawer on click, even if the location is unchanged, so a
-            // repeat tap on the same link doesn't leave the menu stuck.
-            if (l.href.includes('#')) {
-              return (
-                <a
-                  key={l.en}
-                  href={l.href}
-                  style={linkStyle}
-                  onClick={() => setNavOpen(false)}
-                >
-                  {inner}
-                </a>
-              )
-            }
-            return (
-              <Link
-                key={l.en}
-                to={l.href}
-                style={linkStyle}
-                onClick={() => setNavOpen(false)}
+          {NAV_LINKS.map(l => (
+            <a
+              key={l.en}
+              href={l.href}
+              onClick={e => handleMobileNavClick(e, l.href)}
+              style={{
+                padding: '16px 28px',
+                fontFamily: 'var(--ck-mono)',
+                fontSize: 12,
+                letterSpacing: '0.16em',
+                color: 'var(--ck-ink)',
+                textDecoration: 'none',
+                borderTop: '1px solid var(--ck-ink)',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+              }}
+            >
+              <span>{l.en}</span>
+              <span
+                style={{
+                  fontFamily: 'var(--ck-arabic-display)',
+                  fontSize: 22,
+                  direction: 'rtl',
+                  letterSpacing: 0,
+                }}
               >
-                {inner}
-              </Link>
-            )
-          })}
+                {l.ar}
+              </span>
+            </a>
+          ))}
         </div>
       )}
 
