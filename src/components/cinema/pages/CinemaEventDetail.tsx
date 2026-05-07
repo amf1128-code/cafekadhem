@@ -18,6 +18,7 @@ import {
 import { getPaymentProvider, openPaymentLink } from '../../../lib/payment'
 import { buildVenmoNote } from '../../../lib/payment/venmo'
 import { sendNotification } from '../../../lib/notifications'
+import { instagramUrl } from '../../../lib/utils/instagram'
 import { normalizePhone } from '../../../lib/utils/phone'
 import { useToast } from '../../ui/Toast'
 import { RSVPForm } from '../../events/RSVPForm'
@@ -1126,6 +1127,7 @@ function RsvpListGroup({
         >
           {hosts.map(h => {
             const plusOnes = plusOneCountByHost.get(h.id) ?? 0
+            const handle = h.guest?.instagram ?? null
             return (
               <li
                 key={h.id}
@@ -1138,6 +1140,24 @@ function RsvpListGroup({
                 <span style={{ fontWeight: 600 }}>
                   {h.guest?.first_name ?? 'Guest'}
                 </span>
+                {handle && (
+                  <a
+                    href={instagramUrl(handle)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    aria-label={`@${handle} on Instagram`}
+                    title={`@${handle}`}
+                    style={{
+                      marginLeft: 6,
+                      display: 'inline-flex',
+                      verticalAlign: 'middle',
+                      color: 'var(--ck-cobalt)',
+                      lineHeight: 0,
+                    }}
+                  >
+                    <InstagramGlyph />
+                  </a>
+                )}
                 {plusOnes > 0 && (
                   <span
                     style={{
@@ -2033,6 +2053,26 @@ function CartCheckoutModal({
         )}
       </div>
     </div>
+  )
+}
+
+function InstagramGlyph() {
+  return (
+    <svg
+      width="14"
+      height="14"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <rect x="3" y="3" width="18" height="18" rx="5" />
+      <circle cx="12" cy="12" r="4" />
+      <circle cx="17.5" cy="6.5" r="1" fill="currentColor" stroke="none" />
+    </svg>
   )
 }
 
