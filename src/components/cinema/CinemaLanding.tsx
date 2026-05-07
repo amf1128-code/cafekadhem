@@ -1184,7 +1184,6 @@ function CalendarRow({
   return (
     <Link
       to={`/events/${event.id}`}
-      className="ck-cal-row"
       style={{
         display: 'grid',
         gridTemplateColumns: '1fr auto',

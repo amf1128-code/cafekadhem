@@ -42,7 +42,7 @@ export function CinemaCalendar() {
     <>
       {/* HEADER */}
       <section className="ck-page" style={{ paddingBottom: 36 }}>
-        <div className="ck-eyebrow">✦ Every pop-up, past and future</div>
+        <div className="ck-eyebrow">✦ Every event, past and future</div>
         <div
           className="ck-section-head-row"
           style={{ marginTop: 6, alignItems: 'baseline' }}
@@ -69,8 +69,7 @@ export function CinemaCalendar() {
             lineHeight: 1.4,
           }}
         >
-          The whole roster — what's coming up and what's already happened.
-          Each one had its own poster, its own menu, and its own night.
+          What's coming up and what's already happened.
         </p>
       </section>
 
