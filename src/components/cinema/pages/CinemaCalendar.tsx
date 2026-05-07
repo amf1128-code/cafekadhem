@@ -304,16 +304,14 @@ function CalendarFullRow({
               : `$${price}`}
       </div>
 
-      {/* Coming-soon sticker — slapped over the loc/price columns so
-          it reads as a stamp on top of the row chrome instead of
-          eating its own line in the title block. */}
+      {/* Coming-soon sticker — anchored near the title baseline (not
+          the row center) so it sits in line with the event name. */}
       {!muted && event.is_rsvp_open === false && (
         <span
           style={{
             position: 'absolute',
-            top: '50%',
+            top: 18,
             right: 70,
-            transform: 'translateY(-50%)',
             pointerEvents: 'none',
             zIndex: 2,
           }}
@@ -345,6 +343,7 @@ function CalendarRowJayaSticker() {
         transformOrigin: 'center',
         whiteSpace: 'nowrap',
         lineHeight: 1,
+        opacity: 0.8,
       }}
     >
       <span

@@ -1245,17 +1245,20 @@ function CalendarRow({
         <span style={{ opacity: 0.65 }}>{event.time}</span>
       </div>
 
-      {/* Coming-soon sticker — slapped over the date stack so the row
-          stays compact instead of growing a third inline line. */}
+      {/* Coming-soon sticker — anchored near the title baseline (not
+          the row center) so it sits beside the event name instead of
+          floating over the date/time block. Held at 80% opacity here
+          (only on calendar rows) so it reads as a softer overlay
+          rather than a solid stamp. */}
       {!event.rsvpOpen && (
         <span
           style={{
             position: 'absolute',
-            top: '50%',
+            top: 14,
             right: 12,
-            transform: 'translateY(-50%)',
             pointerEvents: 'none',
             zIndex: 2,
+            opacity: 0.8,
           }}
         >
           <JayaTag />
