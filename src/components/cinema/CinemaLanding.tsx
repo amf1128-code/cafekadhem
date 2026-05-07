@@ -1377,7 +1377,7 @@ function StorySection() {
           <div
             style={{
               position: 'relative',
-              width: '55%',
+              width: '41%',
               aspectRatio: '3/4',
             }}
           >
