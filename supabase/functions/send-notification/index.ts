@@ -468,10 +468,30 @@ const messageTemplates: Record<string, (data: Record<string, string>) => { subje
     }
   },
   pickup_order_confirmation: (data) => {
+    type Line = { name: string; quantity: number; unit_price: number }
+    let lines: Line[] = []
+    if (data.line_items) {
+      try {
+        const parsed = JSON.parse(data.line_items)
+        if (Array.isArray(parsed)) lines = parsed as Line[]
+      } catch {
+        // Malformed payload — render the email without an itemization
+        // rather than failing the send.
+      }
+    }
+    const total = Number(data.order_total || '0')
+    const formatMoney = (n: number) => `$${n.toFixed(2)}`
+
     const when = data.pickup_when ? ` for ${data.pickup_when}` : ''
+    const itemsText = lines.length
+      ? '\n\n' + lines
+          .map((l) => `- ${l.name} × ${l.quantity} — ${formatMoney(l.unit_price * l.quantity)}`)
+          .join('\n') +
+        `\n\nTotal: ${formatMoney(total)}`
+      : ''
     const ticketLink = data.pickup_url ? `\n\nShow this at pickup: ${data.pickup_url}` : ''
     const historyLink = data.history_url ? `\n\nAll your orders: ${data.history_url}` : ''
-    const text = `Your pick-up order${when} has been submitted. Your host will confirm payment once received via Venmo.${ticketLink}${historyLink}`
+    const text = `Your pick-up order${when} has been submitted. Your host will confirm payment once received via Venmo.${itemsText}${ticketLink}${historyLink}`
     if (!data.pickup_url) {
       return { subject: 'Pick-Up Order Confirmed - Cafe Kadhem', body: text }
     }
@@ -480,6 +500,34 @@ const messageTemplates: Record<string, (data: Record<string, string>) => { subje
            <img src="${escapeHtml(data.qr_image_url)}" alt="Pickup QR code" width="240" height="240" style="display:block;border:1px solid #e7e0cf;background:#fdfaf3;" />
          </td></tr>`
       : ''
+
+    const itemRows = lines
+      .map(
+        (l) => `
+        <tr>
+          <td style="padding:10px 0;border-bottom:1px dashed #e7e0cf;font-size:14px;color:#1a2e1f;">
+            <strong style="font-weight:700;">${escapeHtml(l.name)}</strong>
+            <span style="color:#6b6452;">&nbsp;×&nbsp;${l.quantity}</span>
+          </td>
+          <td align="right" style="padding:10px 0;border-bottom:1px dashed #e7e0cf;font-size:14px;color:#1a2e1f;font-weight:700;white-space:nowrap;">
+            ${formatMoney(l.unit_price * l.quantity)}
+          </td>
+        </tr>`,
+      )
+      .join('')
+    const itemsBlock = lines.length
+      ? `<tr><td style="padding:20px 0 4px;">
+          <p style="margin:0 0 10px;letter-spacing:0.18em;text-transform:uppercase;font-size:10px;color:#6b6452;">Your order</p>
+          <table cellpadding="0" cellspacing="0" width="100%">
+            ${itemRows}
+            <tr>
+              <td style="padding:14px 0 0;font-family:Georgia,serif;font-weight:900;font-size:18px;color:#1a2e1f;">Total</td>
+              <td align="right" style="padding:14px 0 0;font-family:Georgia,serif;font-weight:900;font-size:18px;color:#1a2e1f;white-space:nowrap;">${formatMoney(total)}</td>
+            </tr>
+          </table>
+        </td></tr>`
+      : ''
+
     const html = `<!doctype html>
 <html><body style="margin:0;padding:0;background:#fdfaf3;font-family:Georgia,'Times New Roman',serif;color:#1a2e1f;">
   <table width="100%" cellpadding="0" cellspacing="0" style="background:#fdfaf3;padding:32px 16px;">
@@ -492,6 +540,7 @@ const messageTemplates: Record<string, (data: Record<string, string>) => { subje
           <h1 style="margin:8px 0 0;font-style:italic;font-weight:400;font-size:24px;color:#1a2e1f;">Pick-Up Order</h1>
           ${data.pickup_when ? `<p style="margin:8px 0 0;font-size:14px;color:#3a3a3a;">${escapeHtml(data.pickup_when)}</p>` : ''}
         </td></tr>
+        ${itemsBlock}
         <tr><td align="center" style="padding:16px 0 8px;border-top:1px solid #e7e0cf;">
           <p style="margin:0;font-size:14px;color:#3a3a3a;">Show this QR at pickup:</p>
         </td></tr>
@@ -803,6 +852,40 @@ Deno.serve(async (req: Request) => {
         data.pickup_url = `${siteUrl}/pickup/${data.pickup_token}`
         const qrImageUrl = await generateAndUploadQr(data.pickup_token, data.pickup_url)
         if (qrImageUrl) data.qr_image_url = qrImageUrl
+
+        // Same shape as the order_confirmation receipt below — pull the
+        // canonical line items + total from pickup_orders/pickup_order_items
+        // so what the guest sees matches what was actually written.
+        const { data: pickupOrderRow } = await supabase
+          .from('pickup_orders')
+          .select('id, total')
+          .eq('pickup_token', data.pickup_token)
+          .eq('guest_id', guestId)
+          .maybeSingle()
+        if (pickupOrderRow?.id) {
+          const { data: pickupItems } = await supabase
+            .from('pickup_order_items')
+            .select('quantity, unit_price, menu_items(name)')
+            .eq('pickup_order_id', pickupOrderRow.id)
+          if (pickupItems) {
+            const lines = (pickupItems as Array<{
+              quantity: number
+              unit_price: number | null
+              menu_items: { name: string } | { name: string }[] | null
+            }>).map((it) => {
+              const m = Array.isArray(it.menu_items) ? it.menu_items[0] : it.menu_items
+              return {
+                name: m?.name || 'Item',
+                quantity: it.quantity,
+                unit_price: Number(it.unit_price ?? 0),
+              }
+            })
+            data.line_items = JSON.stringify(lines)
+          }
+          if (pickupOrderRow.total != null) {
+            data.order_total = String(pickupOrderRow.total)
+          }
+        }
       }
       // Pull the actual line items + total from the DB so the receipt
       // section of the email is sourced from what was written, not from
