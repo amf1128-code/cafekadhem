@@ -15,7 +15,7 @@ import {
   dispatchMergeVerification,
   type PendingMerge,
 } from '../../../lib/identity/handlePendingMerge'
-import { getPaymentProvider } from '../../../lib/payment'
+import { getPaymentProvider, openPaymentLink } from '../../../lib/payment'
 import { sendNotification } from '../../../lib/notifications'
 import { normalizePhone } from '../../../lib/utils/phone'
 import { useToast } from '../../ui/Toast'
@@ -1412,6 +1412,8 @@ function CartCheckoutModal({
   const [phone, setPhone] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [submitted, setSubmitted] = useState(false)
+  const [paymentUrl, setPaymentUrl] = useState<string | null>(null)
+  const [paymentLinkType, setPaymentLinkType] = useState<'deep_link' | 'web_url'>('web_url')
 
   const smsEnabled = !!settings?.sms_enabled
   const total = cart.reduce(
@@ -1526,9 +1528,6 @@ function CartCheckoutModal({
         event,
         settings.venmo_handle,
       )
-      // Same-tab Venmo deep-link works on iOS/Android natively. For web
-      // fallback the provider URL also works.
-      window.open(paymentLink.url, '_blank')
 
       sendNotification({
         guestId,
@@ -1536,7 +1535,14 @@ function CartCheckoutModal({
         type: 'order_confirmation',
       })
 
+      // Stash the link first so the receipt can render an <a href> as a
+      // fallback if the auto-handoff below doesn't fire (e.g. Venmo not
+      // installed). Then navigate same-tab to the deep link — iOS/Android
+      // intercept venmo:// at navigation time and open the app.
+      setPaymentUrl(paymentLink.url)
+      setPaymentLinkType(paymentLink.type)
       setSubmitted(true)
+      openPaymentLink(paymentLink)
     } catch (err) {
       addToast(err instanceof Error ? err.message : 'Failed to submit order', 'error')
     } finally {
@@ -1657,12 +1663,12 @@ function CartCheckoutModal({
                 className="ck-italic"
                 style={{ fontSize: 16, lineHeight: 1.5, margin: '0 auto', maxWidth: 380 }}
               >
-                Venmo just opened in another tab — finish payment there. We
-                emailed a confirmation; the host marks it paid.
+                Venmo opened to finish payment — come back here when it's
+                sent. We emailed a confirmation; the host marks it paid.
               </p>
               <div
                 style={{
-                  marginTop: 16,
+                  marginTop: 18,
                   padding: 12,
                   border: '2px solid var(--ck-ink)',
                   background: 'var(--ck-paper)',
@@ -1670,16 +1676,41 @@ function CartCheckoutModal({
                   fontSize: 11,
                   letterSpacing: '0.14em',
                   textTransform: 'uppercase',
+                  lineHeight: 1.5,
                 }}
               >
-                Anytime: see this order at{' '}
+                See this order anytime at{' '}
                 <Link
                   to="/my-tickets"
                   style={{ color: 'var(--ck-cobalt)', textDecoration: 'underline' }}
                 >
-                  /my-tickets
+                  My Tickets &amp; Orders
                 </Link>
               </div>
+              {paymentUrl && (
+                <p
+                  style={{
+                    marginTop: 14,
+                    fontFamily: 'var(--ck-mono)',
+                    fontSize: 10,
+                    letterSpacing: '0.14em',
+                    textTransform: 'uppercase',
+                    opacity: 0.7,
+                    lineHeight: 1.6,
+                  }}
+                >
+                  Venmo didn't open?{' '}
+                  <a
+                    href={paymentUrl}
+                    target={paymentLinkType === 'deep_link' ? undefined : '_blank'}
+                    rel="noopener noreferrer"
+                    style={{ color: 'var(--ck-cobalt)', textDecoration: 'underline' }}
+                  >
+                    Tap here to retry
+                  </a>
+                  .
+                </p>
+              )}
               <button
                 type="button"
                 onClick={() => {
@@ -1860,7 +1891,7 @@ function CartCheckoutModal({
                 margin: 0,
               }}
             >
-              Venmo opens in a new tab. We email you a confirmation.
+              We capture your order, then hand off to Venmo. Email confirmation included.
             </p>
           </div>
         )}

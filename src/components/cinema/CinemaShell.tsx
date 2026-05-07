@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, NavLink, Outlet, useLocation } from 'react-router-dom'
 import { clearMyGuest, useMyGuest } from '../../lib/identity/useMyGuest'
+import { AmbientTokenHandler } from '../layout/AmbientTokenHandler'
 import { KadhemLockup, Marquee, RegMark } from './primitives'
 
 const NAV_LINKS = [
@@ -63,7 +64,9 @@ export function CinemaShell() {
 
   return (
     <div className="cinema-root" style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
-      {/* TOP STRIP */}
+      {/* Resolves ?as=<token> recognition links and strips the param.
+          USER_FLOWS_SPEC §3a.1. Renders nothing visible. */}
+      <AmbientTokenHandler />      {/* TOP STRIP */}
       <div
         className="ck-strip"
         style={{
@@ -203,36 +206,62 @@ export function CinemaShell() {
             background: 'var(--ck-cream)',
           }}
         >
-          {NAV_LINKS.map(l => (
-            <Link
-              key={l.en}
-              to={l.href}
-              style={{
-                padding: '16px 28px',
-                fontFamily: 'var(--ck-mono)',
-                fontSize: 12,
-                letterSpacing: '0.16em',
-                color: 'var(--ck-ink)',
-                textDecoration: 'none',
-                borderTop: '1px solid var(--ck-ink)',
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-              }}
-            >
-              <span>{l.en}</span>
-              <span
-                style={{
-                  fontFamily: 'var(--ck-arabic-display)',
-                  fontSize: 22,
-                  direction: 'rtl',
-                  letterSpacing: 0,
-                }}
+          {NAV_LINKS.map(l => {
+            const linkStyle = {
+              padding: '16px 28px',
+              fontFamily: 'var(--ck-mono)',
+              fontSize: 12,
+              letterSpacing: '0.16em',
+              color: 'var(--ck-ink)',
+              textDecoration: 'none',
+              borderTop: '1px solid var(--ck-ink)',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+            } as const
+            const inner = (
+              <>
+                <span>{l.en}</span>
+                <span
+                  style={{
+                    fontFamily: 'var(--ck-arabic-display)',
+                    fontSize: 22,
+                    direction: 'rtl',
+                    letterSpacing: 0,
+                  }}
+                >
+                  {l.ar}
+                </span>
+              </>
+            )
+            // Hash anchors (e.g. /#menu) need a real <a> so the browser
+            // performs native anchor scrolling — react-router's <Link>
+            // would only push history without scrolling. Always close the
+            // drawer on click, even if the location is unchanged, so a
+            // repeat tap on the same link doesn't leave the menu stuck.
+            if (l.href.includes('#')) {
+              return (
+                <a
+                  key={l.en}
+                  href={l.href}
+                  style={linkStyle}
+                  onClick={() => setNavOpen(false)}
+                >
+                  {inner}
+                </a>
+              )
+            }
+            return (
+              <Link
+                key={l.en}
+                to={l.href}
+                style={linkStyle}
+                onClick={() => setNavOpen(false)}
               >
-                {l.ar}
-              </span>
-            </Link>
-          ))}
+                {inner}
+              </Link>
+            )
+          })}
         </div>
       )}
 

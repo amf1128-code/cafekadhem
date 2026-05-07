@@ -15,7 +15,7 @@ import {
 } from '../lib/identity/handlePendingMerge'
 import { ConsentNote } from '../components/ui/ConsentNote'
 import { normalizePhone } from '../lib/utils/phone'
-import { getPaymentProvider } from '../lib/payment'
+import { getPaymentProvider, openPaymentLink } from '../lib/payment'
 import { sendNotification } from '../lib/notifications'
 import { useToast } from '../components/ui/Toast'
 import { CinemaPageLoader } from '../components/cinema/primitives'
@@ -39,6 +39,9 @@ export function Order() {
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
   const [submitted, setSubmitted] = useState(false)
+  const [paymentUrl, setPaymentUrl] = useState<string | null>(null)
+  const [paymentLinkType, setPaymentLinkType] = useState<'deep_link' | 'web_url'>('web_url')
+  const [paidAmount, setPaidAmount] = useState(0)
 
   const [firstName, setFirstName] = useState('')
   const [email, setEmail] = useState('')
@@ -214,16 +217,23 @@ export function Order() {
         event!,
         settings.venmo_handle,
       )
-      window.open(paymentLink.url, '_blank')
 
       sendNotification({
         guestId,
         eventId: id!,
         type: 'order_confirmation',
+        data: { order_id: order.id as string },
       })
 
+      // Stash the link so the receipt can render a fallback anchor, then
+      // navigate same-tab to the deep link so iOS/Android hand off to the
+      // Venmo app (window.open with _blank doesn't work for venmo://).
+      setPaymentUrl(paymentLink.url)
+      setPaymentLinkType(paymentLink.type)
+      setPaidAmount(total)
       setSubmitted(true)
       addToast('Order submitted!')
+      openPaymentLink(paymentLink)
     } catch (err) {
       addToast(err instanceof Error ? err.message : 'Failed to submit order', 'error')
     } finally {
@@ -277,8 +287,8 @@ export function Order() {
             className="ck-italic"
             style={{ fontSize: 18, marginTop: 18, lineHeight: 1.5 }}
           >
-            Venmo just opened in another tab — finish payment there. We
-            emailed a confirmation; the host marks it paid.
+            Venmo opened to finish payment — come back here when it's
+            sent. We emailed a confirmation; the host marks it paid.
           </p>
           <div
             style={{
@@ -290,12 +300,36 @@ export function Order() {
             }}
           >
             <Link to="/my-tickets" className="ck-btn ck-btn--primary">
-              See my orders →
+              See my tickets &amp; orders →
             </Link>
             <Link to={`/events/${event.id}`} className="ck-btn">
               Back to event
             </Link>
           </div>
+          {paymentUrl && (
+            <p
+              style={{
+                marginTop: 14,
+                fontFamily: 'var(--ck-mono)',
+                fontSize: 10,
+                letterSpacing: '0.14em',
+                textTransform: 'uppercase',
+                opacity: 0.7,
+                lineHeight: 1.6,
+              }}
+            >
+              Venmo didn't open?{' '}
+              <a
+                href={paymentUrl}
+                target={paymentLinkType === 'deep_link' ? undefined : '_blank'}
+                rel="noopener noreferrer"
+                style={{ color: 'var(--ck-cobalt)', textDecoration: 'underline' }}
+              >
+                Tap here to retry (${paidAmount.toFixed(2)})
+              </a>
+              .
+            </p>
+          )}
         </div>
       </section>
     )
@@ -653,7 +687,7 @@ export function Order() {
               marginTop: 10,
             }}
           >
-            Venmo opens in a new tab. We email you a confirmation.
+            We capture your order, then hand off to Venmo. Email confirmation included.
           </p>
           <ConsentNote verb="order" />
         </div>
