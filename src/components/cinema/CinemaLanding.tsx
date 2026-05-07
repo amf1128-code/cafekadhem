@@ -1299,16 +1299,32 @@ function StorySection() {
         }}
       >
         <div>
+          <div
+            style={{
+              fontFamily: 'var(--ck-mono)',
+              fontSize: 11,
+              letterSpacing: '0.18em',
+              textTransform: 'uppercase',
+            }}
+          >
+            The start of Cafe Kadhem
+          </div>
           <h2
             style={{
               fontFamily: 'var(--ck-serif)',
               fontWeight: 900,
-              fontSize: 'clamp(48px, 6vw, 76px)',
-              lineHeight: 0.9,
-              margin: '0 0 14px',
+              fontSize: 'clamp(56px, 7vw, 88px)',
+              lineHeight: 0.82,
+              margin: '8px 0 14px',
             }}
           >
-            The start of Cafe Kadhem
+            FOR KADHEM
+            <br />
+            AL-SAHER, &
+            <br />
+            <span style={{ fontStyle: 'italic', fontFamily: 'var(--ck-serif-edit)' }}>
+              for the table
+            </span>
           </h2>
           <div
             style={{
