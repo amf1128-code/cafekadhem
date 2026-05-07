@@ -1000,21 +1000,6 @@ Deno.serve(async (req: Request) => {
       ]
     }
 
-    // Per-type routing for guests with preference='both'. Time-sensitive
-    // sends go SMS (if phone available + sms_enabled), bulkier or less
-    // urgent sends go email. USER_FLOWS_SPEC.md §7.1.
-    const BOTH_PREFERS_SMS: Record<string, boolean> = {
-      rsvp_confirmation: true,
-      ticket_issued: true,
-      invite: true,
-      event_reminder: true,
-      waitlist_promoted: true,
-      merge_verification: false,    // forced channel per §3.4 — never falls here
-      order_confirmation: false,
-      pickup_order_confirmation: false,
-      event_update: false,
-    }
-
     // Resolve sms_enabled (the global toggle from admin_settings).
     let smsEnabled = false
     {
@@ -1072,17 +1057,99 @@ Deno.serve(async (req: Request) => {
       channel = 'email'
       success = await sendEmail(guest.email, subject, body, html, attachments)
     } else if (preference === 'both') {
-      const wantsSms = BOTH_PREFERS_SMS[type] ?? false
-      if (wantsSms && smsEnabled && guest.phone) {
-        channel = 'sms'
-        success = await sendSMS(guest.phone, body)
-      } else if (guest.email) {
-        channel = 'email'
-        success = await sendEmail(guest.email, subject, body, html, attachments)
-      } else if (smsEnabled && guest.phone) {
-        channel = 'sms'
-        success = await sendSMS(guest.phone, body)
+      // Guest gave us both contacts → fan out to both channels (when
+      // available + sms_enabled). Each channel gets its own log row,
+      // keyed with a channel-suffixed dedup_key so a retry skips
+      // whichever leg already succeeded.
+      const baseDedup = data.dedup_key as string | undefined
+      let smsAttempted = false
+      let emailAttempted = false
+      let smsOk = false
+      let emailOk = false
+
+      if (smsEnabled && guest.phone) {
+        smsAttempted = true
+        const smsKey = baseDedup ? `${baseDedup}:sms` : null
+        let alreadySent = false
+        if (smsKey) {
+          const { data: existing } = await supabase
+            .from('notifications_log')
+            .select('id, status')
+            .eq('dedup_key', smsKey)
+            .limit(1)
+            .maybeSingle()
+          if (existing && existing.status === 'sent') alreadySent = true
+        }
+        if (alreadySent) {
+          smsOk = true
+        } else {
+          smsOk = await sendSMS(guest.phone, body)
+          const row = {
+            guest_id: guestId,
+            event_id: eventId,
+            channel: 'sms' as const,
+            type,
+            status: smsOk ? 'sent' : 'failed',
+            dedup_key: smsKey,
+            sent_at: smsOk ? new Date().toISOString() : null,
+            error: smsOk ? null : 'Send failed',
+          }
+          if (smsKey) {
+            await supabase.from('notifications_log').upsert(row, {
+              onConflict: 'dedup_key',
+              ignoreDuplicates: true,
+            })
+          } else {
+            await supabase.from('notifications_log').insert(row)
+          }
+        }
       }
+
+      if (guest.email) {
+        emailAttempted = true
+        const emailKey = baseDedup ? `${baseDedup}:email` : null
+        let alreadySent = false
+        if (emailKey) {
+          const { data: existing } = await supabase
+            .from('notifications_log')
+            .select('id, status')
+            .eq('dedup_key', emailKey)
+            .limit(1)
+            .maybeSingle()
+          if (existing && existing.status === 'sent') alreadySent = true
+        }
+        if (alreadySent) {
+          emailOk = true
+        } else {
+          emailOk = await sendEmail(guest.email, subject, body, html, attachments)
+          const row = {
+            guest_id: guestId,
+            event_id: eventId,
+            channel: 'email' as const,
+            type,
+            status: emailOk ? 'sent' : 'failed',
+            dedup_key: emailKey,
+            sent_at: emailOk ? new Date().toISOString() : null,
+            error: emailOk ? null : 'Send failed',
+          }
+          if (emailKey) {
+            await supabase.from('notifications_log').upsert(row, {
+              onConflict: 'dedup_key',
+              ignoreDuplicates: true,
+            })
+          } else {
+            await supabase.from('notifications_log').insert(row)
+          }
+        }
+      }
+
+      const anySuccess = smsOk || emailOk
+      const channelLabel: 'sms' | 'email' | 'both' =
+        smsAttempted && emailAttempted ? 'both' : smsAttempted ? 'sms' : 'email'
+      return new Response(
+        JSON.stringify({ success: anySuccess, channel: channelLabel }),
+        { headers: jsonHeaders },
+      )
     } else {
       // Last-resort fallback: try email first, then SMS.
       if (guest.email) {

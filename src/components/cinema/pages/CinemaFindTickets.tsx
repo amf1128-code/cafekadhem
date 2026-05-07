@@ -46,7 +46,7 @@ export function CinemaFindTickets() {
     if (!isEmail && !isPhone) {
       addToast(
         smsEnabled
-          ? 'Enter a valid email or phone number'
+          ? 'Enter a valid phone number or email'
           : 'Enter a valid email address',
         'error',
       )
@@ -94,7 +94,7 @@ export function CinemaFindTickets() {
           style={{ fontSize: 18, marginTop: 14, lineHeight: 1.4 }}
         >
           {smsEnabled
-            ? "Type the email or phone you've used with us before."
+            ? "Type the phone or email you've used with us before."
             : "Type the email you've used with us before."}
           {' '}We&apos;ll send a one-tap link to your RSVPs, tickets, and pickup
           orders. No password.
@@ -183,7 +183,7 @@ export function CinemaFindTickets() {
             }}
           >
             <label className="ck-label">
-              {smsEnabled ? 'Email or phone' : 'Email'}
+              {smsEnabled ? 'Phone or email' : 'Email'}
             </label>
             <input
               type={smsEnabled ? 'text' : 'email'}
@@ -191,7 +191,7 @@ export function CinemaFindTickets() {
               onChange={e => setContact(e.target.value)}
               placeholder={
                 smsEnabled
-                  ? 'you@example.com or (555) 555-5555'
+                  ? '(555) 555-5555 or you@example.com'
                   : 'you@example.com'
               }
               className="ck-input"

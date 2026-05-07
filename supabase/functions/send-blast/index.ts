@@ -225,47 +225,43 @@ Deno.serve(async (req: Request) => {
   let failed = 0
 
   for (const guest of recipients) {
-    // Per-recipient dedup: check notifications_log first (covers retries
-    // after a stuck-sending recovery; the unique index would also catch
-    // it on insert but we want to skip the provider call too).
-    const dedupKey = `blast:${blastId}:${guest.id}`
-    const { data: existing } = await admin
-      .from('notifications_log')
-      .select('id, status')
-      .eq('dedup_key', dedupKey)
-      .limit(1)
-      .maybeSingle()
-    if (existing && existing.status === 'sent') {
-      sent++
-      continue
-    }
+    const baseDedupKey = `blast:${blastId}:${guest.id}`
 
-    // Channel resolution per blast spec.
-    let channel: 'sms' | 'email' | null = null
-    if (guest.notification_preference === 'sms' && smsEnabled && guest.phone) {
-      channel = 'sms'
-    } else if (guest.email) {
-      channel = 'email'
-    } else if (smsEnabled && guest.phone) {
-      channel = 'sms'
-    }
+    // Decide which channels to attempt for this guest. 'both' fans out
+    // to SMS + email; single-channel preferences pick one (with the
+    // usual email/sms fallbacks).
+    const wantsSms = !!(
+      guest.phone &&
+      smsEnabled &&
+      (guest.notification_preference === 'sms' ||
+        guest.notification_preference === 'both' ||
+        !guest.email)
+    )
+    const wantsEmail = !!(
+      guest.email &&
+      (guest.notification_preference === 'email' ||
+        guest.notification_preference === 'both' ||
+        guest.notification_preference === null ||
+        guest.notification_preference === undefined ||
+        !guest.phone ||
+        !smsEnabled)
+    )
 
-    if (!channel) {
-      // No reachable channel — log skip
+    if (!wantsSms && !wantsEmail) {
       await admin.from('notifications_log').insert({
         guest_id: guest.id,
         event_id: blast.event_id,
         channel: 'email',
         type: 'notification_blast',
         status: 'failed',
-        dedup_key: dedupKey,
+        dedup_key: baseDedupKey,
         error: 'no reachable channel',
       })
       failed++
       continue
     }
 
-    // Mint ambient token + inject into URL
+    // Mint ambient token + inject into URL.
     let eventUrl = bareEventUrl
     try {
       const { data: tok } = await admin.rpc('mint_ambient_token', { p_guest_id: guest.id })
@@ -275,32 +271,71 @@ Deno.serve(async (req: Request) => {
       // Non-fatal — fall back to bare URL
     }
 
-    let ok = false
-    if (channel === 'sms' && guest.phone) {
-      const smsBody = `${blast.sms_body}\n\n${eventUrl}`
-      ok = await sendSMS(guest.phone, smsBody)
-    } else if (channel === 'email' && guest.email) {
-      const html = htmlEmail({
-        title: eventRow.title,
-        eventType: eventRow.event_type,
-        body: blast.email_body,
-        eventUrl,
-      })
-      const text = `${blast.email_body}\n\nDetails: ${eventUrl}`
-      ok = await sendEmail(guest.email, blast.email_subject, text, html)
+    const dualSend = wantsSms && wantsEmail
+    const dedupSuffix = (ch: 'sms' | 'email') => (dualSend ? `:${ch}` : '')
+
+    let smsOk: boolean | null = null
+    let emailOk: boolean | null = null
+
+    if (wantsSms) {
+      const smsKey = `${baseDedupKey}${dedupSuffix('sms')}`
+      const { data: existing } = await admin
+        .from('notifications_log')
+        .select('id, status')
+        .eq('dedup_key', smsKey)
+        .limit(1)
+        .maybeSingle()
+      if (existing && existing.status === 'sent') {
+        smsOk = true
+      } else {
+        const smsBody = `${blast.sms_body}\n\n${eventUrl}`
+        smsOk = await sendSMS(guest.phone!, smsBody)
+        await admin.from('notifications_log').insert({
+          guest_id: guest.id,
+          event_id: blast.event_id,
+          channel: 'sms',
+          type: 'notification_blast',
+          status: smsOk ? 'sent' : 'failed',
+          dedup_key: smsKey,
+          sent_at: smsOk ? new Date().toISOString() : null,
+          error: smsOk ? null : 'send failed',
+        })
+      }
     }
 
-    await admin.from('notifications_log').insert({
-      guest_id: guest.id,
-      event_id: blast.event_id,
-      channel,
-      type: 'notification_blast',
-      status: ok ? 'sent' : 'failed',
-      dedup_key: dedupKey,
-      sent_at: ok ? new Date().toISOString() : null,
-      error: ok ? null : 'send failed',
-    })
-    if (ok) sent++
+    if (wantsEmail) {
+      const emailKey = `${baseDedupKey}${dedupSuffix('email')}`
+      const { data: existing } = await admin
+        .from('notifications_log')
+        .select('id, status')
+        .eq('dedup_key', emailKey)
+        .limit(1)
+        .maybeSingle()
+      if (existing && existing.status === 'sent') {
+        emailOk = true
+      } else {
+        const html = htmlEmail({
+          title: eventRow.title,
+          eventType: eventRow.event_type,
+          body: blast.email_body,
+          eventUrl,
+        })
+        const text = `${blast.email_body}\n\nDetails: ${eventUrl}`
+        emailOk = await sendEmail(guest.email!, blast.email_subject, text, html)
+        await admin.from('notifications_log').insert({
+          guest_id: guest.id,
+          event_id: blast.event_id,
+          channel: 'email',
+          type: 'notification_blast',
+          status: emailOk ? 'sent' : 'failed',
+          dedup_key: emailKey,
+          sent_at: emailOk ? new Date().toISOString() : null,
+          error: emailOk ? null : 'send failed',
+        })
+      }
+    }
+
+    if (smsOk === true || emailOk === true) sent++
     else failed++
   }
 

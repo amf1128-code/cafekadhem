@@ -85,6 +85,14 @@ type GuestShape = {
 
 function resolveChannel(g: GuestShape, smsEnabled: boolean): { channel: 'sms' | 'email'; resolved_email: string | null; resolved_phone: string | null } | null {
   if (g.notification_preference === 'none') return null
+  // 'both' guests get fanned out to both channels at send time. The
+  // primary `channel` is recorded as SMS (the more time-sensitive
+  // medium); the email leg fires alongside it whenever both columns
+  // are populated. handleConfirm reads the populated columns to decide
+  // what to dispatch.
+  if (g.notification_preference === 'both' && smsEnabled && g.phone && g.email) {
+    return { channel: 'sms', resolved_email: g.email, resolved_phone: g.phone }
+  }
   if (g.notification_preference === 'sms' && smsEnabled && g.phone) {
     return { channel: 'sms', resolved_email: null, resolved_phone: g.phone }
   }
@@ -312,25 +320,53 @@ async function handleConfirm(body: Record<string, unknown>): Promise<Response> {
   </table>
 </body></html>`
 
-      if (rec.channel === 'sms' && rec.resolved_phone) {
-        ok = await sendInviteSMS(rec.resolved_phone, text)
-      } else if (rec.channel === 'email' && rec.resolved_email) {
-        ok = await sendInviteEmail(rec.resolved_email, `You're invited — ${event.title}`, text, html)
+      // Fan-out: 'both' guests have both columns populated (set by
+      // resolveChannel during preview) and receive the invite via both
+      // channels. Single-channel guests have exactly one column populated.
+      let smsOk: boolean | null = null
+      let emailOk: boolean | null = null
+      if (rec.resolved_phone) {
+        smsOk = await sendInviteSMS(rec.resolved_phone, text)
       }
+      if (rec.resolved_email) {
+        emailOk = await sendInviteEmail(rec.resolved_email, `You're invited — ${event.title}`, text, html)
+      }
+      ok = smsOk === true || emailOk === true
 
-      // Log to notifications_log (if guest_id is set).
+      // Log per-channel rows so notifications_log reflects what actually
+      // dispatched. Suffix the dedup_key with channel for the dual-send
+      // case so the unique index doesn't collapse them.
       if (rec.guest_id) {
-        const { data: logged } = await admin.from('notifications_log').insert({
-          guest_id: rec.guest_id,
-          event_id: job.event_id,
-          channel: rec.channel,
-          type: 'invite',
-          status: ok ? 'sent' : 'failed',
-          dedup_key: `bulk_invite:${jobId}:${rec.guest_id}`,
-          sent_at: ok ? new Date().toISOString() : null,
-          error: ok ? null : 'send failed',
-        }).select('id').single()
-        notification_id = logged?.id ?? null
+        const dualSend = smsOk !== null && emailOk !== null
+        const suffix = (ch: 'sms' | 'email') => (dualSend ? `:${ch}` : '')
+        if (smsOk !== null) {
+          const { data: logged } = await admin.from('notifications_log').insert({
+            guest_id: rec.guest_id,
+            event_id: job.event_id,
+            channel: 'sms',
+            type: 'invite',
+            status: smsOk ? 'sent' : 'failed',
+            dedup_key: `bulk_invite:${jobId}:${rec.guest_id}${suffix('sms')}`,
+            sent_at: smsOk ? new Date().toISOString() : null,
+            error: smsOk ? null : 'send failed',
+          }).select('id').single()
+          // Track the primary (SMS) row on the recipient for parity with
+          // single-channel sends; the email row is fetchable via dedup_key.
+          notification_id = logged?.id ?? null
+        }
+        if (emailOk !== null) {
+          const { data: logged } = await admin.from('notifications_log').insert({
+            guest_id: rec.guest_id,
+            event_id: job.event_id,
+            channel: 'email',
+            type: 'invite',
+            status: emailOk ? 'sent' : 'failed',
+            dedup_key: `bulk_invite:${jobId}:${rec.guest_id}${suffix('email')}`,
+            sent_at: emailOk ? new Date().toISOString() : null,
+            error: emailOk ? null : 'send failed',
+          }).select('id').single()
+          if (notification_id === null) notification_id = logged?.id ?? null
+        }
       }
 
       // Update invites.last_sent_at

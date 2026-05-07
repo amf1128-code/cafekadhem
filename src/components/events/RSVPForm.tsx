@@ -569,13 +569,6 @@ export function RSVPForm({ eventId, event, existingRsvp, existingPlusOne, isFull
         value={lastName}
         onChange={e => setLastName(e.target.value)}
       />
-      <CinemaField
-        label="Email"
-        type="email"
-        value={email}
-        onChange={e => setEmail(e.target.value)}
-        placeholder="you@example.com"
-      />
       {smsEnabled && (
         <CinemaField
           label="Phone"
@@ -585,6 +578,13 @@ export function RSVPForm({ eventId, event, existingRsvp, existingPlusOne, isFull
           placeholder="Required if no email"
         />
       )}
+      <CinemaField
+        label="Email"
+        type="email"
+        value={email}
+        onChange={e => setEmail(e.target.value)}
+        placeholder="you@example.com"
+      />
       <CinemaField
         label="Instagram"
         optional
