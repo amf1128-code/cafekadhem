@@ -147,10 +147,18 @@ export function CinemaLanding() {
 
       <Marquee items={HERO_MARQUEE_ITEMS} />
 
-      {/* CURRENT MENU — only render if the next event has menu items */}
-      {next && next.menu.length > 0 && (
-        <MenuSection event={next} blurb={menuBlurb} />
-      )}
+      {/* CURRENT MENU — always render whenever there's an upcoming event so
+          the MENU nav anchor (#menu) always lands somewhere. The section
+          itself shows a "menu drops soon" placeholder when items are empty.
+          (Was previously gated on next.menu.length > 0 — that conditional
+          was hiding the section on iOS Safari/iOS Chrome where the
+          embedded menu_items relation came back empty.) */}
+      {next && <MenuSection event={next} blurb={menuBlurb} />}
+
+      {/* TEMP: on-page debug strip so we can confirm what data the iOS
+          browser actually sees. Remove once the iOS empty-menu mystery is
+          resolved. */}
+      <DebugStrip events={events} loading={loading} />
 
       {/* CALENDAR — small preview of the next 1-2 upcoming events
           AFTER the hero one. Full calendar is /cinema/calendar. */}
@@ -925,6 +933,40 @@ function MenuSection({ event, blurb }: { event: CinemaEvent; blurb: string }) {
         </div>
       </div>
 
+      {event.menu.length === 0 ? (
+        <div
+          style={{
+            border: '2px solid var(--ck-ink)',
+            padding: '40px 28px',
+            textAlign: 'center',
+            background: 'var(--ck-cream)',
+          }}
+        >
+          <div
+            style={{
+              fontFamily: 'var(--ck-mono)',
+              fontSize: 11,
+              letterSpacing: '0.18em',
+              color: 'var(--ck-cobalt)',
+              textTransform: 'uppercase',
+            }}
+          >
+            ✦ MENU DROPS SOON
+          </div>
+          <div
+            style={{
+              fontFamily: 'var(--ck-arabic-display)',
+              fontSize: 44,
+              direction: 'rtl',
+              color: 'var(--ck-ink)',
+              marginTop: 6,
+              lineHeight: 1,
+            }}
+          >
+            القائمة قادمة
+          </div>
+        </div>
+      ) : (
       <div
         className="ck-bakes-grid"
         style={{
@@ -1038,7 +1080,49 @@ function MenuSection({ event, blurb }: { event: CinemaEvent; blurb: string }) {
           </div>
         ))}
       </div>
+      )}
     </section>
+  )
+}
+
+// TEMPORARY: visible debug strip so the iOS-only "menu missing" mystery
+// can be diagnosed from a screenshot. Shows event count and the next
+// event's menu length — if the strip reads `events:1 menu:0` on iOS but
+// `events:1 menu:N` on desktop, we know iOS Safari's Supabase response
+// is dropping the embedded menu_items relation. Remove once resolved.
+function DebugStrip({ events, loading }: { events: CinemaEvent[]; loading: boolean }) {
+  const next = events[0]
+  const ua = typeof navigator !== 'undefined' ? navigator.userAgent : ''
+  const platform =
+    /iPad|iPhone|iPod/.test(ua) ? 'iOS'
+      : /Android/.test(ua) ? 'Android'
+      : /Macintosh/.test(ua) ? 'macOS'
+      : /Windows/.test(ua) ? 'Windows'
+      : 'other'
+  const engine =
+    /CriOS/.test(ua) ? 'iOS-Chrome'
+      : /FxiOS/.test(ua) ? 'iOS-Firefox'
+      : /Version\/.*Safari/.test(ua) && /iPhone|iPad/.test(ua) ? 'iOS-Safari'
+      : /Chrome/.test(ua) ? 'Chrome'
+      : /Firefox/.test(ua) ? 'Firefox'
+      : /Safari/.test(ua) ? 'Safari'
+      : 'other'
+  return (
+    <div
+      style={{
+        padding: '10px 16px',
+        background: 'var(--ck-ink)',
+        color: 'var(--ck-cream)',
+        fontFamily: 'var(--ck-mono)',
+        fontSize: 10,
+        letterSpacing: '0.1em',
+        textAlign: 'center',
+        borderTop: '2px solid var(--ck-ink)',
+        borderBottom: '2px solid var(--ck-ink)',
+      }}
+    >
+      [debug] {platform} · {engine} · loading:{String(loading)} · events:{events.length} · next:{next?.no ?? '—'} · menu items:{next?.menu.length ?? '—'}
+    </div>
   )
 }
 
