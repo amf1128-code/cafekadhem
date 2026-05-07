@@ -105,9 +105,6 @@ const AdminEventBulkInvite = lazy(() =>
 const AdminEventBlast = lazy(() =>
   import('./pages/admin/EventBlast').then(m => ({ default: m.AdminEventBlast }))
 )
-const JayaPreviewPage = lazy(() =>
-  import('./pages/admin/JayaPreview').then(m => ({ default: m.JayaPreviewPage }))
-)
 
 export const router = createBrowserRouter([
   // Public site. CinemaShell provides the top strip, nav, marquee, and
@@ -163,7 +160,6 @@ export const router = createBrowserRouter([
       { path: 'pickup', element: <AdminPickupConfig /> },
       { path: 'pickup/orders', element: <AdminPickupOrders /> },
       { path: 'settings', element: <AdminSettings /> },
-      { path: 'jaya-preview', element: <JayaPreviewPage /> },
     ],
   },
 ])
