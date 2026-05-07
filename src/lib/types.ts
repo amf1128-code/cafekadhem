@@ -108,6 +108,9 @@ export interface Guest {
   phone: string | null
   instagram: string | null
   notification_preference: 'sms' | 'email' | 'both' | 'none'
+  // When set, this guest was created as a +1 by the referenced host
+  // guest. Null on regular guests. Stamped server-side by add_plus_one().
+  added_as_plus_one_by: string | null
   created_at: string
   updated_at: string
 }

@@ -9,9 +9,15 @@ import { Input } from '../../components/ui/Input'
 import { useToast } from '../../components/ui/Toast'
 import { PageLoader } from '../../components/ui/LoadingSpinner'
 
+type GuestRow = Guest & {
+  event_count: number
+  host_first_name: string | null
+  host_last_name: string | null
+}
+
 export function AdminGuestDirectory() {
   const { addToast } = useToast()
-  const [guests, setGuests] = useState<(Guest & { event_count: number })[]>([])
+  const [guests, setGuests] = useState<GuestRow[]>([])
   const [search, setSearch] = useState('')
   const [loading, setLoading] = useState(true)
   const [nukingId, setNukingId] = useState<string | null>(null)
@@ -56,14 +62,28 @@ export function AdminGuestDirectory() {
       .order('created_at', { ascending: false })
 
     if (data) {
+      // One pass to build a name lookup so +1 rows can render their host's
+      // name without a per-row round trip.
+      const nameById = new Map<string, { first: string; last: string | null }>()
+      for (const g of data as Guest[]) {
+        nameById.set(g.id, { first: g.first_name, last: g.last_name })
+      }
       const withCounts = await Promise.all(
-        data.map(async (guest) => {
+        (data as Guest[]).map(async (guest) => {
           const { count } = await supabase
             .from('rsvps')
             .select('*', { count: 'exact', head: true })
             .eq('guest_id', guest.id)
             .eq('status', 'yes')
-          return { ...guest, event_count: count || 0 }
+          const host = guest.added_as_plus_one_by
+            ? nameById.get(guest.added_as_plus_one_by) ?? null
+            : null
+          return {
+            ...guest,
+            event_count: count || 0,
+            host_first_name: host?.first ?? null,
+            host_last_name: host?.last ?? null,
+          }
         })
       )
       setGuests(withCounts)
@@ -80,6 +100,9 @@ export function AdminGuestDirectory() {
       instagram: g.instagram || '',
       notification_preference: g.notification_preference,
       events_attended: g.event_count,
+      added_as_plus_one_by: g.host_first_name
+        ? `${g.host_first_name}${g.host_last_name ? ' ' + g.host_last_name : ''}`
+        : '',
     }))
     downloadCSV(rows, 'guests.csv')
     addToast('CSV downloaded')
@@ -93,7 +116,9 @@ export function AdminGuestDirectory() {
       (g.last_name || '').toLowerCase().includes(s) ||
       (g.email || '').toLowerCase().includes(s) ||
       (g.phone || '').includes(s) ||
-      (g.instagram || '').toLowerCase().includes(s)
+      (g.instagram || '').toLowerCase().includes(s) ||
+      (g.host_first_name || '').toLowerCase().includes(s) ||
+      (g.host_last_name || '').toLowerCase().includes(s)
     )
   })
 
@@ -135,6 +160,18 @@ export function AdminGuestDirectory() {
                 <td className="px-4 py-3">
                   <span className="font-medium">{guest.first_name}</span>
                   {guest.last_name && <span className="text-ink/70"> {guest.last_name}</span>}
+                  {guest.added_as_plus_one_by && (
+                    <span
+                      className="ml-2 inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-mono uppercase tracking-wider bg-warm text-ink/70"
+                      title={
+                        guest.host_first_name
+                          ? `Added as a +1 by ${guest.host_first_name}${guest.host_last_name ? ' ' + guest.host_last_name : ''}`
+                          : 'Added as a +1 (host deleted)'
+                      }
+                    >
+                      +1 of {guest.host_first_name ?? 'unknown'}
+                    </span>
+                  )}
                 </td>
                 <td className="px-4 py-3 text-ink/70">{guest.email || '-'}</td>
                 <td className="px-4 py-3 text-ink/70">
