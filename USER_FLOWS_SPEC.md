@@ -381,11 +381,12 @@ Every flow below ends in the same place: a **post-action state** for `(guest, ev
 
 **Pipeline:**
 1. Normalize → `upsert_guest` → `guest_id`.
-2. `safe_create_order(event_id, guest_id, items, total, payment_method)`.
-3. Render confirmation card in-page with Venmo deep link, plus an explicit "Back to event" link.
+2. **RSVP guardrail**: checkout requires the guest to pick `yes` / `maybe` / `no`. Pre-filled from any existing RSVP (`waitlisted` → `yes`). The submit handler calls `safe_create_rsvp(event_id, guest_id, status)` before the order RPC. `rsvp_confirmation` notification fires only on first-time RSVPs (returning guests don't get re-notified — `order_confirmation` covers them).
+3. `safe_create_order(event_id, guest_id, items, total, payment_method)`.
+4. Render confirmation card in-page with Venmo deep link, plus an explicit "Back to event" link.
 
 **Rules:**
-- An order does **not** create or modify an RSVP. If the guest hasn't RSVP'd, the Order page must show a non-blocking inline notice ("You haven't RSVP'd — order will be held but seat is not reserved") with a one-click "RSVP yes" button that calls `safe_create_rsvp` from the same form values.
+- The order flow **is** the RSVP gate. Browsing menu → cart is unguarded, but checkout requires an explicit RSVP intent. Picking `no` or `maybe` reveals an acknowledgment checkbox the guest must confirm: *"I acknowledge that I'm ordering items but can't attend the event, so I'm going to arrange with the host to pick them up within 24 hours after the event."* The pay button stays disabled until the RSVP is selected (and acknowledged when `no`/`maybe`).
 - Orders are independent of payment status for tickets. The Venmo note for a food order is `"<name> – <event_title> food"`; for a ticket payment it is `"<name> – <event_title> ticket"`. (Distinct notes prevent admin confusion when verifying receipts.)
 - **Editing an order**: not supported in v1. Guest contacts admin. UI must hide any "edit" affordance.
 - **Re-submission** of the same cart: produces a second order. **No client-side dedup**; admin must reconcile. (Future: include an idempotency key derived from `hash(guest_id, event_id, cart_signature)` and reject within a 60-second window.)
