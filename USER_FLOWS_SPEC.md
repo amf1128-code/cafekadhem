@@ -381,12 +381,12 @@ Every flow below ends in the same place: a **post-action state** for `(guest, ev
 
 **Pipeline:**
 1. Normalize → `upsert_guest` → `guest_id`.
-2. **RSVP guardrail**: checkout requires the guest to pick `yes` / `maybe` / `no`. Pre-filled from any existing RSVP (`waitlisted` → `yes`). The submit handler calls `safe_create_rsvp(event_id, guest_id, status)` before the order RPC. `rsvp_confirmation` notification fires only on first-time RSVPs (returning guests don't get re-notified — `order_confirmation` covers them).
+2. **RSVP guardrail** (only when no prior RSVP exists for `(event_id, guest_id)`): checkout requires the guest to pick `yes` / `maybe` / `no`. The submit handler calls `safe_create_rsvp(event_id, guest_id, status)` and fires an `rsvp_confirmation` notification before the order RPC. Returning guests with any prior status (`yes`/`maybe`/`no`/`waitlisted`/`paid`) skip the gate and the RSVP RPC entirely — the order_confirmation alone covers them.
 3. `safe_create_order(event_id, guest_id, items, total, payment_method)`.
 4. Render confirmation card in-page with Venmo deep link, plus an explicit "Back to event" link.
 
 **Rules:**
-- The order flow **is** the RSVP gate. Browsing menu → cart is unguarded, but checkout requires an explicit RSVP intent. Picking `no` or `maybe` reveals an acknowledgment checkbox the guest must confirm: *"I acknowledge that I'm ordering items but can't attend the event, so I'm going to arrange with the host to pick them up within 24 hours after the event."* The pay button stays disabled until the RSVP is selected (and acknowledged when `no`/`maybe`).
+- The order flow **is** the RSVP gate for first-time guests. Browsing menu → cart is unguarded; checkout asks "Btw, are you coming?" with `I'm going` / `Maybe` / `Can't come` buttons. Picking `Maybe` or `Can't come` reveals an acknowledgment checkbox the guest must confirm: *"I acknowledge that I'm ordering items but can't attend the event, so I'm going to arrange with the host to pick them up within 24 hours after the event."* The pay button stays disabled until the RSVP is selected (and acknowledged when `no`/`maybe`).
 - Orders are independent of payment status for tickets. The Venmo note for a food order is `"<name> – <event_title> food"`; for a ticket payment it is `"<name> – <event_title> ticket"`. (Distinct notes prevent admin confusion when verifying receipts.)
 - **Editing an order**: not supported in v1. Guest contacts admin. UI must hide any "edit" affordance.
 - **Re-submission** of the same cart: produces a second order. **No client-side dedup**; admin must reconcile. (Future: include an idempotency key derived from `hash(guest_id, event_id, cart_signature)` and reject within a 60-second window.)
