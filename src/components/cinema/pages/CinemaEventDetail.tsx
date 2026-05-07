@@ -1417,17 +1417,11 @@ function CartCheckoutModal({
   const [submitted, setSubmitted] = useState(false)
   const [paymentUrl, setPaymentUrl] = useState<string | null>(null)
   const [paymentLinkType, setPaymentLinkType] = useState<'deep_link' | 'web_url'>('web_url')
-  // RSVP gate (USER_FLOWS_SPEC.md §4.2). Checkout always commits an RSVP
-  // intent so the host knows whether to plate this order at the event.
-  // Pre-fills from the existing RSVP — 'waitlisted' counts as 'yes' for
-  // the gate since the guest is trying to attend.
-  const [rsvpStatus, setRsvpStatus] = useState<'yes' | 'maybe' | 'no' | null>(
-    existingRsvp
-      ? existingRsvp.status === 'waitlisted'
-        ? 'yes'
-        : (existingRsvp.status as 'yes' | 'maybe' | 'no')
-      : null,
-  )
+  // RSVP gate (USER_FLOWS_SPEC.md §4.2). Only shown when the guest has
+  // no prior RSVP for this event — returning RSVPs (any status, including
+  // 'no'/'waitlisted') skip the gate so we don't re-ask at every checkout.
+  const showRsvpGate = !existingRsvp
+  const [rsvpStatus, setRsvpStatus] = useState<'yes' | 'maybe' | 'no' | null>(null)
   const [acknowledged, setAcknowledged] = useState(false)
   const needsAck = rsvpStatus === 'no' || rsvpStatus === 'maybe'
 
@@ -1483,13 +1477,15 @@ function CartCheckoutModal({
       )
       return
     }
-    if (!rsvpStatus) {
-      addToast('Tell us if you can make the event before checking out.', 'error')
-      return
-    }
-    if (needsAck && !acknowledged) {
-      addToast('Acknowledge the post-event pickup before checking out.', 'error')
-      return
+    if (showRsvpGate) {
+      if (!rsvpStatus) {
+        addToast('Tell us if you can make the event before checking out.', 'error')
+        return
+      }
+      if (needsAck && !acknowledged) {
+        addToast('Acknowledge the post-event pickup before checking out.', 'error')
+        return
+      }
     }
     if (!settings?.venmo_handle) {
       addToast('Venmo handle not configured. Tell the host.', 'error')
@@ -1522,30 +1518,29 @@ function CartCheckoutModal({
       // RSVP guardrail: commit the chosen status before the order so the
       // host has an accurate seat count alongside the food order. Plus-one
       // cleanup on 'no'/'maybe' is handled by the sync_plus_one_status
-      // trigger (mig 034).
-      const isNewRsvp = !existingRsvp
-      const { data: rsvpResult, error: rsvpError } = await supabase.rpc(
-        'safe_create_rsvp',
-        {
-          p_event_id: event.id,
-          p_guest_id: guestId,
-          p_status: rsvpStatus,
-        },
-      )
-      if (rsvpError) throw rsvpError
-
-      // Confirmation notification only on the first RSVP — re-checkouts
-      // shouldn't re-notify, the order_confirmation below covers them.
-      if (isNewRsvp && rsvpStatus !== 'no') {
-        sendNotification({
-          guestId,
-          eventId: event.id,
-          type: 'rsvp_confirmation',
-          data: {
-            status: rsvpResult?.status || rsvpStatus,
-            is_ticketed: event.ticketing_enabled ? 'true' : 'false',
+      // trigger (mig 034). Skipped for returning guests — they keep
+      // whatever RSVP they already have.
+      if (showRsvpGate && rsvpStatus) {
+        const { data: rsvpResult, error: rsvpError } = await supabase.rpc(
+          'safe_create_rsvp',
+          {
+            p_event_id: event.id,
+            p_guest_id: guestId,
+            p_status: rsvpStatus,
           },
-        })
+        )
+        if (rsvpError) throw rsvpError
+        if (rsvpStatus !== 'no') {
+          sendNotification({
+            guestId,
+            eventId: event.id,
+            type: 'rsvp_confirmation',
+            data: {
+              status: rsvpResult?.status || rsvpStatus,
+              is_ticketed: event.ticketing_enabled ? 'true' : 'false',
+            },
+          })
+        }
       }
 
       const venmoNote = `${firstName.trim()} - ${event.title}`
@@ -1912,88 +1907,83 @@ function CartCheckoutModal({
                 )}
               </div>
 
-              {/* RSVP guardrail (USER_FLOWS_SPEC.md §4.2). Required before
-                  checkout; prefilled from existingRsvp when present. 'no' /
-                  'maybe' demand an acknowledgment that the guest will
-                  arrange post-event pickup with the host. */}
-              <div
-                style={{
-                  marginTop: 18,
-                  paddingTop: 18,
-                  borderTop: '2px solid var(--ck-ink)',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: 12,
-                }}
-              >
-                <div className="ck-eyebrow" style={{ color: 'var(--ck-cobalt)' }}>
-                  ✦ Are you coming?
-                </div>
-                <p
-                  className="ck-italic"
-                  style={{ fontSize: 15, lineHeight: 1.4, margin: 0 }}
+              {/* RSVP guardrail (USER_FLOWS_SPEC.md §4.2). Hidden for
+                  returning guests who already RSVP'd. 'no' / 'maybe'
+                  demand an acknowledgment that the guest will arrange
+                  post-event pickup with the host. */}
+              {showRsvpGate && (
+                <div
+                  style={{
+                    marginTop: 18,
+                    paddingTop: 18,
+                    borderTop: '2px solid var(--ck-ink)',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: 12,
+                  }}
                 >
-                  Quick RSVP for {event.title} — locks in whether the host
-                  should expect you.
-                </p>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-                  {(
-                    [
-                      { value: 'yes', label: "I'm going" },
-                      { value: 'maybe', label: 'Maybe' },
-                      { value: 'no', label: "Can't come" },
-                    ] as const
-                  ).map(opt => (
-                    <button
-                      type="button"
-                      key={opt.value}
-                      onClick={() => setRsvpStatus(opt.value)}
-                      className={
-                        rsvpStatus === opt.value
-                          ? 'ck-btn ck-btn--primary'
-                          : 'ck-btn'
-                      }
-                      style={{ flex: '1 1 100px' }}
-                    >
-                      {opt.label}
-                    </button>
-                  ))}
-                </div>
-                {needsAck && (
-                  <label
-                    style={{
-                      display: 'flex',
-                      gap: 10,
-                      alignItems: 'flex-start',
-                      padding: 12,
-                      border: '2px solid var(--ck-ink)',
-                      background: 'var(--ck-paper)',
-                      cursor: 'pointer',
-                      fontFamily: 'var(--ck-sans)',
-                      fontSize: 13,
-                      lineHeight: 1.45,
-                    }}
-                  >
-                    <input
-                      type="checkbox"
-                      checked={acknowledged}
-                      onChange={e => setAcknowledged(e.target.checked)}
+                  <div className="ck-eyebrow" style={{ color: 'var(--ck-cobalt)' }}>
+                    ✦ Btw, are you coming?
+                  </div>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                    {(
+                      [
+                        { value: 'yes', label: "I'm going" },
+                        { value: 'maybe', label: 'Maybe' },
+                        { value: 'no', label: "Can't come" },
+                      ] as const
+                    ).map(opt => (
+                      <button
+                        type="button"
+                        key={opt.value}
+                        onClick={() => setRsvpStatus(opt.value)}
+                        className={
+                          rsvpStatus === opt.value
+                            ? 'ck-btn ck-btn--primary'
+                            : 'ck-btn'
+                        }
+                        style={{ flex: '1 1 100px' }}
+                      >
+                        {opt.label}
+                      </button>
+                    ))}
+                  </div>
+                  {needsAck && (
+                    <label
                       style={{
-                        width: 16,
-                        height: 16,
-                        marginTop: 2,
-                        accentColor: 'var(--ck-cobalt)',
-                        flexShrink: 0,
+                        display: 'flex',
+                        gap: 10,
+                        alignItems: 'flex-start',
+                        padding: 12,
+                        border: '2px solid var(--ck-ink)',
+                        background: 'var(--ck-paper)',
+                        cursor: 'pointer',
+                        fontFamily: 'var(--ck-sans)',
+                        fontSize: 13,
+                        lineHeight: 1.45,
                       }}
-                    />
-                    <span>
-                      I acknowledge that I'm ordering items but can't
-                      attend the event, so I'm going to arrange with the
-                      host to pick them up within 24 hours after the event.
-                    </span>
-                  </label>
-                )}
-              </div>
+                    >
+                      <input
+                        type="checkbox"
+                        checked={acknowledged}
+                        onChange={e => setAcknowledged(e.target.checked)}
+                        style={{
+                          width: 16,
+                          height: 16,
+                          marginTop: 2,
+                          accentColor: 'var(--ck-cobalt)',
+                          flexShrink: 0,
+                        }}
+                      />
+                      <span>
+                        I acknowledge that I'm ordering items but can't
+                        attend the event, so I'm going to arrange with the
+                        host to pick them up within 24 hours after the event.
+                      </span>
+                    </label>
+                  )}
+                </div>
+              )}
             </>
           )}
         </div>
@@ -2014,8 +2004,7 @@ function CartCheckoutModal({
               disabled={
                 submitting ||
                 cart.length === 0 ||
-                !rsvpStatus ||
-                (needsAck && !acknowledged)
+                (showRsvpGate && (!rsvpStatus || (needsAck && !acknowledged)))
               }
               className="ck-btn ck-btn--primary ck-btn--block"
             >
