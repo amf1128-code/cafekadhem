@@ -1369,50 +1369,77 @@ function StorySection() {
         </div>
         <div
           style={{
-            position: 'relative',
-            aspectRatio: '3/4',
-            border: '3px solid var(--ck-cream)',
-            overflow: 'hidden',
-            background: 'var(--ck-ink)',
-            color: 'var(--ck-cream)',
+            display: 'flex',
+            justifyContent: 'center',
+            alignItems: 'center',
           }}
         >
-          {!photoMissing && (
-            <img
-              src="/story/portrait.jpg"
-              alt="Cafe Kadhem"
-              loading="lazy"
-              decoding="async"
-              onError={() => setPhotoMissing(true)}
+          <div
+            style={{
+              position: 'relative',
+              width: '55%',
+              aspectRatio: '3/4',
+            }}
+          >
+            <div
+              aria-hidden="true"
               style={{
                 position: 'absolute',
                 inset: 0,
-                width: '100%',
-                height: '100%',
-                objectFit: 'cover',
-                display: 'block',
+                border: '3px solid var(--ck-sun)',
+                transform: 'rotate(20deg)',
+                pointerEvents: 'none',
               }}
             />
-          )}
-          {photoMissing && (
             <div
               style={{
                 position: 'absolute',
                 inset: 0,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                fontFamily: 'var(--ck-mono)',
-                fontSize: 10,
-                letterSpacing: '0.14em',
-                textTransform: 'uppercase',
-                textAlign: 'center',
-                padding: 24,
+                border: '8px solid var(--ck-cream)',
+                overflow: 'hidden',
+                background: 'var(--ck-ink)',
+                color: 'var(--ck-cream)',
+                transform: 'rotate(-5deg)',
               }}
             >
-              Add /public/story/portrait.jpg in GitHub.
+              {!photoMissing && (
+                <img
+                  src="/story/portrait.jpg"
+                  alt="Cafe Kadhem"
+                  loading="lazy"
+                  decoding="async"
+                  onError={() => setPhotoMissing(true)}
+                  style={{
+                    position: 'absolute',
+                    inset: 0,
+                    width: '100%',
+                    height: '100%',
+                    objectFit: 'cover',
+                    display: 'block',
+                  }}
+                />
+              )}
+              {photoMissing && (
+                <div
+                  style={{
+                    position: 'absolute',
+                    inset: 0,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontFamily: 'var(--ck-mono)',
+                    fontSize: 10,
+                    letterSpacing: '0.14em',
+                    textTransform: 'uppercase',
+                    textAlign: 'center',
+                    padding: 24,
+                  }}
+                >
+                  Add /public/story/portrait.jpg in GitHub.
+                </div>
+              )}
             </div>
-          )}
+          </div>
         </div>
       </div>
     </section>
