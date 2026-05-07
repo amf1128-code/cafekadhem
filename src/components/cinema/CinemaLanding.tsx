@@ -103,10 +103,16 @@ export function CinemaLanding() {
   useEffect(() => {
     let cancelled = false
     ;(async () => {
+      // menu_items is locked down to authenticated reads (migration 017
+      // strips unit_cost from anon callers via the public_menu_items
+      // view), so embedding it directly here returns an empty array for
+      // every anon visitor — which on the wild iOS Safari is everyone.
+      // Pull the next event's menu separately from public_menu_items,
+      // matching the pattern used on the event detail page.
       const [eventsResult, settingsResult] = await Promise.all([
         supabase
           .from('events')
-          .select('*, menu:menus(id, name, items:menu_items(*))')
+          .select('*')
           .eq('is_published', true)
           .order('date', { ascending: true }),
         supabase
@@ -118,10 +124,24 @@ export function CinemaLanding() {
 
       if (cancelled) return
       const upcoming = (eventsResult.data ?? []).filter(e => isUpcoming(e.date))
-      const mapped = upcoming.map((e, i) => {
-        const items: MenuItem[] = e.menu?.items ?? []
-        return mapEvent(e as Event, i, items)
-      })
+
+      // Only the next event renders its menu on the landing page, so we
+      // only fetch that one's items.
+      const nextMenuId = upcoming[0]?.menu_id
+      let nextItems: MenuItem[] = []
+      if (nextMenuId) {
+        const { data: items } = await supabase
+          .from('public_menu_items')
+          .select('*')
+          .eq('menu_id', nextMenuId)
+          .order('sort_order')
+        if (cancelled) return
+        nextItems = (items ?? []) as MenuItem[]
+      }
+
+      const mapped = upcoming.map((e, i) =>
+        mapEvent(e as Event, i, i === 0 ? nextItems : [])
+      )
       setEvents(mapped)
       const blurb = settingsResult.data?.current_menu_blurb?.trim()
       if (blurb) setMenuBlurb(blurb)
@@ -154,11 +174,6 @@ export function CinemaLanding() {
           was hiding the section on iOS Safari/iOS Chrome where the
           embedded menu_items relation came back empty.) */}
       {next && <MenuSection event={next} blurb={menuBlurb} />}
-
-      {/* TEMP: on-page debug strip so we can confirm what data the iOS
-          browser actually sees. Remove once the iOS empty-menu mystery is
-          resolved. */}
-      <DebugStrip events={events} loading={loading} />
 
       {/* CALENDAR — small preview of the next 1-2 upcoming events
           AFTER the hero one. Full calendar is /cinema/calendar. */}
@@ -1082,47 +1097,6 @@ function MenuSection({ event, blurb }: { event: CinemaEvent; blurb: string }) {
       </div>
       )}
     </section>
-  )
-}
-
-// TEMPORARY: visible debug strip so the iOS-only "menu missing" mystery
-// can be diagnosed from a screenshot. Shows event count and the next
-// event's menu length — if the strip reads `events:1 menu:0` on iOS but
-// `events:1 menu:N` on desktop, we know iOS Safari's Supabase response
-// is dropping the embedded menu_items relation. Remove once resolved.
-function DebugStrip({ events, loading }: { events: CinemaEvent[]; loading: boolean }) {
-  const next = events[0]
-  const ua = typeof navigator !== 'undefined' ? navigator.userAgent : ''
-  const platform =
-    /iPad|iPhone|iPod/.test(ua) ? 'iOS'
-      : /Android/.test(ua) ? 'Android'
-      : /Macintosh/.test(ua) ? 'macOS'
-      : /Windows/.test(ua) ? 'Windows'
-      : 'other'
-  const engine =
-    /CriOS/.test(ua) ? 'iOS-Chrome'
-      : /FxiOS/.test(ua) ? 'iOS-Firefox'
-      : /Version\/.*Safari/.test(ua) && /iPhone|iPad/.test(ua) ? 'iOS-Safari'
-      : /Chrome/.test(ua) ? 'Chrome'
-      : /Firefox/.test(ua) ? 'Firefox'
-      : /Safari/.test(ua) ? 'Safari'
-      : 'other'
-  return (
-    <div
-      style={{
-        padding: '10px 16px',
-        background: 'var(--ck-ink)',
-        color: 'var(--ck-cream)',
-        fontFamily: 'var(--ck-mono)',
-        fontSize: 10,
-        letterSpacing: '0.1em',
-        textAlign: 'center',
-        borderTop: '2px solid var(--ck-ink)',
-        borderBottom: '2px solid var(--ck-ink)',
-      }}
-    >
-      [debug] {platform} · {engine} · loading:{String(loading)} · events:{events.length} · next:{next?.no ?? '—'} · menu items:{next?.menu.length ?? '—'}
-    </div>
   )
 }
 

@@ -16,6 +16,7 @@ import {
   type PendingMerge,
 } from '../../../lib/identity/handlePendingMerge'
 import { getPaymentProvider, openPaymentLink } from '../../../lib/payment'
+import { buildVenmoNote } from '../../../lib/payment/venmo'
 import { sendNotification } from '../../../lib/notifications'
 import { normalizePhone } from '../../../lib/utils/phone'
 import { useToast } from '../../ui/Toast'
@@ -1548,7 +1549,11 @@ function CartCheckoutModal({
         })
       }
 
-      const venmoNote = `${firstName.trim()} - ${event.title}`
+      const venmoNote = buildVenmoNote({
+        firstName: firstName.trim(),
+        eventTitle: event.title,
+        items: cart.map(c => ({ name: c.menuItem.name, quantity: c.quantity })),
+      })
       const { data: order, error: orderErr } = await supabase.rpc(
         'safe_create_order',
         {
@@ -1586,6 +1591,7 @@ function CartCheckoutModal({
         guestId,
         eventId: event.id,
         type: 'order_confirmation',
+        data: { order_id: order.id as string },
       })
 
       // Stash the link first so the receipt can render an <a href> as a

@@ -18,6 +18,7 @@ import { ConsentNote } from '../components/ui/ConsentNote'
 import { normalizePhone } from '../lib/utils/phone'
 import { formatTime } from '../lib/utils/date'
 import { getPaymentProvider, openPaymentLink } from '../lib/payment'
+import { buildVenmoNote } from '../lib/payment/venmo'
 import { sendNotification } from '../lib/notifications'
 import { useToast } from '../components/ui/Toast'
 import { CinemaPageLoader } from '../components/cinema/primitives'
@@ -235,7 +236,11 @@ export function Pickup() {
         void dispatchMergeVerification(pendingMerge)
       }
 
-      const venmoNote = `${firstName.trim()} - Pickup ${selectedDate}`
+      const venmoNote = buildVenmoNote({
+        firstName: firstName.trim(),
+        eventTitle: `Pickup ${selectedDate}`,
+        items: cart.map(c => ({ name: c.menuItem.name, quantity: c.quantity })),
+      })
 
       const { data: order, error: orderErr } = await supabase.rpc(
         'safe_create_pickup_order',
