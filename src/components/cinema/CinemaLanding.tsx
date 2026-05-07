@@ -1289,38 +1289,26 @@ function StorySection() {
         className="ck-story-grid"
         style={{
           display: 'grid',
-          gridTemplateColumns: '1.4fr 1fr',
+          // Wider text column on desktop now that the photo prints
+          // smaller — keeps the body copy from feeling cramped beside
+          // the empty cobalt around it. Mobile collapses both columns
+          // to 1fr via the !important rule in index.css.
+          gridTemplateColumns: '2fr 1fr',
           gap: 40,
           alignItems: 'center',
         }}
       >
         <div>
-          <div
-            style={{
-              fontFamily: 'var(--ck-mono)',
-              fontSize: 11,
-              letterSpacing: '0.18em',
-              textTransform: 'uppercase',
-            }}
-          >
-            How this happened
-          </div>
           <h2
             style={{
               fontFamily: 'var(--ck-serif)',
               fontWeight: 900,
-              fontSize: 'clamp(56px, 7vw, 88px)',
-              lineHeight: 0.82,
-              margin: '8px 0 14px',
+              fontSize: 'clamp(48px, 6vw, 76px)',
+              lineHeight: 0.9,
+              margin: '0 0 14px',
             }}
           >
-            FOR KADHEM
-            <br />
-            AL-SAHER, &
-            <br />
-            <span style={{ fontStyle: 'italic', fontFamily: 'var(--ck-serif-edit)' }}>
-              for the table
-            </span>
+            The start of Cafe Kadhem
           </h2>
           <div
             style={{
