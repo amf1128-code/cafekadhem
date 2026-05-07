@@ -1120,9 +1120,14 @@ function RsvpListGroup({
             listStyle: 'none',
             padding: 0,
             margin: 0,
-            display: 'flex',
-            flexDirection: 'column',
-            gap: 6,
+            // CSS multi-column lays names out in two columns when the
+            // container can fit two ~160px tracks side-by-side; on
+            // narrower phones the browser drops to one column on its
+            // own. columnCount caps the upper bound so wide screens
+            // don't fan out into 3+ columns and look loose.
+            columnWidth: '160px',
+            columnCount: 2,
+            columnGap: 24,
           }}
         >
           {hosts.map(h => {
@@ -1135,6 +1140,10 @@ function RsvpListGroup({
                   fontFamily: 'var(--ck-sans)',
                   fontSize: 15,
                   lineHeight: 1.35,
+                  // Keep a single row's name + IG + +N chip together
+                  // when columns wrap.
+                  breakInside: 'avoid',
+                  marginBottom: 6,
                 }}
               >
                 <span style={{ fontWeight: 600 }}>
