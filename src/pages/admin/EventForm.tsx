@@ -36,6 +36,7 @@ export function AdminEventForm() {
   const [menuId, setMenuId] = useState('')
   const [isPublished, setIsPublished] = useState(false)
   const [isRsvpOpen, setIsRsvpOpen] = useState(true)
+  const [preorderEnabled, setPreorderEnabled] = useState(true)
   const [ticketingEnabled, setTicketingEnabled] = useState(false)
   const [ticketPrice, setTicketPrice] = useState('')
   const [flyerFile, setFlyerFile] = useState<File | null>(null)
@@ -115,6 +116,7 @@ export function AdminEventForm() {
         setMenuId(event.menu_id || '')
         setIsPublished(event.is_published)
         setIsRsvpOpen(event.is_rsvp_open ?? true)
+        setPreorderEnabled(event.preorder_enabled ?? true)
         setTicketingEnabled(!!event.ticketing_enabled)
         setTicketPrice(event.ticket_price != null ? String(event.ticket_price) : '')
         setFlyerUrl(event.flyer_url)
@@ -185,6 +187,7 @@ export function AdminEventForm() {
         menu_id: menuId || null,
         is_published: isPublished,
         is_rsvp_open: isRsvpOpen,
+        preorder_enabled: preorderEnabled,
         ticketing_enabled: ticketingEnabled,
         ticket_price: ticketingEnabled && ticketPrice ? parseFloat(ticketPrice) : null,
         flyer_url: uploadedFlyerUrl,
@@ -380,7 +383,26 @@ export function AdminEventForm() {
           placeholder="No menu"
         />
 
-        {menuId && menuItemsForLimits.length > 0 && (
+        {menuId && (
+          <div>
+            <label className="flex items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                checked={!preorderEnabled}
+                onChange={e => setPreorderEnabled(!e.target.checked)}
+                className="rounded border-warm text-forest focus:ring-forest"
+              />
+              Show menu only — don't allow pre-ordering
+            </label>
+            <p className="text-xs text-ink-muted mt-1 ml-6">
+              Check this to display the menu for guests to browse without taking
+              orders. The item cards, prices, and descriptions still show, but
+              the "pre-order" copy, add-to-cart buttons, and checkout are hidden.
+            </p>
+          </div>
+        )}
+
+        {menuId && preorderEnabled && menuItemsForLimits.length > 0 && (
           <div className="border border-warm rounded-lg p-4 bg-warm/10">
             <p className="text-sm font-medium text-ink mb-1">Per-item limits (optional)</p>
             <p className="text-xs text-ink-muted mb-3">

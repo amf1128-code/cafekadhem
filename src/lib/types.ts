@@ -37,6 +37,10 @@ export interface Event {
   // public RSVP/ticketing CTAs are swapped for a "more details to
   // come" panel with a جاية tag. Defaults to true.
   is_rsvp_open: boolean
+  // When false, the attached menu renders read-only — items are visible
+  // but the pre-order cart, add buttons, and checkout are hidden.
+  // Defaults to true.
+  preorder_enabled: boolean
   ticketing_enabled: boolean
   ticket_price: number | null
   theme: 'theme1' | 'theme2' | 'theme3'

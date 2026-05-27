@@ -324,6 +324,37 @@ export function Order() {
     )
   }
 
+  // Pre-ordering is turned off for this event — the menu is browse-only.
+  // Send guests back to the event page where the menu still renders.
+  if (event.preorder_enabled === false) {
+    return (
+      <section className="ck-page" style={{ textAlign: 'center', borderBottom: 'none' }}>
+        <div className="ck-narrow">
+          <div className="ck-eyebrow">✦ Heads up</div>
+          <h1 className="ck-h1" style={{ marginTop: 12 }}>
+            PRE-ORDERS ARE
+            <br />
+            <span className="ck-italic">closed.</span>
+          </h1>
+          <p
+            className="ck-italic"
+            style={{ fontSize: 18, marginTop: 18, lineHeight: 1.5 }}
+          >
+            The menu for this one is just to look at — grab what you want at
+            the event.
+          </p>
+          <Link
+            to={`/events/${event.id}`}
+            className="ck-btn ck-btn--primary"
+            style={{ marginTop: 28 }}
+          >
+            Back to the event →
+          </Link>
+        </div>
+      </section>
+    )
+  }
+
   if (submitted) {
     return (
       <section className="ck-page" style={{ textAlign: 'center', borderBottom: 'none' }}>

@@ -167,6 +167,9 @@ export function CinemaEventDetail() {
   // poster + details, but swap the RSVP form (and pre-order menu) for
   // a "more details to come" panel + Jaya (جاية) tag.
   const rsvpOpen = event.is_rsvp_open ?? true
+  // When false, the menu is shown read-only: no pre-order nudge, no
+  // add-to-cart controls, no sticky cart / checkout.
+  const preorderEnabled = event.preorder_enabled ?? true
   // Group RSVPs into hosts (plus_one_of === null) + their plus-ones, plus
   // separate maybe and waitlist buckets. The +1s collapse onto their host
   // row as a "+1" suffix instead of rendering as standalone names.
@@ -510,8 +513,8 @@ export function CinemaEventDetail() {
 
           {/* Inline pre-order nudge — anchors down to the menu grid
               where each item is tap-to-add. Only shown if the event has
-              a menu attached. */}
-          {items.length > 0 && (
+              a menu attached and pre-ordering is enabled. */}
+          {preorderEnabled && items.length > 0 && (
             <a
               href="#menu"
               style={{
@@ -654,6 +657,7 @@ export function CinemaEventDetail() {
                 )}
                 <MenuCellControls
                   item={it}
+                  preorderEnabled={preorderEnabled}
                   cartQty={cart.find(c => c.menuItem.id === it.id)?.quantity ?? 0}
                   remaining={remainingFor(it.id)}
                   unavailable={!it.is_available}
@@ -673,7 +677,9 @@ export function CinemaEventDetail() {
               opacity: 0.65,
             }}
           >
-            Tap an item to add it to your cart. Pay one tab at the end.
+            {preorderEnabled
+              ? 'Tap an item to add it to your cart. Pay one tab at the end.'
+              : 'A taste of what we’re serving — available at the event.'}
           </p>
         </section>
       )}
@@ -753,7 +759,7 @@ export function CinemaEventDetail() {
         />
       )}
 
-      {cart.length > 0 && (
+      {preorderEnabled && cart.length > 0 && (
         <StickyCartBar
           count={cartCount}
           total={cartTotal}
@@ -761,7 +767,7 @@ export function CinemaEventDetail() {
         />
       )}
 
-      {cartOpen && (
+      {preorderEnabled && cartOpen && (
         <CartCheckoutModal
           cart={cart}
           event={event}
@@ -1199,6 +1205,7 @@ function RsvpListGroup({
  */
 function MenuCellControls({
   item,
+  preorderEnabled,
   cartQty,
   remaining,
   unavailable,
@@ -1206,6 +1213,7 @@ function MenuCellControls({
   onRemove,
 }: {
   item: MenuItem
+  preorderEnabled: boolean
   cartQty: number
   remaining: number | null
   unavailable: boolean
@@ -1240,7 +1248,8 @@ function MenuCellControls({
         {price}
       </span>
 
-      {soldOut ? (
+      {/* View-only menu: show price only, no add-to-cart controls. */}
+      {!preorderEnabled ? null : soldOut ? (
         <span
           style={{
             fontFamily: 'var(--ck-mono)',
