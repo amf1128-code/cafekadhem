@@ -24,6 +24,7 @@ const fixture = vi.hoisted(() => {
     event_type: null,
     rsvp_required: true,
     is_published: true,
+    preorder_enabled: true,
     ticketing_enabled: false,
     ticket_price: 0,
     theme: 'theme1',
@@ -166,5 +167,32 @@ describe('CinemaEventDetail — pre-order cart', () => {
     expect(within(dialog).getByText('Your cart.')).toBeInTheDocument()
     expect(within(dialog).getByText('Pistachio Bun')).toBeInTheDocument()
     expect(within(dialog).getByText(/Pay \$7.00 with Venmo/i)).toBeInTheDocument()
+  })
+})
+
+describe('CinemaEventDetail — view-only menu (preorder disabled)', () => {
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date('2099-05-01T12:00:00Z'))
+    fixture.event.preorder_enabled = false
+  })
+  afterEach(() => {
+    vi.useRealTimers()
+    fixture.event.preorder_enabled = true
+  })
+
+  it('still renders the menu items', async () => {
+    renderDetail()
+    expect(await screen.findByText('Knafeh Croissant')).toBeInTheDocument()
+    expect(screen.getByText('Pistachio Bun')).toBeInTheDocument()
+  })
+
+  it('hides add-to-cart buttons and the pre-order nudge', async () => {
+    renderDetail()
+    await screen.findByText('Knafeh Croissant')
+    expect(
+      screen.queryByRole('button', { name: /add .* to cart/i }),
+    ).not.toBeInTheDocument()
+    expect(screen.queryByText(/pre-order food too/i)).not.toBeInTheDocument()
   })
 })
