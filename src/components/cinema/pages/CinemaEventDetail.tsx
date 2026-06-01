@@ -194,6 +194,17 @@ export function CinemaEventDetail() {
       0,
     )
 
+  // Public ticket / seat availability shown in the hero card.
+  //   - capacity null or 0 => unlimited, so no counter is shown.
+  //   - seatsTaken mirrors the EXACT gate the RSVP form uses below
+  //     (rsvps with status 'yes', plus-ones included), so "N left"
+  //     reaches 0 at the same moment the CTA flips to "Join waitlist".
+  const totalSeats = event.capacity || null
+  const seatsTaken = rsvps.filter(r => r.status === 'yes').length
+  const seatsRemaining =
+    totalSeats !== null ? Math.max(0, totalSeats - seatsTaken) : null
+  const seatNoun = event.ticketing_enabled ? 'ticket' : 'seat'
+
   // Cart total / count helpers + adjust handler. Caps a quantity to the
   // remaining stock when an event_menu_item_limit has been set.
   const cartTotal = cart.reduce(
@@ -450,6 +461,35 @@ export function CinemaEventDetail() {
                 </a>
               )}
             </div>
+
+            {/* Ticket / seat availability. Mirrors the capacity gate the
+                RSVP form uses, so "N left" hits 0 exactly when the CTA
+                flips to "Join waitlist". Hidden when capacity is unset
+                (null/0 = unlimited) or while RSVP is locked (coming-soon). */}
+            {rsvpOpen && totalSeats !== null && (
+              <div
+                className="ck-mono"
+                style={{
+                  fontSize: 11,
+                  letterSpacing: '0.14em',
+                  textTransform: 'uppercase',
+                }}
+              >
+                {seatsRemaining === 0 ? (
+                  <span style={{ color: 'var(--ck-magenta)' }}>
+                    {event.ticketing_enabled ? 'Sold out' : 'Full'} — join the
+                    waitlist
+                  </span>
+                ) : (
+                  <>
+                    <span style={{ color: 'var(--ck-cobalt)' }}>
+                      {seatsRemaining}
+                    </span>{' '}
+                    of {totalSeats} {seatNoun}s left
+                  </>
+                )}
+              </div>
+            )}
           </div>
         </div>
       </section>
@@ -503,10 +543,7 @@ export function CinemaEventDetail() {
               event={event}
               existingRsvp={myRsvp}
               existingPlusOne={myPlusOne}
-              isFull={
-                !!event.capacity &&
-                rsvps.filter(r => r.status === 'yes').length >= event.capacity
-              }
+              isFull={totalSeats !== null && seatsTaken >= totalSeats}
               onRsvpComplete={() => loadEvent({ silent: true })}
             />
           </div>
