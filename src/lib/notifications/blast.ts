@@ -1,0 +1,77 @@
+import { supabase } from '../supabase'
+
+// Audiences a notification blast can target. Keep this union — and the
+// status/payment maps below — in sync with:
+//   - the notification_blasts.audience CHECK (migration 056)
+//   - STATUSES_FOR_AUDIENCE / PAYMENT_STATUSES_FOR_AUDIENCE in the
+//     send-blast edge function (which actually resolves recipients).
+export type BlastAudience =
+  | 'yes_only'
+  | 'yes_and_maybe'
+  | 'all_invited'
+  | 'unpaid_tickets'
+  | 'maybes'
+
+// RSVP statuses each audience includes.
+export const AUDIENCE_STATUSES: Record<BlastAudience, string[]> = {
+  yes_only: ['yes'],
+  yes_and_maybe: ['yes', 'maybe'],
+  all_invited: ['yes', 'maybe', 'no', 'waitlisted'],
+  // A "ticket holder" reserved a seat (status 'yes'); the payment
+  // narrowing below restricts to those who haven't paid.
+  unpaid_tickets: ['yes'],
+  maybes: ['maybe'],
+}
+
+// Audiences that additionally filter on payment_status. Absent = no
+// payment filter (any payment_status is fine).
+export const AUDIENCE_PAYMENT_STATUSES: Partial<Record<BlastAudience, string[]>> = {
+  // "Haven't paid yet" = no confirmed payment. 'pending' (guest clicked
+  // "I've paid" but the host hasn't verified) is included so a stalled
+  // payment still gets a nudge; 'paid'/'refunded' are excluded.
+  unpaid_tickets: ['unpaid', 'pending'],
+}
+
+export interface CreateBlastInput {
+  eventId: string
+  audience: BlastAudience
+  emailSubject: string
+  emailBody: string
+  smsBody: string
+}
+
+export interface BlastResult {
+  sent: number
+  failed: number
+}
+
+// Insert a notification_blasts row, then invoke the send-blast edge
+// function to deliver it. The edge function resolves recipients from the
+// audience, fans out to SMS/email per guest preference, dedups, and
+// honours the sms_enabled gate — so callers only supply the message.
+//
+// Shared by the Blast composer (custom copy) and the one-click
+// reminder/nudge actions on the Tickets page (prebuilt copy). Both paths
+// produce a row that shows up in the event's blast history.
+export async function createAndSendBlast(input: CreateBlastInput): Promise<BlastResult> {
+  const { data: created, error: insertErr } = await supabase
+    .from('notification_blasts')
+    .insert({
+      event_id: input.eventId,
+      audience: input.audience,
+      email_subject: input.emailSubject,
+      email_body: input.emailBody,
+      sms_body: input.smsBody,
+    })
+    .select('id')
+    .single()
+  if (insertErr || !created) throw insertErr || new Error('Failed to create blast')
+
+  const { data: result, error: invokeErr } = await supabase.functions.invoke('send-blast', {
+    body: { blast_id: created.id },
+  })
+  if (invokeErr) throw invokeErr
+
+  const r = result as { sent?: number; failed?: number } | null
+  return { sent: r?.sent ?? 0, failed: r?.failed ?? 0 }
+}

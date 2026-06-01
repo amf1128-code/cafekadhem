@@ -5,6 +5,7 @@ import type { Event, RSVP, Guest } from '../../lib/types'
 import { formatDate, formatTime } from '../../lib/utils/date'
 import { formatPhone } from '../../lib/utils/phone'
 import { sendNotification } from '../../lib/notifications'
+import { createAndSendBlast } from '../../lib/notifications/blast'
 import { Button } from '../../components/ui/Button'
 import { Badge } from '../../components/ui/Badge'
 import { useToast } from '../../components/ui/Toast'
@@ -29,9 +30,29 @@ export function AdminEventTickets() {
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState<string | null>(null)
   const [filter, setFilter] = useState<FilterTab>('pending')
+  const [blasting, setBlasting] = useState<null | 'remind' | 'nudge'>(null)
+
+  // One-click reminder/nudge audiences. "Unpaid" = a held seat (status
+  // 'yes') without confirmed payment — matching the unpaid_tickets blast
+  // audience. Maybes are nudged regardless of payment (they never began
+  // paying); nudging never changes anyone's RSVP.
+  const unpaidTicketCount = useMemo(
+    () =>
+      rows.filter(
+        r =>
+          r.status === 'yes' &&
+          (r.payment_status === 'unpaid' || r.payment_status === 'pending'),
+      ).length,
+    [rows],
+  )
+  const maybeCount = useMemo(
+    () => rows.filter(r => r.status === 'maybe').length,
+    [rows],
+  )
 
   useEffect(() => {
     if (id) loadData()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id])
 
   async function loadData() {
@@ -123,6 +144,58 @@ export function AdminEventTickets() {
     }
   }
 
+  async function handleRemindUnpaid() {
+    if (!event || unpaidTicketCount === 0) return
+    if (
+      !confirm(
+        `Send a payment reminder to ${unpaidTicketCount} guest${unpaidTicketCount === 1 ? '' : 's'} who haven't paid for their ticket? They'll be emailed/texted now.`,
+      )
+    )
+      return
+    setBlasting('remind')
+    try {
+      const amount = event.ticket_price?.toFixed(2) ?? '0.00'
+      const { sent, failed } = await createAndSendBlast({
+        eventId: event.id,
+        audience: 'unpaid_tickets',
+        emailSubject: `Your ticket for ${event.title} isn't paid yet`,
+        emailBody: `Hi! We're holding your spot for ${event.title}, but we don't have your payment confirmed yet. Tickets are $${amount}. Open the event page below to pay by Venmo and lock in your seat.`,
+        smsBody: `Reminder: we don't have payment for your $${amount} ticket to ${event.title} yet. Open the event to pay and confirm your seat:`,
+      })
+      addToast(`Reminder sent — ${sent} delivered${failed > 0 ? `, ${failed} failed` : ''}`)
+    } catch (err) {
+      addToast(err instanceof Error ? err.message : 'Failed to send reminder', 'error')
+    } finally {
+      setBlasting(null)
+    }
+  }
+
+  async function handleNudgeMaybes() {
+    if (!event || maybeCount === 0) return
+    if (
+      !confirm(
+        `Send a nudge to ${maybeCount} guest${maybeCount === 1 ? '' : 's'} who RSVPed "maybe"? They'll be emailed/texted now — no one's RSVP changes.`,
+      )
+    )
+      return
+    setBlasting('nudge')
+    try {
+      const amount = event.ticket_price?.toFixed(2) ?? '0.00'
+      const { sent, failed } = await createAndSendBlast({
+        eventId: event.id,
+        audience: 'maybes',
+        emailSubject: `Still thinking about ${event.title}?`,
+        emailBody: `You marked yourself as a "maybe" for ${event.title}. Seats are limited and tickets are $${amount} — if you're in, open the event page below to grab your ticket before it fills up.`,
+        smsBody: `Still thinking about ${event.title}? Seats are limited — open the event to grab your $${amount} ticket:`,
+      })
+      addToast(`Nudge sent — ${sent} delivered${failed > 0 ? `, ${failed} failed` : ''}`)
+    } catch (err) {
+      addToast(err instanceof Error ? err.message : 'Failed to send nudge', 'error')
+    } finally {
+      setBlasting(null)
+    }
+  }
+
   const filtered = useMemo(() => {
     if (filter === 'all') return rows
     return rows.filter(r => r.payment_status === filter)
@@ -171,6 +244,37 @@ export function AdminEventTickets() {
             <Button variant="ghost" size="sm">Edit Event</Button>
           </Link>
         </div>
+      </div>
+
+      {/* Bulk reminders — one-click sends through the blast engine, so
+          both show up in this event's blast history. */}
+      <div className="flex flex-wrap items-center gap-2 mb-4">
+        <span className="text-[10px] tracking-[0.2em] uppercase text-ink/50 mr-1">
+          Reminders
+        </span>
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={handleRemindUnpaid}
+          loading={blasting === 'remind'}
+          disabled={unpaidTicketCount === 0 || blasting !== null}
+        >
+          Remind to pay ({unpaidTicketCount})
+        </Button>
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={handleNudgeMaybes}
+          loading={blasting === 'nudge'}
+          disabled={maybeCount === 0 || blasting !== null}
+        >
+          Nudge maybes ({maybeCount})
+        </Button>
+        <Link to={`/admin/events/${id}/blast`} className="ml-auto">
+          <Button size="sm" variant="ghost">
+            Custom blast →
+          </Button>
+        </Link>
       </div>
 
       {/* Filter tabs */}

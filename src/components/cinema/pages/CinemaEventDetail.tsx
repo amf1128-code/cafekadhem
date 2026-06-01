@@ -484,8 +484,8 @@ export function CinemaEventDetail() {
                   <>
                     <span style={{ color: 'var(--ck-cobalt)' }}>
                       {seatsRemaining}
-                    </span>{' '}
-                    of {totalSeats} {seatNoun}s left
+                    </span>
+                    {` of ${totalSeats} ${seatNoun}s left`}
                   </>
                 )}
               </div>

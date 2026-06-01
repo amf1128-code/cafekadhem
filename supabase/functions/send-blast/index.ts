@@ -123,10 +123,19 @@ async function verifyAdminJwt(req: Request): Promise<boolean> {
   return true
 }
 
+// Keep in sync with AUDIENCE_STATUSES / AUDIENCE_PAYMENT_STATUSES in
+// src/lib/notifications/blast.ts and the audience CHECK in migration 056.
 const STATUSES_FOR_AUDIENCE: Record<string, string[]> = {
   yes_only: ['yes'],
   yes_and_maybe: ['yes', 'maybe'],
   all_invited: ['yes', 'maybe', 'no', 'waitlisted'],
+  unpaid_tickets: ['yes'],
+  maybes: ['maybe'],
+}
+
+// Audiences that additionally narrow on payment_status.
+const PAYMENT_STATUSES_FOR_AUDIENCE: Record<string, string[] | undefined> = {
+  unpaid_tickets: ['unpaid', 'pending'],
 }
 
 Deno.serve(async (req: Request) => {
@@ -194,13 +203,21 @@ Deno.serve(async (req: Request) => {
   const bareEventUrl = `${siteUrl}/events/${blast.event_id}`
 
   // Audience query: distinct guest_ids with required status, plus_one_of NULL,
-  // contactable, with notification_preference != 'none'.
-  const { data: rsvps } = await admin
+  // contactable, with notification_preference != 'none'. Some audiences
+  // (e.g. unpaid_tickets) additionally narrow on payment_status.
+  let recipientQuery = admin
     .from('rsvps')
     .select('guest_id, guests!guest_id(id, first_name, email, phone, notification_preference)')
     .eq('event_id', blast.event_id)
     .is('plus_one_of', null)
     .in('status', STATUSES_FOR_AUDIENCE[blast.audience] ?? ['yes'])
+
+  const paymentStatuses = PAYMENT_STATUSES_FOR_AUDIENCE[blast.audience]
+  if (paymentStatuses) {
+    recipientQuery = recipientQuery.in('payment_status', paymentStatuses)
+  }
+
+  const { data: rsvps } = await recipientQuery
 
   type GuestShape = {
     id: string

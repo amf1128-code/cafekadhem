@@ -18,7 +18,7 @@ const fixture = vi.hoisted(() => {
     flyer_url: null,
     home_flyer_url: null,
     menu_id: 'menu-1',
-    capacity: 50,
+    capacity: 50 as number | null,
     donation_info: null,
     gathering_number: 'No. 014',
     event_type: null,
@@ -194,5 +194,45 @@ describe('CinemaEventDetail — view-only menu (preorder disabled)', () => {
       screen.queryByRole('button', { name: /add .* to cart/i }),
     ).not.toBeInTheDocument()
     expect(screen.queryByText(/pre-order food too/i)).not.toBeInTheDocument()
+  })
+})
+
+describe('CinemaEventDetail — ticket / seat availability', () => {
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date('2099-05-01T12:00:00Z'))
+  })
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  it('shows remaining + total from capacity (seats, non-ticketed)', async () => {
+    renderDetail()
+    await screen.findByText('Knafeh Croissant')
+    // capacity 50, no RSVPs going -> "50 of 50 seats left"
+    expect(screen.getByText(/of 50 seats left/i)).toBeInTheDocument()
+  })
+
+  it('labels the unit "tickets" when ticketing is enabled', async () => {
+    fixture.event.ticketing_enabled = true
+    try {
+      renderDetail()
+      await screen.findByText('Knafeh Croissant')
+      expect(screen.getByText(/of 50 tickets left/i)).toBeInTheDocument()
+    } finally {
+      fixture.event.ticketing_enabled = false
+    }
+  })
+
+  it('hides the counter when capacity is unset (unlimited)', async () => {
+    fixture.event.capacity = null
+    try {
+      renderDetail()
+      await screen.findByText('Knafeh Croissant')
+      expect(screen.queryByText(/seats left/i)).not.toBeInTheDocument()
+      expect(screen.queryByText(/tickets left/i)).not.toBeInTheDocument()
+    } finally {
+      fixture.event.capacity = 50
+    }
   })
 })
