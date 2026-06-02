@@ -251,6 +251,44 @@ async function generateAndUploadQr(token: string, encodedUrl: string): Promise<s
   }
 }
 
+// Shared compact email card for simple one-message notifications
+// (payment reminders, maybe nudges). Matches the cream/serif house
+// style of the other templates; the single CTA links to event_url
+// (ambient-token-stamped upstream, so the guest is recognized).
+function simpleCardHtml(opts: {
+  title: string
+  eventType?: string
+  greeting: string
+  body: string
+  buttonLabel: string
+  url: string
+}): string {
+  const bodyHtml = escapeHtml(opts.body).replace(/\r?\n/g, '<br>')
+  return `<!doctype html>
+<html><body style="margin:0;padding:0;background:#fdfaf3;font-family:Georgia,'Times New Roman',serif;color:#1a2e1f;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#fdfaf3;padding:32px 16px;">
+    <tr><td align="center">
+      <table width="480" cellpadding="0" cellspacing="0" style="max-width:480px;background:#ffffff;border:1px solid #e7e0cf;padding:32px;">
+        <tr><td align="center" style="padding-bottom:8px;">
+          <p style="margin:0;letter-spacing:0.25em;text-transform:uppercase;font-size:11px;color:#6b6452;">Cafe Kadhem</p>
+        </td></tr>
+        <tr><td align="center" style="padding-bottom:8px;">
+          <h1 style="margin:8px 0 0;font-style:italic;font-weight:400;font-size:24px;color:#1a2e1f;">${escapeHtml(opts.title)}</h1>
+          ${opts.eventType ? `<p style="margin:6px 0 0;font-size:12px;letter-spacing:0.18em;text-transform:uppercase;color:#6b6452;">${escapeHtml(opts.eventType)}</p>` : ''}
+        </td></tr>
+        <tr><td align="center" style="padding:16px 0 8px;">
+          <p style="margin:0;font-size:15px;line-height:1.5;color:#3a3a3a;">${escapeHtml(opts.greeting)}</p>
+          <p style="margin:8px 0 0;font-size:15px;line-height:1.5;color:#3a3a3a;">${bodyHtml}</p>
+        </td></tr>
+        ${opts.url ? `<tr><td align="center" style="padding:24px 0 8px;">
+          <a href="${escapeHtml(opts.url)}" style="display:inline-block;background:#1a2e1f;color:#fdfaf3;text-decoration:none;padding:14px 28px;letter-spacing:0.2em;text-transform:uppercase;font-size:12px;">${escapeHtml(opts.buttonLabel)}</a>
+        </td></tr>` : ''}
+      </table>
+    </td></tr>
+  </table>
+</body></html>`
+}
+
 const messageTemplates: Record<string, (data: Record<string, string>) => { subject: string; body: string; html?: string }> = {
   rsvp_confirmation: (data) => {
     const title = data.event_title || 'Cafe Kadhem'
@@ -649,6 +687,44 @@ const messageTemplates: Record<string, (data: Record<string, string>) => { subje
       subject: `Your ticket - ${eventTitle}`,
       body: text,
       html,
+    }
+  },
+  payment_reminder: (data) => {
+    const title = data.event_title || 'Cafe Kadhem'
+    const greeting = data.first_name ? `Hi ${data.first_name},` : 'Hi,'
+    const amountNote = data.amount ? ` ($${data.amount})` : ''
+    const lead = `We're holding your spot for ${title}, but we don't have your payment confirmed yet${amountNote}. Tap below to pay by Venmo and lock in your seat.`
+    const link = data.event_url ? `\n\n${data.event_url}` : ''
+    return {
+      subject: `Your ticket for ${title} isn't paid yet`,
+      body: `${greeting} ${lead}${link}`,
+      html: simpleCardHtml({
+        title,
+        eventType: data.event_type,
+        greeting,
+        body: lead,
+        buttonLabel: 'Pay & confirm',
+        url: data.event_url || '',
+      }),
+    }
+  },
+  maybe_nudge: (data) => {
+    const title = data.event_title || 'Cafe Kadhem'
+    const greeting = data.first_name ? `Hi ${data.first_name},` : 'Hi,'
+    const amountNote = data.amount ? ` Tickets are $${data.amount}.` : ''
+    const lead = `You marked yourself as a maybe for ${title}.${amountNote} Seats are limited — if you're in, tap below to grab your spot before it fills up.`
+    const link = data.event_url ? `\n\n${data.event_url}` : ''
+    return {
+      subject: `Still thinking about ${title}?`,
+      body: `${greeting} ${lead}${link}`,
+      html: simpleCardHtml({
+        title,
+        eventType: data.event_type,
+        greeting,
+        body: lead,
+        buttonLabel: 'Grab your spot',
+        url: data.event_url || '',
+      }),
     }
   },
 }

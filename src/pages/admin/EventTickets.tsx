@@ -196,6 +196,71 @@ export function AdminEventTickets() {
     }
   }
 
+  // Per-row sends. Single-guest, through send-notification (like
+  // Re-send), so each click sends again — no dedup. The amount is passed
+  // for the copy; the message links back to the event page where the
+  // guest's own Venmo card lives.
+  async function handleRemindOne(row: TicketRow) {
+    setBusy(row.id)
+    try {
+      const amount = event?.ticket_price?.toFixed(2) ?? '0.00'
+      const res = await sendNotification({
+        guestId: row.guest_id,
+        eventId: id!,
+        type: 'payment_reminder',
+        data: { amount },
+      })
+      if (res.success) addToast(`Reminder sent to ${row.guest.first_name}`)
+      else addToast(res.error || 'Failed to send reminder', 'error')
+    } finally {
+      setBusy(null)
+    }
+  }
+
+  async function handleNudgeOne(row: TicketRow) {
+    setBusy(row.id)
+    try {
+      const amount = event?.ticket_price?.toFixed(2) ?? '0.00'
+      const res = await sendNotification({
+        guestId: row.guest_id,
+        eventId: id!,
+        type: 'maybe_nudge',
+        data: { amount },
+      })
+      if (res.success) addToast(`Nudge sent to ${row.guest.first_name}`)
+      else addToast(res.error || 'Failed to send nudge', 'error')
+    } finally {
+      setBusy(null)
+    }
+  }
+
+  // Silent removal: deletes this RSVP for this event (and its +1 via the
+  // ON DELETE CASCADE fk). No notification is sent. The guest record and
+  // their RSVPs to other events are untouched — for a full wipe, use the
+  // Guest Directory. Admins can delete rsvps directly (RLS: FOR ALL).
+  async function handleRemove(row: TicketRow) {
+    const name = `${row.guest.first_name}${row.guest.last_name ? ` ${row.guest.last_name}` : ''}`
+    const paidWarn =
+      row.payment_status === 'paid' ? ' They have a PAID ticket — it will be deleted.' : ''
+    if (
+      !confirm(
+        `Remove ${name} from this event?${paidWarn} Their +1 (if any) goes too. They won't be notified, and this can't be undone.`,
+      )
+    )
+      return
+    setBusy(row.id)
+    try {
+      const { error } = await supabase.from('rsvps').delete().eq('id', row.id)
+      if (error) throw error
+      addToast(`Removed ${row.guest.first_name}`)
+      await loadData()
+    } catch (err) {
+      addToast(err instanceof Error ? err.message : 'Failed to remove', 'error')
+    } finally {
+      setBusy(null)
+    }
+  }
+
   const filtered = useMemo(() => {
     if (filter === 'all') return rows
     return rows.filter(r => r.payment_status === filter)
@@ -351,34 +416,66 @@ export function AdminEventTickets() {
                     )}
                   </td>
                   <td className="px-4 py-3 text-right whitespace-nowrap">
-                    {row.payment_status === 'paid' ? (
-                      <div className="flex gap-2 justify-end">
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => handleResend(row)}
-                          loading={busy === row.id}
-                        >
-                          Re-send
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => handleMarkUnpaid(row)}
-                          loading={busy === row.id}
-                        >
-                          Undo
-                        </Button>
-                      </div>
-                    ) : (
+                    <div className="flex gap-2 justify-end flex-wrap">
+                      {row.payment_status === 'paid' ? (
+                        <>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleResend(row)}
+                            loading={busy === row.id}
+                          >
+                            Re-send
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => handleMarkUnpaid(row)}
+                            loading={busy === row.id}
+                          >
+                            Undo
+                          </Button>
+                        </>
+                      ) : (
+                        <>
+                          {row.status === 'yes' && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleRemindOne(row)}
+                              loading={busy === row.id}
+                            >
+                              Remind
+                            </Button>
+                          )}
+                          {row.status === 'maybe' && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleNudgeOne(row)}
+                              loading={busy === row.id}
+                            >
+                              Nudge
+                            </Button>
+                          )}
+                          <Button
+                            size="sm"
+                            onClick={() => handleMarkPaid(row)}
+                            loading={busy === row.id}
+                          >
+                            Mark paid
+                          </Button>
+                        </>
+                      )}
                       <Button
                         size="sm"
-                        onClick={() => handleMarkPaid(row)}
+                        variant="ghost"
+                        onClick={() => handleRemove(row)}
                         loading={busy === row.id}
                       >
-                        Mark paid
+                        Remove
                       </Button>
-                    )}
+                    </div>
                   </td>
                 </tr>
               ))}

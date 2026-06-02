@@ -10,6 +10,8 @@ export interface NotificationPayload {
     | 'invite'
     | 'waitlist_promoted'
     | 'ticket_issued'
+    | 'payment_reminder'
+    | 'maybe_nudge'
   data?: Record<string, string>
 }
 
