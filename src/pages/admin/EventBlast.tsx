@@ -3,18 +3,22 @@ import { Link, useParams } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import type { Event } from '../../lib/types'
 import { formatDate, formatTime } from '../../lib/utils/date'
+import {
+  createAndSendBlast,
+  AUDIENCE_STATUSES,
+  AUDIENCE_PAYMENT_STATUSES,
+  type BlastAudience,
+} from '../../lib/notifications/blast'
 import { Button } from '../../components/ui/Button'
 import { Badge } from '../../components/ui/Badge'
 import { Input } from '../../components/ui/Input'
 import { useToast } from '../../components/ui/Toast'
 import { PageLoader } from '../../components/ui/LoadingSpinner'
 
-type Audience = 'yes_only' | 'yes_and_maybe' | 'all_invited'
-
 type BlastRow = {
   id: string
   event_id: string
-  audience: Audience
+  audience: BlastAudience
   email_subject: string
   email_body: string
   sms_body: string
@@ -25,10 +29,12 @@ type BlastRow = {
   created_at: string
 }
 
-const AUDIENCE_LABELS: Record<Audience, string> = {
+const AUDIENCE_LABELS: Record<BlastAudience, string> = {
   yes_only: 'Going (yes)',
   yes_and_maybe: 'Going + maybe',
+  maybes: 'Maybes',
   all_invited: 'All invited',
+  unpaid_tickets: 'Unpaid ticket holders',
 }
 
 const STATUS_VARIANT: Record<BlastRow['status'], 'default' | 'success' | 'warning' | 'error' | 'info'> = {
@@ -42,7 +48,7 @@ export function AdminEventBlast() {
   const { id } = useParams<{ id: string }>()
   const { addToast } = useToast()
   const [event, setEvent] = useState<Event | null>(null)
-  const [audience, setAudience] = useState<Audience>('yes_only')
+  const [audience, setAudience] = useState<BlastAudience>('yes_only')
   const [emailSubject, setEmailSubject] = useState('')
   const [emailBody, setEmailBody] = useState('')
   const [smsBody, setSmsBody] = useState('')
@@ -82,18 +88,17 @@ export function AdminEventBlast() {
     if (!id) return
     let cancelled = false
     ;(async () => {
-      const statusFilter =
-        audience === 'yes_only' ? ['yes']
-        : audience === 'yes_and_maybe' ? ['yes', 'maybe']
-        : ['yes', 'maybe', 'no', 'waitlisted']
+      let rsvpQuery = supabase
+        .from('rsvps')
+        .select('guest_id, guests!guest_id(id, email, phone, notification_preference)')
+        .eq('event_id', id)
+        .is('plus_one_of', null)
+        .in('status', AUDIENCE_STATUSES[audience])
+      const paymentStatuses = AUDIENCE_PAYMENT_STATUSES[audience]
+      if (paymentStatuses) rsvpQuery = rsvpQuery.in('payment_status', paymentStatuses)
 
       const [rsvpsRes, settingsRes] = await Promise.all([
-        supabase
-          .from('rsvps')
-          .select('guest_id, guests!guest_id(id, email, phone, notification_preference)')
-          .eq('event_id', id)
-          .is('plus_one_of', null)
-          .in('status', statusFilter),
+        rsvpQuery,
         supabase.from('admin_settings').select('sms_enabled').limit(1).single(),
       ])
       if (cancelled) return
@@ -125,6 +130,14 @@ export function AdminEventBlast() {
     }
   }, [id, audience])
 
+  // Audiences offered in the composer. "Unpaid ticket holders" only
+  // makes sense once an event has ticketing turned on.
+  const availableAudiences = useMemo<BlastAudience[]>(() => {
+    const opts: BlastAudience[] = ['yes_only', 'yes_and_maybe', 'maybes', 'all_invited']
+    if (event?.ticketing_enabled) opts.unshift('unpaid_tickets')
+    return opts
+  }, [event?.ticketing_enabled])
+
   const smsLength = smsBody.length
   const smsOverLimit = smsLength > 160
 
@@ -146,28 +159,13 @@ export function AdminEventBlast() {
 
     setSending(true)
     try {
-      // 1. Insert the blast row.
-      const { data: created, error: insertErr } = await supabase
-        .from('notification_blasts')
-        .insert({
-          event_id: event.id,
-          audience,
-          email_subject: emailSubject.trim(),
-          email_body: emailBody.trim(),
-          sms_body: smsBody.trim(),
-        })
-        .select('id')
-        .single()
-      if (insertErr || !created) throw insertErr || new Error('insert failed')
-
-      // 2. Invoke the edge function — it uses our session JWT for auth.
-      const { data: result, error: invokeErr } = await supabase.functions.invoke('send-blast', {
-        body: { blast_id: created.id },
+      const { sent, failed } = await createAndSendBlast({
+        eventId: event.id,
+        audience,
+        emailSubject: emailSubject.trim(),
+        emailBody: emailBody.trim(),
+        smsBody: smsBody.trim(),
       })
-      if (invokeErr) throw invokeErr
-
-      const sent = (result as { sent?: number; failed?: number })?.sent ?? 0
-      const failed = (result as { sent?: number; failed?: number })?.failed ?? 0
       addToast(`Blast sent — ${sent} delivered${failed > 0 ? `, ${failed} failed` : ''}`)
 
       // Reset compose form, refresh history.
@@ -211,7 +209,7 @@ export function AdminEventBlast() {
             Audience
           </label>
           <div className="flex flex-wrap gap-2">
-            {(Object.keys(AUDIENCE_LABELS) as Audience[]).map((opt) => (
+            {availableAudiences.map((opt) => (
               <button
                 key={opt}
                 type="button"
