@@ -7,19 +7,22 @@ import { normalizePhone, isValidPhone } from '../../lib/utils/phone'
 import { ConsentNote } from '../ui/ConsentNote'
 import { useToast } from '../ui/Toast'
 
-// New payment-gated RSVP flow (events.use_new_rsvp_flow). The guest is
-// recorded as 'pending_payment' (saved, but NOT counted as going) until
-// they pay or self-attest, at which point they flip to 'yes'. Mirrors the
-// Partiful sequence: register -> attention-commanding pay step ->
-// "did you pay?" -> you're going.
+// New payment-gated RSVP flow (events.use_new_rsvp_flow). "Going" routes
+// through payment — the guest is recorded as 'pending_payment' (saved but
+// NOT counted) until they pay or self-attest, then flips to 'yes'.
+// "Maybe" / "Can't go" just capture the guest + their response (for future
+// events); they're never counted and never pay.
 //
 // Steps:
-//   form    -> collect info, register_pending_payment, advance to pay
-//   pay     -> price + Venmo deeplink + "I've already paid"
-//   confirm -> "Did you send $X?" yes -> going / no -> saved
-//   going   -> counted; shows ticket once paid
+//   form     -> info + Going / Maybe / Can't go
+//   pay      -> price + Venmo deeplink + "I've already paid"   (Going)
+//   confirm  -> "Did you send $X?" yes -> going / no -> saved
+//   going    -> counted; ticket once paid
+//   saved    -> registered but said not-paid-yet (not counted)
+//   maybe    -> marked maybe
+//   declined -> marked can't go
 
-type Step = 'form' | 'pay' | 'confirm' | 'going' | 'saved'
+type Step = 'form' | 'pay' | 'confirm' | 'going' | 'saved' | 'maybe' | 'declined'
 
 interface Props {
   eventId: string
@@ -27,6 +30,21 @@ interface Props {
   settings: AdminSettings | null
   existingRsvp: RSVP | null
   onComplete: () => void
+}
+
+function stepForStatus(status: RSVP['status'] | undefined): Step {
+  switch (status) {
+    case 'yes':
+      return 'going'
+    case 'pending_payment':
+      return 'pay'
+    case 'maybe':
+      return 'maybe'
+    case 'no':
+      return 'declined'
+    default:
+      return 'form'
+  }
 }
 
 function Field({
@@ -48,13 +66,7 @@ function Field({
 export function NewTicketedRsvp({ eventId, event, settings, existingRsvp, onComplete }: Props) {
   const { addToast } = useToast()
   const [rsvp, setRsvp] = useState<RSVP | null>(existingRsvp)
-  const [step, setStep] = useState<Step>(
-    existingRsvp?.status === 'yes'
-      ? 'going'
-      : existingRsvp?.status === 'pending_payment'
-        ? 'pay'
-        : 'form',
-  )
+  const [step, setStep] = useState<Step>(stepForStatus(existingRsvp?.status))
   const [firstName, setFirstName] = useState('')
   const [lastName, setLastName] = useState('')
   const [email, setEmail] = useState('')
@@ -68,8 +80,7 @@ export function NewTicketedRsvp({ eventId, event, settings, existingRsvp, onComp
   const isMobile =
     typeof navigator !== 'undefined' && /iPhone|iPad|iPod|Android/i.test(navigator.userAgent)
 
-  // Prefill from a known guest (returning visitor) so a pending_payment
-  // guest who comes back just confirms payment.
+  // Prefill from a known guest so a returning visitor doesn't retype.
   useEffect(() => {
     const token = getGuestToken()
     if (!token) return
@@ -92,48 +103,79 @@ export function NewTicketedRsvp({ eventId, event, settings, existingRsvp, onComp
       : `https://venmo.com/${venmoHandle}?txn=pay&amount=${amount}&note=${note}`
     : ''
 
-  async function handleRegister() {
+  // Validate + upsert the guest record. Returns the guest id, or null
+  // (after toasting) if validation failed. Shared by all three responses.
+  async function upsertGuest(): Promise<string | null> {
     if (!firstName.trim()) {
       addToast('Please enter your first name.', 'error')
-      return
+      return null
     }
     if (!email.trim() && !(smsEnabled && phone.trim())) {
       addToast(
         smsEnabled ? 'Please provide an email or phone number.' : 'Please provide an email address.',
         'error',
       )
-      return
+      return null
     }
     if (smsEnabled && phone.trim() && !isValidPhone(phone.trim())) {
       addToast('Please enter a valid US phone number.', 'error')
-      return
+      return null
     }
 
+    const fields: Record<string, unknown> = {
+      first_name: firstName.trim(),
+      last_name: lastName.trim() || null,
+      email: email.trim() || null,
+    }
+    if (smsEnabled) fields.phone = phone.trim() ? normalizePhone(phone.trim()) : null
+
+    const { data: guest, error } = await supabase.rpc('upsert_guest', {
+      p_fields: fields,
+      p_guest_id: existingRsvp?.guest_id ?? getGuestToken(),
+    })
+    if (error) throw error
+    if (!guest) throw new Error('Could not save your info')
+    const guestId = guest.id as string
+    setGuestToken(guestId)
+    return guestId
+  }
+
+  async function handleGoing() {
     setLoading(true)
     try {
-      const fields: Record<string, unknown> = {
-        first_name: firstName.trim(),
-        last_name: lastName.trim() || null,
-        email: email.trim() || null,
-      }
-      if (smsEnabled) fields.phone = phone.trim() ? normalizePhone(phone.trim()) : null
-
-      const { data: guest, error: guestErr } = await supabase.rpc('upsert_guest', {
-        p_fields: fields,
-        p_guest_id: existingRsvp?.guest_id ?? getGuestToken(),
-      })
-      if (guestErr) throw guestErr
-      if (!guest) throw new Error('Could not save your info')
-      const guestId = guest.id as string
-      setGuestToken(guestId)
-
-      const { data: created, error: rsvpErr } = await supabase.rpc('register_pending_payment', {
+      const guestId = await upsertGuest()
+      if (!guestId) return
+      const { data: created, error } = await supabase.rpc('register_pending_payment', {
         p_event_id: eventId,
         p_guest_id: guestId,
       })
-      if (rsvpErr) throw rsvpErr
+      if (error) throw error
       setRsvp(created as RSVP)
       setStep('pay')
+      onComplete()
+    } catch (err) {
+      addToast(err instanceof Error ? err.message : 'Something went wrong', 'error')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  // Maybe / Can't go: capture the guest + response. Never paid, never
+  // counted. Reuses safe_create_rsvp (capacity logic only applies to 'yes').
+  async function handleResponse(status: 'maybe' | 'no') {
+    setLoading(true)
+    try {
+      const guestId = await upsertGuest()
+      if (!guestId) return
+      const { data: created, error } = await supabase.rpc('safe_create_rsvp', {
+        p_event_id: eventId,
+        p_guest_id: guestId,
+        p_status: status,
+      })
+      if (error) throw error
+      setRsvp((created as RSVP) ?? null)
+      setStep(status === 'maybe' ? 'maybe' : 'declined')
+      addToast(status === 'maybe' ? 'Marked as maybe.' : 'Thanks for letting us know.')
       onComplete()
     } catch (err) {
       addToast(err instanceof Error ? err.message : 'Something went wrong', 'error')
@@ -159,18 +201,19 @@ export function NewTicketedRsvp({ eventId, event, settings, existingRsvp, onComp
     }
   }
 
+  const changeButton = (
+    <button type="button" className="ck-btn" style={{ marginTop: 18 }} onClick={() => setStep('form')}>
+      Change response
+    </button>
+  )
+
   // ---- GOING (counted) ----------------------------------------------------
   if (step === 'going') {
     const paid = rsvp?.payment_status === 'paid'
     return (
       <div style={{ textAlign: 'center', padding: '8px 0' }}>
         <div
-          style={{
-            fontFamily: 'var(--ck-serif)',
-            fontWeight: 900,
-            fontSize: 32,
-            color: 'var(--ck-cobalt)',
-          }}
+          style={{ fontFamily: 'var(--ck-serif)', fontWeight: 900, fontSize: 32, color: 'var(--ck-cobalt)' }}
         >
           YOU&apos;RE GOING
         </div>
@@ -179,16 +222,50 @@ export function NewTicketedRsvp({ eventId, event, settings, existingRsvp, onComp
             ? 'Payment confirmed — your ticket is on the way.'
             : 'We have your payment — your host will confirm it shortly.'}
         </p>
-        {paid && rsvp?.ticket_token && (
+        {paid && rsvp?.ticket_token ? (
           <a href={`/ticket/${rsvp.ticket_token}`} className="ck-btn ck-btn--primary" style={{ marginTop: 18 }}>
             View your ticket →
           </a>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 18 }}>
+            <button type="button" className="ck-btn" onClick={() => setStep('pay')}>
+              Pay again / resend
+            </button>
+            <button type="button" className="ck-btn" onClick={() => setStep('form')} style={{ opacity: 0.7 }}>
+              Change response
+            </button>
+          </div>
         )}
-        {!paid && (
-          <button type="button" className="ck-btn" style={{ marginTop: 18 }} onClick={() => setStep('pay')}>
-            Pay again / resend
-          </button>
-        )}
+      </div>
+    )
+  }
+
+  // ---- MAYBE --------------------------------------------------------------
+  if (step === 'maybe') {
+    return (
+      <div style={{ textAlign: 'center', padding: '8px 0' }}>
+        <div style={{ fontFamily: 'var(--ck-serif)', fontWeight: 900, fontSize: 32, color: 'var(--ck-cobalt)' }}>
+          MAYBE
+        </div>
+        <p className="ck-mono" style={{ marginTop: 10, opacity: 0.7 }}>
+          You&apos;re on the maybe list — no spot held. Come back to grab a ticket when you&apos;re sure.
+        </p>
+        {changeButton}
+      </div>
+    )
+  }
+
+  // ---- DECLINED -----------------------------------------------------------
+  if (step === 'declined') {
+    return (
+      <div style={{ textAlign: 'center', padding: '8px 0' }}>
+        <div style={{ fontFamily: 'var(--ck-serif)', fontWeight: 900, fontSize: 28 }}>
+          CAN&apos;T GO
+        </div>
+        <p className="ck-mono" style={{ marginTop: 10, opacity: 0.7 }}>
+          Thanks for the heads up — we&apos;ll keep you posted on what&apos;s next.
+        </p>
+        {changeButton}
       </div>
     )
   }
@@ -206,9 +283,14 @@ export function NewTicketedRsvp({ eventId, event, settings, existingRsvp, onComp
         <p className="ck-mono" style={{ marginTop: 10, opacity: 0.7 }}>
           Your info is saved. Come back any time to pay and lock in your spot.
         </p>
-        <button type="button" className="ck-btn ck-btn--primary" style={{ marginTop: 18 }} onClick={() => setStep('pay')}>
-          Pay now →
-        </button>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 18 }}>
+          <button type="button" className="ck-btn ck-btn--primary" onClick={() => setStep('pay')}>
+            Pay now →
+          </button>
+          <button type="button" className="ck-btn" onClick={() => setStep('form')} style={{ opacity: 0.7 }}>
+            Change response
+          </button>
+        </div>
       </div>
     )
   }
@@ -220,9 +302,7 @@ export function NewTicketedRsvp({ eventId, event, settings, existingRsvp, onComp
         <div className="ck-mono" style={{ letterSpacing: '0.16em', opacity: 0.7 }}>
           THIS EVENT COSTS
         </div>
-        <div
-          style={{ fontFamily: 'var(--ck-serif)', fontWeight: 900, fontSize: 44, lineHeight: 1.1 }}
-        >
+        <div style={{ fontFamily: 'var(--ck-serif)', fontWeight: 900, fontSize: 44, lineHeight: 1.1 }}>
           ${amount}
         </div>
         <p className="ck-italic" style={{ fontSize: 18, marginTop: 6 }}>
@@ -264,18 +344,11 @@ export function NewTicketedRsvp({ eventId, event, settings, existingRsvp, onComp
   if (step === 'confirm') {
     return (
       <div style={{ textAlign: 'center', padding: '8px 0' }}>
-        <div
-          style={{ fontFamily: 'var(--ck-serif)', fontWeight: 800, fontSize: 24, lineHeight: 1.2 }}
-        >
+        <div style={{ fontFamily: 'var(--ck-serif)', fontWeight: 800, fontSize: 24, lineHeight: 1.2 }}>
           Did you send ${amount} to the host?
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 22 }}>
-          <button
-            type="button"
-            className="ck-btn ck-btn--primary"
-            onClick={handleConfirmPaid}
-            disabled={paidBusy}
-          >
+          <button type="button" className="ck-btn ck-btn--primary" onClick={handleConfirmPaid} disabled={paidBusy}>
             {paidBusy ? 'Saving…' : `Yes, I've paid $${amount}`}
           </button>
           <button type="button" className="ck-btn" onClick={() => setStep('saved')} disabled={paidBusy}>
@@ -289,11 +362,11 @@ export function NewTicketedRsvp({ eventId, event, settings, existingRsvp, onComp
     )
   }
 
-  // ---- FORM (register) ----------------------------------------------------
+  // ---- FORM (choose a response) -------------------------------------------
   return (
     <form onSubmit={e => e.preventDefault()} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
       <p className="ck-italic" style={{ fontSize: 18, lineHeight: 1.4 }}>
-        ${amount} per person. Enter your info, then pay to lock in your spot.
+        ${amount} per person. Going? Enter your info, then pay to lock in your spot.
       </p>
       <Field label="Name" value={firstName} onChange={e => setFirstName(e.target.value)} placeholder="Your first name" required />
       <Field label="Last name" optional value={lastName} onChange={e => setLastName(e.target.value)} />
@@ -301,15 +374,33 @@ export function NewTicketedRsvp({ eventId, event, settings, existingRsvp, onComp
         <Field label="Phone" type="tel" value={phone} onChange={e => setPhone(e.target.value)} placeholder="Required if no email" />
       )}
       <Field label="Email" type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="you@example.com" />
-      <button
-        type="button"
-        onClick={handleRegister}
-        disabled={loading}
-        className="ck-btn ck-btn--primary"
-        style={{ marginTop: 6 }}
-      >
-        {loading ? 'Saving…' : 'Continue to payment →'}
-      </button>
+
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 6 }}>
+        <button
+          type="button"
+          onClick={handleGoing}
+          disabled={loading}
+          className="ck-btn ck-btn--primary"
+          style={{ flex: '1 1 200px' }}
+        >
+          {loading ? 'Saving…' : 'Going — reserve a seat →'}
+        </button>
+        <button type="button" onClick={() => handleResponse('maybe')} disabled={loading} className="ck-btn">
+          Maybe
+        </button>
+        <button
+          type="button"
+          onClick={() => handleResponse('no')}
+          disabled={loading}
+          className="ck-btn"
+          style={{ background: 'transparent', border: '2px solid transparent', opacity: 0.6 }}
+        >
+          Can&apos;t go
+        </button>
+      </div>
+      <p className="ck-mono" style={{ opacity: 0.6, fontSize: 11 }}>
+        Maybe / Can&apos;t go just save your info — no spot held, nothing to pay.
+      </p>
       <ConsentNote verb="rsvp" />
     </form>
   )
