@@ -129,13 +129,13 @@ const STATUSES_FOR_AUDIENCE: Record<string, string[]> = {
   yes_only: ['yes'],
   yes_and_maybe: ['yes', 'maybe'],
   all_invited: ['yes', 'maybe', 'no', 'waitlisted'],
-  unpaid_tickets: ['yes'],
+  unpaid_tickets: ['pending_payment', 'yes'],
   maybes: ['maybe'],
 }
 
 // Audiences that additionally narrow on payment_status.
 const PAYMENT_STATUSES_FOR_AUDIENCE: Record<string, string[] | undefined> = {
-  unpaid_tickets: ['unpaid', 'pending'],
+  unpaid_tickets: ['unpaid'],
 }
 
 Deno.serve(async (req: Request) => {

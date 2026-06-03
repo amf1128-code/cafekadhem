@@ -22,6 +22,7 @@ import { instagramUrl } from '../../../lib/utils/instagram'
 import { normalizePhone } from '../../../lib/utils/phone'
 import { useToast } from '../../ui/Toast'
 import { RSVPForm } from '../../events/RSVPForm'
+import { NewTicketedRsvp } from '../../events/NewTicketedRsvp'
 import { CinemaPageLoader } from '../primitives'
 
 type RsvpWithGuest = RSVP & { guest: PublicGuestProfile }
@@ -538,14 +539,24 @@ export function CinemaEventDetail() {
             className="ck-card"
             style={{ marginTop: 22, padding: 24, background: 'var(--ck-cream)' }}
           >
-            <RSVPForm
-              eventId={event.id}
-              event={event}
-              existingRsvp={myRsvp}
-              existingPlusOne={myPlusOne}
-              isFull={totalSeats !== null && seatsTaken >= totalSeats}
-              onRsvpComplete={() => loadEvent({ silent: true })}
-            />
+            {event.ticketing_enabled && event.use_new_rsvp_flow ? (
+              <NewTicketedRsvp
+                eventId={event.id}
+                event={event}
+                settings={settings}
+                existingRsvp={myRsvp}
+                onComplete={() => loadEvent({ silent: true })}
+              />
+            ) : (
+              <RSVPForm
+                eventId={event.id}
+                event={event}
+                existingRsvp={myRsvp}
+                existingPlusOne={myPlusOne}
+                isFull={totalSeats !== null && seatsTaken >= totalSeats}
+                onRsvpComplete={() => loadEvent({ silent: true })}
+              />
+            )}
           </div>
 
           {/* Inline pre-order nudge — anchors down to the menu grid

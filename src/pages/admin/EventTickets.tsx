@@ -13,6 +13,17 @@ import { PageLoader } from '../../components/ui/LoadingSpinner'
 
 type TicketRow = RSVP & { guest: Guest }
 
+// "Needs to pay" = the new flow's registered-but-unpaid (pending_payment),
+// or a grandfathered going-but-unpaid 'yes' row. Excludes 'pending' (the
+// guest self-attested, so they count as going) and 'paid'. Drives the
+// Remind action + count.
+function needsPayment(r: TicketRow): boolean {
+  return (
+    r.status === 'pending_payment' ||
+    (r.status === 'yes' && r.payment_status === 'unpaid')
+  )
+}
+
 type FilterTab = 'pending' | 'unpaid' | 'paid' | 'all'
 
 const paymentVariant: Record<string, 'warning' | 'info' | 'success' | 'default'> = {
@@ -36,15 +47,7 @@ export function AdminEventTickets() {
   // 'yes') without confirmed payment — matching the unpaid_tickets blast
   // audience. Maybes are nudged regardless of payment (they never began
   // paying); nudging never changes anyone's RSVP.
-  const unpaidTicketCount = useMemo(
-    () =>
-      rows.filter(
-        r =>
-          r.status === 'yes' &&
-          (r.payment_status === 'unpaid' || r.payment_status === 'pending'),
-      ).length,
-    [rows],
-  )
+  const unpaidTicketCount = useMemo(() => rows.filter(needsPayment).length, [rows])
   const maybeCount = useMemo(
     () => rows.filter(r => r.status === 'maybe').length,
     [rows],
@@ -438,7 +441,7 @@ export function AdminEventTickets() {
                         </>
                       ) : (
                         <>
-                          {row.status === 'yes' && (
+                          {needsPayment(row) && (
                             <Button
                               size="sm"
                               variant="outline"

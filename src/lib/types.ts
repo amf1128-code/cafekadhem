@@ -43,6 +43,11 @@ export interface Event {
   preorder_enabled: boolean
   ticketing_enabled: boolean
   ticket_price: number | null
+  // When true, this event uses the new payment-gated RSVP flow: a guest
+  // who hasn't paid is recorded as 'pending_payment' (not counted) until
+  // they pay or self-attest. Default false = the legacy flow. Per-event
+  // so it can be rolled out one event at a time.
+  use_new_rsvp_flow: boolean
   theme: 'theme1' | 'theme2' | 'theme3'
   // Cinema/poster landing fields. All optional; the cinema landing falls
   // back to defaults when null. Set per event from the admin form.
@@ -129,7 +134,10 @@ export interface RSVP {
   id: string
   event_id: string
   guest_id: string
-  status: 'yes' | 'maybe' | 'no' | 'waitlisted'
+  // 'pending_payment' (new flow): registered + info saved, but not paid
+  // and NOT counted as going. Becomes 'yes' once payment is attested or
+  // confirmed.
+  status: 'yes' | 'maybe' | 'no' | 'waitlisted' | 'pending_payment'
   waitlist_position: number | null
   waitlisted_at: string | null
   payment_status: 'unpaid' | 'pending' | 'paid' | 'refunded'

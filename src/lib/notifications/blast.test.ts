@@ -8,11 +8,11 @@ vi.mock('../supabase', () => ({ supabase: {} }))
 import { AUDIENCE_STATUSES, AUDIENCE_PAYMENT_STATUSES } from './blast'
 
 describe('blast audiences', () => {
-  it('unpaid_tickets = held seats (yes) without confirmed payment', () => {
-    expect(AUDIENCE_STATUSES.unpaid_tickets).toEqual(['yes'])
-    // 'pending' is included (claimed-but-unverified still gets a nudge);
-    // 'paid'/'refunded' are excluded.
-    expect(AUDIENCE_PAYMENT_STATUSES.unpaid_tickets).toEqual(['unpaid', 'pending'])
+  it('unpaid_tickets = registered-or-going but unpaid', () => {
+    expect(AUDIENCE_STATUSES.unpaid_tickets).toEqual(['pending_payment', 'yes'])
+    // Only 'unpaid'. 'pending' = self-attested (counts as going), excluded;
+    // 'paid'/'refunded' too.
+    expect(AUDIENCE_PAYMENT_STATUSES.unpaid_tickets).toEqual(['unpaid'])
   })
 
   it('maybes = only maybe RSVPs, with no payment filter', () => {
