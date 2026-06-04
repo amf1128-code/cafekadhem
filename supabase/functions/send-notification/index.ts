@@ -731,18 +731,18 @@ const messageTemplates: Record<string, (data: Record<string, string>) => { subje
     const title = data.event_title || 'Cafe Kadhem'
     const greeting = data.first_name ? `Hi ${data.first_name},` : 'Hi,'
     const amountNote = data.amount ? ` ($${data.amount})` : ''
-    const lead = `Thanks for grabbing your ticket to ${title}! We just haven't seen your payment land yet${amountNote} — mind double-checking it went through?`
+    const lead = `We're holding your spot for ${title}, but we don't have your payment confirmed yet${amountNote}. Tap below to pay and lock in your seat.`
     const target = data.pay_url || data.event_url || ''
     const link = target ? `\n\n${target}` : ''
     return {
-      subject: `Quick check on your ${title} payment`,
+      subject: `We're holding your spot for ${title}, but get your ticket!`,
       body: `${greeting} ${lead}${link}`,
       html: simpleCardHtml({
         title,
         eventType: data.event_type,
         greeting,
         body: lead,
-        buttonLabel: 'Check / pay',
+        buttonLabel: 'Pay & confirm',
         url: target,
       }),
     }

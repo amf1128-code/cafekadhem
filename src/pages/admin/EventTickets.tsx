@@ -219,9 +219,9 @@ export function AdminEventTickets() {
       const { sent, failed } = await createAndSendBlast({
         eventId: event.id,
         audience: 'payment_unconfirmed',
-        emailSubject: `Quick check on your ${event.title} payment`,
-        emailBody: `Thanks for grabbing your ticket to ${event.title}! We just haven't seen your $${amount} payment land yet — mind double-checking it went through?`,
-        smsBody: `Thanks for grabbing your ${event.title} ticket! We haven't seen your $${amount} payment yet — mind double-checking it went through?`,
+        emailSubject: `We're holding your spot for ${event.title}, but get your ticket!`,
+        emailBody: `Hi! We're holding your spot for ${event.title}, but we don't have your payment confirmed yet. Tickets are $${amount}. Open the event page below to pay and lock in your seat.`,
+        smsBody: `Reminder: we don't have payment for your $${amount} ticket to ${event.title} yet. Open the event to pay and confirm your seat:`,
       })
       addToast(`Sent — ${sent} delivered${failed > 0 ? `, ${failed} failed` : ''}`)
     } catch (err) {
