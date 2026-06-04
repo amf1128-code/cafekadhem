@@ -66,7 +66,12 @@ function Field({
 export function NewTicketedRsvp({ eventId, event, settings, existingRsvp, onComplete }: Props) {
   const { addToast } = useToast()
   const [rsvp, setRsvp] = useState<RSVP | null>(existingRsvp)
-  const [step, setStep] = useState<Step>(stepForStatus(existingRsvp?.status))
+  const [step, setStep] = useState<Step>(() => {
+    // A 'yes' row that's still unpaid (e.g. grandfathered from the old
+    // flow) should land on the pay step, not the "you're going" screen.
+    if (existingRsvp?.status === 'yes' && existingRsvp.payment_status === 'unpaid') return 'pay'
+    return stepForStatus(existingRsvp?.status)
+  })
   const [firstName, setFirstName] = useState('')
   const [lastName, setLastName] = useState('')
   const [email, setEmail] = useState('')
@@ -220,7 +225,7 @@ export function NewTicketedRsvp({ eventId, event, settings, existingRsvp, onComp
         <p className="ck-mono" style={{ marginTop: 10, opacity: 0.7 }}>
           {paid
             ? 'Payment confirmed — your ticket is on the way.'
-            : 'We have your payment — your host will confirm it shortly.'}
+            : 'Your host will verify payment and send your ticket within 48 hours.'}
         </p>
         {paid && rsvp?.ticket_token ? (
           <a href={`/ticket/${rsvp.ticket_token}`} className="ck-btn ck-btn--primary" style={{ marginTop: 18 }}>
@@ -361,7 +366,7 @@ export function NewTicketedRsvp({ eventId, event, settings, existingRsvp, onComp
           </button>
         </div>
         <p className="ck-mono" style={{ marginTop: 14, opacity: 0.6, fontSize: 11 }}>
-          Trust-based — your host verifies the Venmo and sends your ticket.
+          Your host will verify payment and send your ticket within 48 hours.
         </p>
       </div>
     )
