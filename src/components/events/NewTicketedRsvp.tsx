@@ -299,6 +299,11 @@ export function NewTicketedRsvp({ eventId, event, settings, existingRsvp, onComp
   if (step === 'pay') {
     return (
       <div style={{ textAlign: 'center', padding: '8px 0' }}>
+        {firstName.trim() && (
+          <p className="ck-italic" style={{ fontSize: 18, marginBottom: 6 }}>
+            Hi {firstName.trim()} —
+          </p>
+        )}
         <div className="ck-mono" style={{ letterSpacing: '0.16em', opacity: 0.7 }}>
           THIS EVENT COSTS
         </div>
