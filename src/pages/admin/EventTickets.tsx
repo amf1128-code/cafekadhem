@@ -24,6 +24,12 @@ function needsPayment(r: TicketRow): boolean {
   )
 }
 
+// Self-attested payment, awaiting host confirmation — the "you said you
+// paid but we don't see it yet" set.
+function isAttestedUnconfirmed(r: TicketRow): boolean {
+  return r.status === 'yes' && r.payment_status === 'pending'
+}
+
 type FilterTab = 'registered' | 'pending' | 'unpaid' | 'paid' | 'all'
 
 const paymentVariant: Record<string, 'warning' | 'info' | 'success' | 'default'> = {
@@ -41,7 +47,7 @@ export function AdminEventTickets() {
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState<string | null>(null)
   const [filter, setFilter] = useState<FilterTab>('pending')
-  const [blasting, setBlasting] = useState<null | 'remind' | 'nudge'>(null)
+  const [blasting, setBlasting] = useState<null | 'remind' | 'nudge' | 'chase'>(null)
 
   // One-click reminder/nudge audiences. "Unpaid" = a held seat (status
   // 'yes') without confirmed payment — matching the unpaid_tickets blast
@@ -52,6 +58,7 @@ export function AdminEventTickets() {
     () => rows.filter(r => r.status === 'maybe').length,
     [rows],
   )
+  const pendingCount = useMemo(() => rows.filter(isAttestedUnconfirmed).length, [rows])
 
   useEffect(() => {
     if (id) loadData()
@@ -199,6 +206,32 @@ export function AdminEventTickets() {
     }
   }
 
+  async function handleChasePending() {
+    if (!event || pendingCount === 0) return
+    if (
+      !confirm(
+        `Send a payment check to ${pendingCount} guest${pendingCount === 1 ? '' : 's'} who said they paid but haven't been confirmed? They'll be emailed/texted now.`,
+      )
+    )
+      return
+    setBlasting('chase')
+    try {
+      const amount = event.ticket_price?.toFixed(2) ?? '0.00'
+      const { sent, failed } = await createAndSendBlast({
+        eventId: event.id,
+        audience: 'payment_unconfirmed',
+        emailSubject: `Quick check on your ${event.title} payment`,
+        emailBody: `You marked your ticket for ${event.title} as paid, but we haven't matched a Venmo from you yet. Tickets are $${amount}. Mind double-checking it went through? If it didn't, open the event page below to pay.`,
+        smsBody: `Quick check: you marked your $${amount} ticket for ${event.title} as paid, but we haven't received it yet. Mind confirming it went through?`,
+      })
+      addToast(`Sent — ${sent} delivered${failed > 0 ? `, ${failed} failed` : ''}`)
+    } catch (err) {
+      addToast(err instanceof Error ? err.message : 'Failed to send', 'error')
+    } finally {
+      setBlasting(null)
+    }
+  }
+
   // Per-row sends. Single-guest, through send-notification (like
   // Re-send), so each click sends again — no dedup. The amount is passed
   // for the copy; the message links back to the event page where the
@@ -210,7 +243,7 @@ export function AdminEventTickets() {
       const res = await sendNotification({
         guestId: row.guest_id,
         eventId: id!,
-        type: 'payment_reminder',
+        type: isAttestedUnconfirmed(row) ? 'payment_unconfirmed' : 'payment_reminder',
         data: { amount },
       })
       if (res.success) addToast(`Reminder sent to ${row.guest.first_name}`)
@@ -339,6 +372,15 @@ export function AdminEventTickets() {
         <Button
           size="sm"
           variant="outline"
+          onClick={handleChasePending}
+          loading={blasting === 'chase'}
+          disabled={pendingCount === 0 || blasting !== null}
+        >
+          Chase unconfirmed ({pendingCount})
+        </Button>
+        <Button
+          size="sm"
+          variant="outline"
           onClick={handleNudgeMaybes}
           loading={blasting === 'nudge'}
           disabled={maybeCount === 0 || blasting !== null}
@@ -452,7 +494,7 @@ export function AdminEventTickets() {
                         </>
                       ) : (
                         <>
-                          {needsPayment(row) && (
+                          {(needsPayment(row) || isAttestedUnconfirmed(row)) && (
                             <Button
                               size="sm"
                               variant="outline"

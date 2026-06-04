@@ -11,6 +11,7 @@ export type BlastAudience =
   | 'all_invited'
   | 'unpaid_tickets'
   | 'maybes'
+  | 'payment_unconfirmed'
 
 // RSVP statuses each audience includes.
 export const AUDIENCE_STATUSES: Record<BlastAudience, string[]> = {
@@ -22,6 +23,9 @@ export const AUDIENCE_STATUSES: Record<BlastAudience, string[]> = {
   // below restricts to payment_status 'unpaid'.
   unpaid_tickets: ['pending_payment', 'yes'],
   maybes: ['maybe'],
+  // Self-attested payment ('yes'), still awaiting host confirmation —
+  // narrowed to payment_status 'pending' below.
+  payment_unconfirmed: ['yes'],
 }
 
 // Audiences that additionally filter on payment_status. Absent = no
@@ -31,6 +35,8 @@ export const AUDIENCE_PAYMENT_STATUSES: Partial<Record<BlastAudience, string[]>>
   // flow a 'pending' guest has self-attested payment and counts as going,
   // so a "you haven't paid" nudge would be wrong. 'paid'/'refunded' too.
   unpaid_tickets: ['unpaid'],
+  // They clicked "I've paid" but the host hasn't matched the Venmo yet.
+  payment_unconfirmed: ['pending'],
 }
 
 export interface CreateBlastInput {

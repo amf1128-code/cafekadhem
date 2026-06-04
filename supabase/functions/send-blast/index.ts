@@ -131,11 +131,13 @@ const STATUSES_FOR_AUDIENCE: Record<string, string[]> = {
   all_invited: ['yes', 'maybe', 'no', 'waitlisted'],
   unpaid_tickets: ['pending_payment', 'yes'],
   maybes: ['maybe'],
+  payment_unconfirmed: ['yes'],
 }
 
 // Audiences that additionally narrow on payment_status.
 const PAYMENT_STATUSES_FOR_AUDIENCE: Record<string, string[] | undefined> = {
   unpaid_tickets: ['unpaid'],
+  payment_unconfirmed: ['pending'],
 }
 
 Deno.serve(async (req: Request) => {
@@ -203,7 +205,7 @@ Deno.serve(async (req: Request) => {
   // Payment-reminder blasts point at the focused /pay page; other
   // audiences link to the full event page.
   const bareEventUrl =
-    blast.audience === 'unpaid_tickets'
+    blast.audience === 'unpaid_tickets' || blast.audience === 'payment_unconfirmed'
       ? `${siteUrl}/pay/${blast.event_id}`
       : `${siteUrl}/events/${blast.event_id}`
 

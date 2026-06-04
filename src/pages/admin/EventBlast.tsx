@@ -35,6 +35,7 @@ const AUDIENCE_LABELS: Record<BlastAudience, string> = {
   maybes: 'Maybes',
   all_invited: 'All invited',
   unpaid_tickets: 'Unpaid ticket holders',
+  payment_unconfirmed: 'Said they paid (unconfirmed)',
 }
 
 const STATUS_VARIANT: Record<BlastRow['status'], 'default' | 'success' | 'warning' | 'error' | 'info'> = {
@@ -134,7 +135,7 @@ export function AdminEventBlast() {
   // makes sense once an event has ticketing turned on.
   const availableAudiences = useMemo<BlastAudience[]>(() => {
     const opts: BlastAudience[] = ['yes_only', 'yes_and_maybe', 'maybes', 'all_invited']
-    if (event?.ticketing_enabled) opts.unshift('unpaid_tickets')
+    if (event?.ticketing_enabled) opts.unshift('unpaid_tickets', 'payment_unconfirmed')
     return opts
   }, [event?.ticketing_enabled])
 

@@ -728,6 +728,26 @@ const messageTemplates: Record<string, (data: Record<string, string>) => { subje
       }),
     }
   },
+  payment_unconfirmed: (data) => {
+    const title = data.event_title || 'Cafe Kadhem'
+    const greeting = data.first_name ? `Hi ${data.first_name},` : 'Hi,'
+    const amountNote = data.amount ? ` ($${data.amount})` : ''
+    const lead = `You marked your ticket for ${title} as paid, but we haven't matched a Venmo from you yet${amountNote}. Mind double-checking it went through? If it didn't, you can still pay below.`
+    const target = data.pay_url || data.event_url || ''
+    const link = target ? `\n\n${target}` : ''
+    return {
+      subject: `Quick check on your ${title} payment`,
+      body: `${greeting} ${lead}${link}`,
+      html: simpleCardHtml({
+        title,
+        eventType: data.event_type,
+        greeting,
+        body: lead,
+        buttonLabel: 'Check / pay',
+        url: target,
+      }),
+    }
+  },
 }
 
 async function sendSMS(to: string, body: string): Promise<boolean> {
@@ -872,7 +892,8 @@ Deno.serve(async (req: Request) => {
         const siteUrl = await getSiteUrl()
         data.event_url = `${siteUrl}/events/${eventId}`
         // Payment reminders point at the focused /pay page.
-        if (type === 'payment_reminder') data.pay_url = `${siteUrl}/pay/${eventId}`
+        if (type === 'payment_reminder' || type === 'payment_unconfirmed')
+          data.pay_url = `${siteUrl}/pay/${eventId}`
       }
     }
 

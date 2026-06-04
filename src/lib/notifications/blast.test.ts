@@ -20,6 +20,11 @@ describe('blast audiences', () => {
     expect(AUDIENCE_PAYMENT_STATUSES.maybes).toBeUndefined()
   })
 
+  it('payment_unconfirmed = self-attested (yes + pending)', () => {
+    expect(AUDIENCE_STATUSES.payment_unconfirmed).toEqual(['yes'])
+    expect(AUDIENCE_PAYMENT_STATUSES.payment_unconfirmed).toEqual(['pending'])
+  })
+
   it('legacy audiences are unchanged and not payment-filtered', () => {
     expect(AUDIENCE_STATUSES.yes_only).toEqual(['yes'])
     expect(AUDIENCE_STATUSES.yes_and_maybe).toEqual(['yes', 'maybe'])
