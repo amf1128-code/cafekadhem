@@ -82,3 +82,31 @@ export async function createAndSendBlast(input: CreateBlastInput): Promise<Blast
   const r = result as { sent?: number; failed?: number } | null
   return { sent: r?.sent ?? 0, failed: r?.failed ?? 0 }
 }
+
+// ---- Message templates (admin-editable copy) ---------------------------
+// Reminder / nudge copy lives in the message_templates table so the admin
+// can edit it from the dashboard. Placeholders: {name} {event} {amount}.
+
+export interface MessageVars {
+  name: string
+  event: string
+  amount: string
+}
+
+export function renderTemplate(text: string, vars: MessageVars): string {
+  return text
+    .replace(/\{name\}/g, vars.name)
+    .replace(/\{event\}/g, vars.event)
+    .replace(/\{amount\}/g, vars.amount)
+}
+
+export async function fetchMessageTemplate(
+  key: string,
+): Promise<{ subject: string; email_body: string; sms_body: string } | null> {
+  const { data } = await supabase
+    .from('message_templates')
+    .select('subject, email_body, sms_body')
+    .eq('key', key)
+    .maybeSingle()
+  return (data as { subject: string; email_body: string; sms_body: string } | null) ?? null
+}

@@ -9,6 +9,7 @@ const navItems = [
   { path: '/admin/menus', label: 'Menus' },
   { path: '/admin/pickup', label: 'Pickup' },
   { path: '/admin/guests', label: 'Guests' },
+  { path: '/admin/messages', label: 'Messages' },
   { path: '/admin/settings', label: 'Settings' },
 ]
 

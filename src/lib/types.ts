@@ -1,3 +1,11 @@
+export interface MessageTemplate {
+  key: string
+  subject: string
+  email_body: string
+  sms_body: string
+  updated_at: string
+}
+
 export interface AdminSettings {
   id: string
   venmo_handle: string

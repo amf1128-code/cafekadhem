@@ -5,7 +5,7 @@ import type { Event, RSVP, Guest } from '../../lib/types'
 import { formatDate, formatTime } from '../../lib/utils/date'
 import { formatPhone } from '../../lib/utils/phone'
 import { sendNotification } from '../../lib/notifications'
-import { createAndSendBlast } from '../../lib/notifications/blast'
+import { createAndSendBlast, fetchMessageTemplate, renderTemplate, type BlastAudience } from '../../lib/notifications/blast'
 import { Button } from '../../components/ui/Button'
 import { Badge } from '../../components/ui/Badge'
 import { useToast } from '../../components/ui/Toast'
@@ -154,6 +154,26 @@ export function AdminEventTickets() {
     }
   }
 
+  // Fetch the admin-editable template + fire it as a blast to the audience.
+  // {name} is generic ("there") for bulk sends since the body is shared.
+  async function sendTemplatedBlast(templateKey: string, audience: BlastAudience) {
+    if (!event) throw new Error('No event')
+    const t = await fetchMessageTemplate(templateKey)
+    if (!t) throw new Error('Message template not found — apply migration 059')
+    const vars = {
+      name: 'there',
+      event: event.title,
+      amount: event.ticket_price?.toFixed(2) ?? '0.00',
+    }
+    return createAndSendBlast({
+      eventId: event.id,
+      audience,
+      emailSubject: renderTemplate(t.subject, vars),
+      emailBody: renderTemplate(t.email_body, vars),
+      smsBody: renderTemplate(t.sms_body, vars),
+    })
+  }
+
   async function handleRemindUnpaid() {
     if (!event || unpaidTicketCount === 0) return
     if (
@@ -164,14 +184,7 @@ export function AdminEventTickets() {
       return
     setBlasting('remind')
     try {
-      const amount = event.ticket_price?.toFixed(2) ?? '0.00'
-      const { sent, failed } = await createAndSendBlast({
-        eventId: event.id,
-        audience: 'unpaid_tickets',
-        emailSubject: `We're holding your spot for ${event.title}, but get your ticket!`,
-        emailBody: `Hi! We're holding your spot for ${event.title}, but we don't have your payment confirmed yet. Tickets are $${amount}. Open the event page below to pay and lock in your seat.`,
-        smsBody: `Reminder: we don't have payment for your $${amount} ticket to ${event.title} yet. Open the event to pay and confirm your seat:`,
-      })
+      const { sent, failed } = await sendTemplatedBlast('payment_reminder', 'unpaid_tickets')
       addToast(`Reminder sent — ${sent} delivered${failed > 0 ? `, ${failed} failed` : ''}`)
     } catch (err) {
       addToast(err instanceof Error ? err.message : 'Failed to send reminder', 'error')
@@ -190,13 +203,7 @@ export function AdminEventTickets() {
       return
     setBlasting('nudge')
     try {
-      const { sent, failed } = await createAndSendBlast({
-        eventId: event.id,
-        audience: 'maybes',
-        emailSubject: `Still thinking about ${event.title}?`,
-        emailBody: `You marked yourself as a "maybe" for ${event.title}. Seats are limited — if you're in, open the event page below to grab your ticket before it fills up.`,
-        smsBody: `Still thinking about ${event.title}? Seats are limited — open the event to grab your ticket:`,
-      })
+      const { sent, failed } = await sendTemplatedBlast('maybe_nudge', 'maybes')
       addToast(`Nudge sent — ${sent} delivered${failed > 0 ? `, ${failed} failed` : ''}`)
     } catch (err) {
       addToast(err instanceof Error ? err.message : 'Failed to send nudge', 'error')
@@ -215,14 +222,7 @@ export function AdminEventTickets() {
       return
     setBlasting('chase')
     try {
-      const amount = event.ticket_price?.toFixed(2) ?? '0.00'
-      const { sent, failed } = await createAndSendBlast({
-        eventId: event.id,
-        audience: 'payment_unconfirmed',
-        emailSubject: `We're holding your spot for ${event.title}, but get your ticket!`,
-        emailBody: `Hi! We're holding your spot for ${event.title}, but we don't have your payment confirmed yet. Tickets are $${amount}. Open the event page below to pay and lock in your seat.`,
-        smsBody: `Reminder: we don't have payment for your $${amount} ticket to ${event.title} yet. Open the event to pay and confirm your seat:`,
-      })
+      const { sent, failed } = await sendTemplatedBlast('payment_reminder', 'payment_unconfirmed')
       addToast(`Sent — ${sent} delivered${failed > 0 ? `, ${failed} failed` : ''}`)
     } catch (err) {
       addToast(err instanceof Error ? err.message : 'Failed to send', 'error')
