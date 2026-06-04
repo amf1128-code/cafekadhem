@@ -694,7 +694,8 @@ const messageTemplates: Record<string, (data: Record<string, string>) => { subje
     const greeting = data.first_name ? `Hi ${data.first_name},` : 'Hi,'
     const amountNote = data.amount ? ` ($${data.amount})` : ''
     const lead = `We're holding your spot for ${title}, but we don't have your payment confirmed yet${amountNote}. Tap below to pay by Venmo and lock in your seat.`
-    const link = data.event_url ? `\n\n${data.event_url}` : ''
+    const target = data.pay_url || data.event_url || ''
+    const link = target ? `\n\n${target}` : ''
     return {
       subject: `Your ticket for ${title} isn't paid yet`,
       body: `${greeting} ${lead}${link}`,
@@ -704,7 +705,7 @@ const messageTemplates: Record<string, (data: Record<string, string>) => { subje
         greeting,
         body: lead,
         buttonLabel: 'Pay & confirm',
-        url: data.event_url || '',
+        url: target,
       }),
     }
   },
@@ -870,6 +871,8 @@ Deno.serve(async (req: Request) => {
           : eventRow.location
         const siteUrl = await getSiteUrl()
         data.event_url = `${siteUrl}/events/${eventId}`
+        // Payment reminders point at the focused /pay page.
+        if (type === 'payment_reminder') data.pay_url = `${siteUrl}/pay/${eventId}`
       }
     }
 
@@ -1011,7 +1014,7 @@ Deno.serve(async (req: Request) => {
       if (ambientToken) {
         const siteUrl = await getSiteUrl()
         const siteHost = new URL(siteUrl).host
-        for (const key of ['event_url', 'ticket_url', 'history_url', 'pickup_url']) {
+        for (const key of ['event_url', 'ticket_url', 'history_url', 'pickup_url', 'pay_url']) {
           if (typeof data[key] === 'string') {
             data[key] = injectAmbientToken(data[key], ambientToken, siteHost)
           }
