@@ -612,10 +612,23 @@ const messageTemplates: Record<string, (data: Record<string, string>) => { subje
 </body></html>`
     return { subject: 'Pick-Up Order Confirmed - Cafe Kadhem', body: text, html }
   },
-  event_update: (data) => ({
-    subject: `Event Update - ${data.event_title || 'Cafe Kadhem'}`,
-    body: `There's been an update to ${data.event_title || 'an event'} you RSVP'd to. Check the event page for the latest details.`,
-  }),
+  event_update: (data) => {
+    const eventTitle = data.event_title || 'an event'
+    const url = data.event_url || ''
+    const lead = `There's been an update to ${eventTitle} you RSVP'd to. Check the event page for the latest details.`
+    return {
+      subject: `Event Update - ${data.event_title || 'Cafe Kadhem'}`,
+      body: url ? `${lead}\n\n${url}` : lead,
+      html: simpleCardHtml({
+        title: data.event_title || 'Cafe Kadhem',
+        eventType: data.event_type,
+        greeting: '',
+        body: lead,
+        buttonLabel: 'View Event',
+        url,
+      }),
+    }
+  },
   event_reminder: (data) => ({
     subject: `Reminder - ${data.event_title || 'Cafe Kadhem'} Tomorrow!`,
     body: `Reminder: ${data.event_title || 'Your event'} is tomorrow! See you there.`,
