@@ -200,7 +200,12 @@ Deno.serve(async (req: Request) => {
 
   const siteUrl = await getSiteUrl()
   const siteHost = new URL(siteUrl).host
-  const bareEventUrl = `${siteUrl}/events/${blast.event_id}`
+  // Payment-reminder blasts point at the focused /pay page; other
+  // audiences link to the full event page.
+  const bareEventUrl =
+    blast.audience === 'unpaid_tickets'
+      ? `${siteUrl}/pay/${blast.event_id}`
+      : `${siteUrl}/events/${blast.event_id}`
 
   // Audience query: distinct guest_ids with required status, plus_one_of NULL,
   // contactable, with notification_preference != 'none'. Some audiences

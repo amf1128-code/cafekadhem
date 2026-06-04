@@ -29,6 +29,9 @@ const CinemaCalendar = lazy(() =>
 const CinemaEventDetail = lazy(() =>
   import('./components/cinema/pages/CinemaEventDetail').then(m => ({ default: m.CinemaEventDetail }))
 )
+const CinemaPay = lazy(() =>
+  import('./components/cinema/pages/CinemaPay').then(m => ({ default: m.CinemaPay }))
+)
 const CinemaOrder = lazy(() =>
   import('./components/cinema/pages/CinemaOrder').then(m => ({ default: m.CinemaOrder }))
 )
@@ -118,6 +121,7 @@ export const router = createBrowserRouter([
       { index: true, element: <Lazy><CinemaLanding /></Lazy> },
       { path: 'calendar', element: <Lazy><CinemaCalendar /></Lazy> },
       { path: 'events/:id', element: <Lazy><CinemaEventDetail /></Lazy> },
+      { path: 'pay/:id', element: <Lazy><CinemaPay /></Lazy> },
       { path: 'events/:id/order', element: <Lazy><CinemaOrder /></Lazy> },
       { path: 'ticket/:token', element: <Lazy><CinemaTicket /></Lazy> },
       { path: 'find-tickets', element: <Lazy><CinemaFindTickets /></Lazy> },
