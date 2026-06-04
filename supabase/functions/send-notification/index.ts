@@ -693,11 +693,11 @@ const messageTemplates: Record<string, (data: Record<string, string>) => { subje
     const title = data.event_title || 'Cafe Kadhem'
     const greeting = data.first_name ? `Hi ${data.first_name},` : 'Hi,'
     const amountNote = data.amount ? ` ($${data.amount})` : ''
-    const lead = `We're holding your spot for ${title}, but we don't have your payment confirmed yet${amountNote}. Tap below to pay by Venmo and lock in your seat.`
+    const lead = `We're holding your spot for ${title}, but we don't have your payment confirmed yet${amountNote}. Tap below to pay and lock in your seat.`
     const target = data.pay_url || data.event_url || ''
     const link = target ? `\n\n${target}` : ''
     return {
-      subject: `Your ticket for ${title} isn't paid yet`,
+      subject: `We're holding your spot for ${title}, but get your ticket!`,
       body: `${greeting} ${lead}${link}`,
       html: simpleCardHtml({
         title,
@@ -712,8 +712,7 @@ const messageTemplates: Record<string, (data: Record<string, string>) => { subje
   maybe_nudge: (data) => {
     const title = data.event_title || 'Cafe Kadhem'
     const greeting = data.first_name ? `Hi ${data.first_name},` : 'Hi,'
-    const amountNote = data.amount ? ` Tickets are $${data.amount}.` : ''
-    const lead = `You marked yourself as a maybe for ${title}.${amountNote} Seats are limited — if you're in, tap below to grab your spot before it fills up.`
+    const lead = `You marked yourself as a maybe for ${title}. Seats are limited — if you're in, tap below to grab your spot before it fills up.`
     const link = data.event_url ? `\n\n${data.event_url}` : ''
     return {
       subject: `Still thinking about ${title}?`,
@@ -732,7 +731,7 @@ const messageTemplates: Record<string, (data: Record<string, string>) => { subje
     const title = data.event_title || 'Cafe Kadhem'
     const greeting = data.first_name ? `Hi ${data.first_name},` : 'Hi,'
     const amountNote = data.amount ? ` ($${data.amount})` : ''
-    const lead = `You marked your ticket for ${title} as paid, but we haven't matched a Venmo from you yet${amountNote}. Mind double-checking it went through? If it didn't, you can still pay below.`
+    const lead = `Thanks for grabbing your ticket to ${title}! We just haven't seen your payment land yet${amountNote} — mind double-checking it went through?`
     const target = data.pay_url || data.event_url || ''
     const link = target ? `\n\n${target}` : ''
     return {

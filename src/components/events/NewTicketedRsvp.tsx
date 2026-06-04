@@ -408,9 +408,6 @@ export function NewTicketedRsvp({ eventId, event, settings, existingRsvp, onComp
           Can&apos;t go
         </button>
       </div>
-      <p className="ck-mono" style={{ opacity: 0.6, fontSize: 11 }}>
-        Maybe / Can&apos;t go just save your info — no spot held, nothing to pay.
-      </p>
       <ConsentNote verb="rsvp" />
     </form>
   )

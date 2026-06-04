@@ -168,8 +168,8 @@ export function AdminEventTickets() {
       const { sent, failed } = await createAndSendBlast({
         eventId: event.id,
         audience: 'unpaid_tickets',
-        emailSubject: `Your ticket for ${event.title} isn't paid yet`,
-        emailBody: `Hi! We're holding your spot for ${event.title}, but we don't have your payment confirmed yet. Tickets are $${amount}. Open the event page below to pay by Venmo and lock in your seat.`,
+        emailSubject: `We're holding your spot for ${event.title}, but get your ticket!`,
+        emailBody: `Hi! We're holding your spot for ${event.title}, but we don't have your payment confirmed yet. Tickets are $${amount}. Open the event page below to pay and lock in your seat.`,
         smsBody: `Reminder: we don't have payment for your $${amount} ticket to ${event.title} yet. Open the event to pay and confirm your seat:`,
       })
       addToast(`Reminder sent — ${sent} delivered${failed > 0 ? `, ${failed} failed` : ''}`)
@@ -190,13 +190,12 @@ export function AdminEventTickets() {
       return
     setBlasting('nudge')
     try {
-      const amount = event.ticket_price?.toFixed(2) ?? '0.00'
       const { sent, failed } = await createAndSendBlast({
         eventId: event.id,
         audience: 'maybes',
         emailSubject: `Still thinking about ${event.title}?`,
-        emailBody: `You marked yourself as a "maybe" for ${event.title}. Seats are limited and tickets are $${amount} — if you're in, open the event page below to grab your ticket before it fills up.`,
-        smsBody: `Still thinking about ${event.title}? Seats are limited — open the event to grab your $${amount} ticket:`,
+        emailBody: `You marked yourself as a "maybe" for ${event.title}. Seats are limited — if you're in, open the event page below to grab your ticket before it fills up.`,
+        smsBody: `Still thinking about ${event.title}? Seats are limited — open the event to grab your ticket:`,
       })
       addToast(`Nudge sent — ${sent} delivered${failed > 0 ? `, ${failed} failed` : ''}`)
     } catch (err) {
@@ -221,8 +220,8 @@ export function AdminEventTickets() {
         eventId: event.id,
         audience: 'payment_unconfirmed',
         emailSubject: `Quick check on your ${event.title} payment`,
-        emailBody: `You marked your ticket for ${event.title} as paid, but we haven't matched a Venmo from you yet. Tickets are $${amount}. Mind double-checking it went through? If it didn't, open the event page below to pay.`,
-        smsBody: `Quick check: you marked your $${amount} ticket for ${event.title} as paid, but we haven't received it yet. Mind confirming it went through?`,
+        emailBody: `Thanks for grabbing your ticket to ${event.title}! We just haven't seen your $${amount} payment land yet — mind double-checking it went through?`,
+        smsBody: `Thanks for grabbing your ${event.title} ticket! We haven't seen your $${amount} payment yet — mind double-checking it went through?`,
       })
       addToast(`Sent — ${sent} delivered${failed > 0 ? `, ${failed} failed` : ''}`)
     } catch (err) {
