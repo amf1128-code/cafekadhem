@@ -30,6 +30,19 @@ function isAttestedUnconfirmed(r: TicketRow): boolean {
   return r.status === 'yes' && r.payment_status === 'pending'
 }
 
+// Notification types that count as "we messaged this guest" — the per-row
+// reminders/nudges plus any bulk blast. Drives the Last nudged column.
+const NUDGE_TYPES = ['payment_reminder', 'payment_unconfirmed', 'maybe_nudge', 'notification_blast']
+
+function relativeTime(iso: string): string {
+  const mins = Math.floor((Date.now() - new Date(iso).getTime()) / 60000)
+  if (mins < 1) return 'just now'
+  if (mins < 60) return `${mins}m ago`
+  const hrs = Math.floor(mins / 60)
+  if (hrs < 24) return `${hrs}h ago`
+  return `${Math.floor(hrs / 24)}d ago`
+}
+
 type FilterTab = 'registered' | 'pending' | 'unpaid' | 'paid' | 'all'
 
 const paymentVariant: Record<string, 'warning' | 'info' | 'success' | 'default'> = {
@@ -44,6 +57,7 @@ export function AdminEventTickets() {
   const { addToast } = useToast()
   const [event, setEvent] = useState<Event | null>(null)
   const [rows, setRows] = useState<TicketRow[]>([])
+  const [lastNudged, setLastNudged] = useState<Record<string, string>>({})
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState<string | null>(null)
   const [filter, setFilter] = useState<FilterTab>('pending')
@@ -71,7 +85,7 @@ export function AdminEventTickets() {
     // RSVP status. A guest who paid then declined still shows up so
     // the host can refund or comp the stub. Plus-ones excluded —
     // they never pay separately. USER_FLOWS_SPEC.md §4.3.
-    const [eventResult, rsvpResult] = await Promise.all([
+    const [eventResult, rsvpResult, logResult] = await Promise.all([
       supabase.from('events').select('*').eq('id', id!).single(),
       supabase
         .from('rsvps')
@@ -79,10 +93,26 @@ export function AdminEventTickets() {
         .eq('event_id', id!)
         .is('plus_one_of', null)
         .order('created_at', { ascending: true }),
+      supabase
+        .from('notifications_log')
+        .select('guest_id, sent_at')
+        .eq('event_id', id!)
+        .eq('status', 'sent')
+        .in('type', NUDGE_TYPES)
+        .order('sent_at', { ascending: false }),
     ])
 
     if (eventResult.data) setEvent(eventResult.data)
     if (rsvpResult.data) setRows(rsvpResult.data as TicketRow[])
+
+    // Latest "we messaged this guest" timestamp per guest, for the
+    // Last nudged column (so you don't accidentally re-hit someone).
+    const nudgeMap: Record<string, string> = {}
+    for (const r of (logResult.data ?? []) as Array<{ guest_id: string | null; sent_at: string | null }>) {
+      if (r.guest_id && r.sent_at && !nudgeMap[r.guest_id]) nudgeMap[r.guest_id] = r.sent_at
+    }
+    setLastNudged(nudgeMap)
+
     setLoading(false)
   }
 
@@ -186,6 +216,7 @@ export function AdminEventTickets() {
     try {
       const { sent, failed } = await sendTemplatedBlast('payment_reminder', 'unpaid_tickets')
       addToast(`Reminder sent — ${sent} delivered${failed > 0 ? `, ${failed} failed` : ''}`)
+      await loadData()
     } catch (err) {
       addToast(err instanceof Error ? err.message : 'Failed to send reminder', 'error')
     } finally {
@@ -205,6 +236,7 @@ export function AdminEventTickets() {
     try {
       const { sent, failed } = await sendTemplatedBlast('maybe_nudge', 'maybes')
       addToast(`Nudge sent — ${sent} delivered${failed > 0 ? `, ${failed} failed` : ''}`)
+      await loadData()
     } catch (err) {
       addToast(err instanceof Error ? err.message : 'Failed to send nudge', 'error')
     } finally {
@@ -224,6 +256,7 @@ export function AdminEventTickets() {
     try {
       const { sent, failed } = await sendTemplatedBlast('payment_reminder', 'payment_unconfirmed')
       addToast(`Sent — ${sent} delivered${failed > 0 ? `, ${failed} failed` : ''}`)
+      await loadData()
     } catch (err) {
       addToast(err instanceof Error ? err.message : 'Failed to send', 'error')
     } finally {
@@ -245,8 +278,12 @@ export function AdminEventTickets() {
         type: isAttestedUnconfirmed(row) ? 'payment_unconfirmed' : 'payment_reminder',
         data: { amount },
       })
-      if (res.success) addToast(`Reminder sent to ${row.guest.first_name}`)
-      else addToast(res.error || 'Failed to send reminder', 'error')
+      if (res.success) {
+        addToast(`Reminder sent to ${row.guest.first_name}`)
+        await loadData()
+      } else {
+        addToast(res.error || 'Failed to send reminder', 'error')
+      }
     } finally {
       setBusy(null)
     }
@@ -262,8 +299,12 @@ export function AdminEventTickets() {
         type: 'maybe_nudge',
         data: { amount },
       })
-      if (res.success) addToast(`Nudge sent to ${row.guest.first_name}`)
-      else addToast(res.error || 'Failed to send nudge', 'error')
+      if (res.success) {
+        addToast(`Nudge sent to ${row.guest.first_name}`)
+        await loadData()
+      } else {
+        addToast(res.error || 'Failed to send nudge', 'error')
+      }
     } finally {
       setBusy(null)
     }
@@ -428,6 +469,7 @@ export function AdminEventTickets() {
                 <th className="text-left px-4 py-2 font-medium text-ink/70">RSVP</th>
                 <th className="text-left px-4 py-2 font-medium text-ink/70">Payment</th>
                 <th className="text-left px-4 py-2 font-medium text-ink/70">Checked In</th>
+                <th className="text-left px-4 py-2 font-medium text-ink/70">Last nudged</th>
                 <th className="text-right px-4 py-2 font-medium text-ink/70">Actions</th>
               </tr>
             </thead>
@@ -466,6 +508,21 @@ export function AdminEventTickets() {
                   <td className="px-4 py-3 text-ink/70">
                     {row.checked_in_at ? (
                       <Badge variant="info">In</Badge>
+                    ) : (
+                      <span className="text-ink/40">—</span>
+                    )}
+                  </td>
+                  <td className="px-4 py-3 whitespace-nowrap text-ink/60">
+                    {lastNudged[row.guest_id] ? (
+                      <span
+                        style={
+                          Date.now() - new Date(lastNudged[row.guest_id]).getTime() < 86_400_000
+                            ? { color: '#b45309', fontWeight: 600 }
+                            : undefined
+                        }
+                      >
+                        {relativeTime(lastNudged[row.guest_id])}
+                      </span>
                     ) : (
                       <span className="text-ink/40">—</span>
                     )}
