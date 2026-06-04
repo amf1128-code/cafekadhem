@@ -24,7 +24,7 @@ function needsPayment(r: TicketRow): boolean {
   )
 }
 
-type FilterTab = 'pending' | 'unpaid' | 'paid' | 'all'
+type FilterTab = 'registered' | 'pending' | 'unpaid' | 'paid' | 'all'
 
 const paymentVariant: Record<string, 'warning' | 'info' | 'success' | 'default'> = {
   unpaid: 'default',
@@ -266,12 +266,19 @@ export function AdminEventTickets() {
 
   const filtered = useMemo(() => {
     if (filter === 'all') return rows
+    // New-flow signups who haven't paid (saved, not counted).
+    if (filter === 'registered') return rows.filter(r => r.status === 'pending_payment')
+    // 'unpaid' excludes those registrations (they have their own tab) —
+    // i.e. grandfathered going-but-unpaid rows only.
+    if (filter === 'unpaid')
+      return rows.filter(r => r.payment_status === 'unpaid' && r.status !== 'pending_payment')
     return rows.filter(r => r.payment_status === filter)
   }, [rows, filter])
 
   const counts = useMemo(() => {
     return {
-      unpaid: rows.filter(r => r.payment_status === 'unpaid').length,
+      registered: rows.filter(r => r.status === 'pending_payment').length,
+      unpaid: rows.filter(r => r.payment_status === 'unpaid' && r.status !== 'pending_payment').length,
       pending: rows.filter(r => r.payment_status === 'pending').length,
       paid: rows.filter(r => r.payment_status === 'paid').length,
       all: rows.length,
@@ -347,7 +354,11 @@ export function AdminEventTickets() {
 
       {/* Filter tabs */}
       <div className="flex gap-2 mb-4 flex-wrap">
-        {(['pending', 'unpaid', 'paid', 'all'] as FilterTab[]).map(tab => (
+        {(
+          event.use_new_rsvp_flow || counts.registered > 0
+            ? (['registered', 'pending', 'unpaid', 'paid', 'all'] as FilterTab[])
+            : (['pending', 'unpaid', 'paid', 'all'] as FilterTab[])
+        ).map(tab => (
           <button
             key={tab}
             onClick={() => setFilter(tab)}
@@ -398,7 +409,7 @@ export function AdminEventTickets() {
                         : 'default'
                       }
                     >
-                      {row.status}
+                      {row.status === 'pending_payment' ? 'registered' : row.status}
                     </Badge>
                   </td>
                   <td className="px-4 py-3">
