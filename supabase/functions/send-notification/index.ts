@@ -675,7 +675,7 @@ const messageTemplates: Record<string, (data: Record<string, string>) => { subje
     const eventTitle = data.event_title || 'Cafe Kadhem'
     const ticketUrl = data.ticket_url || ''
     const qrImageUrl = data.qr_image_url || ''
-    const text = `You're confirmed for ${eventTitle}.\n\nView your ticket and QR code here:\n${ticketUrl}\n\nShow the QR (in this email or on the page above) at the door for entry.`
+    const text = `You're confirmed for ${eventTitle}.\n\nYour ticket and QR code are here:\n${ticketUrl}\n\nOpen the link and show the QR at the door for entry.`
     const html = `<!doctype html>
 <html><body style="margin:0;padding:0;background:#fdfaf3;font-family:Georgia,'Times New Roman',serif;color:#1a2e1f;">
   <table width="100%" cellpadding="0" cellspacing="0" style="background:#fdfaf3;padding:32px 16px;">
