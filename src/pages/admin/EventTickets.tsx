@@ -5,7 +5,7 @@ import type { Event, RSVP, Guest } from '../../lib/types'
 import { formatDate, formatTime } from '../../lib/utils/date'
 import { formatPhone } from '../../lib/utils/phone'
 import { sendNotification } from '../../lib/notifications'
-import { createAndSendBlast } from '../../lib/notifications/blast'
+import { createAndSendBlast, fetchMessageTemplate, renderTemplate, type BlastAudience } from '../../lib/notifications/blast'
 import { Button } from '../../components/ui/Button'
 import { Badge } from '../../components/ui/Badge'
 import { useToast } from '../../components/ui/Toast'
@@ -24,6 +24,45 @@ function needsPayment(r: TicketRow): boolean {
   )
 }
 
+// Self-attested payment, awaiting host confirmation — the "you said you
+// paid but we don't see it yet" set.
+function isAttestedUnconfirmed(r: TicketRow): boolean {
+  return r.status === 'yes' && r.payment_status === 'pending'
+}
+
+// Notification types that count as "we messaged this guest" — the per-row
+// reminders/nudges plus any bulk blast. Drives the Last nudged column.
+const NUDGE_TYPES = ['payment_reminder', 'payment_unconfirmed', 'maybe_nudge', 'notification_blast']
+
+function relativeTime(iso: string): string {
+  const mins = Math.floor((Date.now() - new Date(iso).getTime()) / 60000)
+  if (mins < 1) return 'just now'
+  if (mins < 60) return `${mins}m ago`
+  const hrs = Math.floor(mins / 60)
+  if (hrs < 24) return `${hrs}h ago`
+  return `${Math.floor(hrs / 24)}d ago`
+}
+
+// Safety fallback if message_templates isn't seeded yet (e.g. migration
+// 059 not applied). The DB rows are the source of truth; this just keeps
+// the bulk buttons working during the deploy window.
+const DEFAULT_TEMPLATES: Record<string, { subject: string; email_body: string; sms_body: string }> = {
+  payment_reminder: {
+    subject: "We're holding your spot for {event}, but get your ticket!",
+    email_body:
+      "Hi {name}! We're holding your spot for {event}, but we don't have your payment confirmed yet. Tickets are ${amount}. Tap below to pay and lock in your seat.",
+    sms_body:
+      "We're holding your spot for {event}, but we don't have your ${amount} payment yet. Tap below to pay and lock in your seat:",
+  },
+  maybe_nudge: {
+    subject: 'Still thinking about {event}?',
+    email_body:
+      "Hi {name}! You marked yourself as a maybe for {event}. Seats are limited — if you're in, tap below to grab your spot before it fills up.",
+    sms_body:
+      'Still thinking about {event}? Seats are limited — tap below to grab your spot before it fills up:',
+  },
+}
+
 type FilterTab = 'registered' | 'pending' | 'unpaid' | 'paid' | 'all'
 
 const paymentVariant: Record<string, 'warning' | 'info' | 'success' | 'default'> = {
@@ -38,10 +77,11 @@ export function AdminEventTickets() {
   const { addToast } = useToast()
   const [event, setEvent] = useState<Event | null>(null)
   const [rows, setRows] = useState<TicketRow[]>([])
+  const [lastNudged, setLastNudged] = useState<Record<string, string>>({})
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState<string | null>(null)
   const [filter, setFilter] = useState<FilterTab>('pending')
-  const [blasting, setBlasting] = useState<null | 'remind' | 'nudge'>(null)
+  const [blasting, setBlasting] = useState<null | 'remind' | 'nudge' | 'chase'>(null)
 
   // One-click reminder/nudge audiences. "Unpaid" = a held seat (status
   // 'yes') without confirmed payment — matching the unpaid_tickets blast
@@ -52,6 +92,7 @@ export function AdminEventTickets() {
     () => rows.filter(r => r.status === 'maybe').length,
     [rows],
   )
+  const pendingCount = useMemo(() => rows.filter(isAttestedUnconfirmed).length, [rows])
 
   useEffect(() => {
     if (id) loadData()
@@ -64,7 +105,7 @@ export function AdminEventTickets() {
     // RSVP status. A guest who paid then declined still shows up so
     // the host can refund or comp the stub. Plus-ones excluded —
     // they never pay separately. USER_FLOWS_SPEC.md §4.3.
-    const [eventResult, rsvpResult] = await Promise.all([
+    const [eventResult, rsvpResult, logResult] = await Promise.all([
       supabase.from('events').select('*').eq('id', id!).single(),
       supabase
         .from('rsvps')
@@ -72,10 +113,26 @@ export function AdminEventTickets() {
         .eq('event_id', id!)
         .is('plus_one_of', null)
         .order('created_at', { ascending: true }),
+      supabase
+        .from('notifications_log')
+        .select('guest_id, sent_at')
+        .eq('event_id', id!)
+        .eq('status', 'sent')
+        .in('type', NUDGE_TYPES)
+        .order('sent_at', { ascending: false }),
     ])
 
     if (eventResult.data) setEvent(eventResult.data)
     if (rsvpResult.data) setRows(rsvpResult.data as TicketRow[])
+
+    // Latest "we messaged this guest" timestamp per guest, for the
+    // Last nudged column (so you don't accidentally re-hit someone).
+    const nudgeMap: Record<string, string> = {}
+    for (const r of (logResult.data ?? []) as Array<{ guest_id: string | null; sent_at: string | null }>) {
+      if (r.guest_id && r.sent_at && !nudgeMap[r.guest_id]) nudgeMap[r.guest_id] = r.sent_at
+    }
+    setLastNudged(nudgeMap)
+
     setLoading(false)
   }
 
@@ -147,6 +204,26 @@ export function AdminEventTickets() {
     }
   }
 
+  // Fetch the admin-editable template + fire it as a blast to the audience.
+  // {name} is generic ("there") for bulk sends since the body is shared.
+  async function sendTemplatedBlast(templateKey: string, audience: BlastAudience) {
+    if (!event) throw new Error('No event')
+    const t = (await fetchMessageTemplate(templateKey)) ?? DEFAULT_TEMPLATES[templateKey]
+    if (!t) throw new Error('Message template not found')
+    const vars = {
+      name: 'there',
+      event: event.title,
+      amount: event.ticket_price?.toFixed(2) ?? '0.00',
+    }
+    return createAndSendBlast({
+      eventId: event.id,
+      audience,
+      emailSubject: renderTemplate(t.subject, vars),
+      emailBody: renderTemplate(t.email_body, vars),
+      smsBody: renderTemplate(t.sms_body, vars),
+    })
+  }
+
   async function handleRemindUnpaid() {
     if (!event || unpaidTicketCount === 0) return
     if (
@@ -157,15 +234,9 @@ export function AdminEventTickets() {
       return
     setBlasting('remind')
     try {
-      const amount = event.ticket_price?.toFixed(2) ?? '0.00'
-      const { sent, failed } = await createAndSendBlast({
-        eventId: event.id,
-        audience: 'unpaid_tickets',
-        emailSubject: `Your ticket for ${event.title} isn't paid yet`,
-        emailBody: `Hi! We're holding your spot for ${event.title}, but we don't have your payment confirmed yet. Tickets are $${amount}. Open the event page below to pay by Venmo and lock in your seat.`,
-        smsBody: `Reminder: we don't have payment for your $${amount} ticket to ${event.title} yet. Open the event to pay and confirm your seat:`,
-      })
+      const { sent, failed } = await sendTemplatedBlast('payment_reminder', 'unpaid_tickets')
       addToast(`Reminder sent — ${sent} delivered${failed > 0 ? `, ${failed} failed` : ''}`)
+      await loadData()
     } catch (err) {
       addToast(err instanceof Error ? err.message : 'Failed to send reminder', 'error')
     } finally {
@@ -183,17 +254,31 @@ export function AdminEventTickets() {
       return
     setBlasting('nudge')
     try {
-      const amount = event.ticket_price?.toFixed(2) ?? '0.00'
-      const { sent, failed } = await createAndSendBlast({
-        eventId: event.id,
-        audience: 'maybes',
-        emailSubject: `Still thinking about ${event.title}?`,
-        emailBody: `You marked yourself as a "maybe" for ${event.title}. Seats are limited and tickets are $${amount} — if you're in, open the event page below to grab your ticket before it fills up.`,
-        smsBody: `Still thinking about ${event.title}? Seats are limited — open the event to grab your $${amount} ticket:`,
-      })
+      const { sent, failed } = await sendTemplatedBlast('maybe_nudge', 'maybes')
       addToast(`Nudge sent — ${sent} delivered${failed > 0 ? `, ${failed} failed` : ''}`)
+      await loadData()
     } catch (err) {
       addToast(err instanceof Error ? err.message : 'Failed to send nudge', 'error')
+    } finally {
+      setBlasting(null)
+    }
+  }
+
+  async function handleChasePending() {
+    if (!event || pendingCount === 0) return
+    if (
+      !confirm(
+        `Send a payment check to ${pendingCount} guest${pendingCount === 1 ? '' : 's'} who said they paid but haven't been confirmed? They'll be emailed/texted now.`,
+      )
+    )
+      return
+    setBlasting('chase')
+    try {
+      const { sent, failed } = await sendTemplatedBlast('payment_reminder', 'payment_unconfirmed')
+      addToast(`Sent — ${sent} delivered${failed > 0 ? `, ${failed} failed` : ''}`)
+      await loadData()
+    } catch (err) {
+      addToast(err instanceof Error ? err.message : 'Failed to send', 'error')
     } finally {
       setBlasting(null)
     }
@@ -210,11 +295,15 @@ export function AdminEventTickets() {
       const res = await sendNotification({
         guestId: row.guest_id,
         eventId: id!,
-        type: 'payment_reminder',
+        type: isAttestedUnconfirmed(row) ? 'payment_unconfirmed' : 'payment_reminder',
         data: { amount },
       })
-      if (res.success) addToast(`Reminder sent to ${row.guest.first_name}`)
-      else addToast(res.error || 'Failed to send reminder', 'error')
+      if (res.success) {
+        addToast(`Reminder sent to ${row.guest.first_name}`)
+        await loadData()
+      } else {
+        addToast(res.error || 'Failed to send reminder', 'error')
+      }
     } finally {
       setBusy(null)
     }
@@ -230,8 +319,12 @@ export function AdminEventTickets() {
         type: 'maybe_nudge',
         data: { amount },
       })
-      if (res.success) addToast(`Nudge sent to ${row.guest.first_name}`)
-      else addToast(res.error || 'Failed to send nudge', 'error')
+      if (res.success) {
+        addToast(`Nudge sent to ${row.guest.first_name}`)
+        await loadData()
+      } else {
+        addToast(res.error || 'Failed to send nudge', 'error')
+      }
     } finally {
       setBusy(null)
     }
@@ -339,6 +432,15 @@ export function AdminEventTickets() {
         <Button
           size="sm"
           variant="outline"
+          onClick={handleChasePending}
+          loading={blasting === 'chase'}
+          disabled={pendingCount === 0 || blasting !== null}
+        >
+          Chase unconfirmed ({pendingCount})
+        </Button>
+        <Button
+          size="sm"
+          variant="outline"
           onClick={handleNudgeMaybes}
           loading={blasting === 'nudge'}
           disabled={maybeCount === 0 || blasting !== null}
@@ -387,6 +489,7 @@ export function AdminEventTickets() {
                 <th className="text-left px-4 py-2 font-medium text-ink/70">RSVP</th>
                 <th className="text-left px-4 py-2 font-medium text-ink/70">Payment</th>
                 <th className="text-left px-4 py-2 font-medium text-ink/70">Checked In</th>
+                <th className="text-left px-4 py-2 font-medium text-ink/70">Last nudged</th>
                 <th className="text-right px-4 py-2 font-medium text-ink/70">Actions</th>
               </tr>
             </thead>
@@ -429,6 +532,21 @@ export function AdminEventTickets() {
                       <span className="text-ink/40">—</span>
                     )}
                   </td>
+                  <td className="px-4 py-3 whitespace-nowrap text-ink/60">
+                    {lastNudged[row.guest_id] ? (
+                      <span
+                        style={
+                          Date.now() - new Date(lastNudged[row.guest_id]).getTime() < 86_400_000
+                            ? { color: '#b45309', fontWeight: 600 }
+                            : undefined
+                        }
+                      >
+                        {relativeTime(lastNudged[row.guest_id])}
+                      </span>
+                    ) : (
+                      <span className="text-ink/40">—</span>
+                    )}
+                  </td>
                   <td className="px-4 py-3 text-right whitespace-nowrap">
                     <div className="flex gap-2 justify-end flex-wrap">
                       {row.payment_status === 'paid' ? (
@@ -452,7 +570,7 @@ export function AdminEventTickets() {
                         </>
                       ) : (
                         <>
-                          {needsPayment(row) && (
+                          {(needsPayment(row) || isAttestedUnconfirmed(row)) && (
                             <Button
                               size="sm"
                               variant="outline"

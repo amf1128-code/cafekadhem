@@ -12,6 +12,7 @@ export interface NotificationPayload {
     | 'ticket_issued'
     | 'payment_reminder'
     | 'maybe_nudge'
+    | 'payment_unconfirmed'
   data?: Record<string, string>
 }
 

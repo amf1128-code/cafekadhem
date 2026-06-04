@@ -108,6 +108,9 @@ const AdminEventBulkInvite = lazy(() =>
 const AdminEventBlast = lazy(() =>
   import('./pages/admin/EventBlast').then(m => ({ default: m.AdminEventBlast }))
 )
+const AdminMessageTemplates = lazy(() =>
+  import('./pages/admin/MessageTemplates').then(m => ({ default: m.AdminMessageTemplates }))
+)
 
 export const router = createBrowserRouter([
   // Public site. CinemaShell provides the top strip, nav, marquee, and
@@ -164,6 +167,7 @@ export const router = createBrowserRouter([
       { path: 'pickup', element: <AdminPickupConfig /> },
       { path: 'pickup/orders', element: <AdminPickupOrders /> },
       { path: 'settings', element: <AdminSettings /> },
+      { path: 'messages', element: <AdminMessageTemplates /> },
     ],
   },
 ])

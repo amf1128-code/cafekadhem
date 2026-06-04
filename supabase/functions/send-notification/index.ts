@@ -277,7 +277,7 @@ function simpleCardHtml(opts: {
           ${opts.eventType ? `<p style="margin:6px 0 0;font-size:12px;letter-spacing:0.18em;text-transform:uppercase;color:#6b6452;">${escapeHtml(opts.eventType)}</p>` : ''}
         </td></tr>
         <tr><td align="center" style="padding:16px 0 8px;">
-          <p style="margin:0;font-size:15px;line-height:1.5;color:#3a3a3a;">${escapeHtml(opts.greeting)}</p>
+          ${opts.greeting ? `<p style="margin:0;font-size:15px;line-height:1.5;color:#3a3a3a;">${escapeHtml(opts.greeting)}</p>` : ''}
           <p style="margin:8px 0 0;font-size:15px;line-height:1.5;color:#3a3a3a;">${bodyHtml}</p>
         </td></tr>
         ${opts.url ? `<tr><td align="center" style="padding:24px 0 8px;">
@@ -287,6 +287,23 @@ function simpleCardHtml(opts: {
     </td></tr>
   </table>
 </body></html>`
+}
+
+// Replace {name} / {event} / {amount} placeholders in admin-editable copy.
+function renderTemplate(text: string, vars: { name: string; event: string; amount: string }): string {
+  return text
+    .replace(/\{name\}/g, vars.name)
+    .replace(/\{event\}/g, vars.event)
+    .replace(/\{amount\}/g, vars.amount)
+}
+
+// Notification types whose copy is admin-editable (message_templates table).
+// payment_unconfirmed shares the payment_reminder template. Falls back to
+// the hardcoded entry below if the row (or table) is missing.
+const DB_TEMPLATE_KEY: Record<string, string> = {
+  payment_reminder: 'payment_reminder',
+  payment_unconfirmed: 'payment_reminder',
+  maybe_nudge: 'maybe_nudge',
 }
 
 const messageTemplates: Record<string, (data: Record<string, string>) => { subject: string; body: string; html?: string }> = {
@@ -595,10 +612,23 @@ const messageTemplates: Record<string, (data: Record<string, string>) => { subje
 </body></html>`
     return { subject: 'Pick-Up Order Confirmed - Cafe Kadhem', body: text, html }
   },
-  event_update: (data) => ({
-    subject: `Event Update - ${data.event_title || 'Cafe Kadhem'}`,
-    body: `There's been an update to ${data.event_title || 'an event'} you RSVP'd to. Check the event page for the latest details.`,
-  }),
+  event_update: (data) => {
+    const eventTitle = data.event_title || 'an event'
+    const url = data.event_url || ''
+    const lead = `There's been an update to ${eventTitle} you RSVP'd to. Check the event page for the latest details.`
+    return {
+      subject: `Event Update - ${data.event_title || 'Cafe Kadhem'}`,
+      body: url ? `${lead}\n\n${url}` : lead,
+      html: simpleCardHtml({
+        title: data.event_title || 'Cafe Kadhem',
+        eventType: data.event_type,
+        greeting: '',
+        body: lead,
+        buttonLabel: 'View Event',
+        url,
+      }),
+    }
+  },
   event_reminder: (data) => ({
     subject: `Reminder - ${data.event_title || 'Cafe Kadhem'} Tomorrow!`,
     body: `Reminder: ${data.event_title || 'Your event'} is tomorrow! See you there.`,
@@ -658,7 +688,7 @@ const messageTemplates: Record<string, (data: Record<string, string>) => { subje
     const eventTitle = data.event_title || 'Cafe Kadhem'
     const ticketUrl = data.ticket_url || ''
     const qrImageUrl = data.qr_image_url || ''
-    const text = `You're confirmed for ${eventTitle}.\n\nView your ticket and QR code here:\n${ticketUrl}\n\nShow the QR (in this email or on the page above) at the door for entry.`
+    const text = `You're confirmed for ${eventTitle}.\n\nYour ticket and QR code are here:\n${ticketUrl}\n\nOpen the link and show the QR at the door for entry.`
     const html = `<!doctype html>
 <html><body style="margin:0;padding:0;background:#fdfaf3;font-family:Georgia,'Times New Roman',serif;color:#1a2e1f;">
   <table width="100%" cellpadding="0" cellspacing="0" style="background:#fdfaf3;padding:32px 16px;">
@@ -693,11 +723,11 @@ const messageTemplates: Record<string, (data: Record<string, string>) => { subje
     const title = data.event_title || 'Cafe Kadhem'
     const greeting = data.first_name ? `Hi ${data.first_name},` : 'Hi,'
     const amountNote = data.amount ? ` ($${data.amount})` : ''
-    const lead = `We're holding your spot for ${title}, but we don't have your payment confirmed yet${amountNote}. Tap below to pay by Venmo and lock in your seat.`
+    const lead = `We're holding your spot for ${title}, but we don't have your payment confirmed yet${amountNote}. Tap below to pay and lock in your seat.`
     const target = data.pay_url || data.event_url || ''
     const link = target ? `\n\n${target}` : ''
     return {
-      subject: `Your ticket for ${title} isn't paid yet`,
+      subject: `We're holding your spot for ${title}, but get your ticket!`,
       body: `${greeting} ${lead}${link}`,
       html: simpleCardHtml({
         title,
@@ -712,8 +742,7 @@ const messageTemplates: Record<string, (data: Record<string, string>) => { subje
   maybe_nudge: (data) => {
     const title = data.event_title || 'Cafe Kadhem'
     const greeting = data.first_name ? `Hi ${data.first_name},` : 'Hi,'
-    const amountNote = data.amount ? ` Tickets are $${data.amount}.` : ''
-    const lead = `You marked yourself as a maybe for ${title}.${amountNote} Seats are limited — if you're in, tap below to grab your spot before it fills up.`
+    const lead = `You marked yourself as a maybe for ${title}. Seats are limited — if you're in, tap below to grab your spot before it fills up.`
     const link = data.event_url ? `\n\n${data.event_url}` : ''
     return {
       subject: `Still thinking about ${title}?`,
@@ -725,6 +754,26 @@ const messageTemplates: Record<string, (data: Record<string, string>) => { subje
         body: lead,
         buttonLabel: 'Grab your spot',
         url: data.event_url || '',
+      }),
+    }
+  },
+  payment_unconfirmed: (data) => {
+    const title = data.event_title || 'Cafe Kadhem'
+    const greeting = data.first_name ? `Hi ${data.first_name},` : 'Hi,'
+    const amountNote = data.amount ? ` ($${data.amount})` : ''
+    const lead = `We're holding your spot for ${title}, but we don't have your payment confirmed yet${amountNote}. Tap below to pay and lock in your seat.`
+    const target = data.pay_url || data.event_url || ''
+    const link = target ? `\n\n${target}` : ''
+    return {
+      subject: `We're holding your spot for ${title}, but get your ticket!`,
+      body: `${greeting} ${lead}${link}`,
+      html: simpleCardHtml({
+        title,
+        eventType: data.event_type,
+        greeting,
+        body: lead,
+        buttonLabel: 'Pay & confirm',
+        url: target,
       }),
     }
   },
@@ -872,7 +921,8 @@ Deno.serve(async (req: Request) => {
         const siteUrl = await getSiteUrl()
         data.event_url = `${siteUrl}/events/${eventId}`
         // Payment reminders point at the focused /pay page.
-        if (type === 'payment_reminder') data.pay_url = `${siteUrl}/pay/${eventId}`
+        if (type === 'payment_reminder' || type === 'payment_unconfirmed')
+          data.pay_url = `${siteUrl}/pay/${eventId}`
       }
     }
 
@@ -1026,15 +1076,53 @@ Deno.serve(async (req: Request) => {
       console.error('mint_ambient_token failed:', err)
     }
 
-    const template = messageTemplates[type]
-    if (!template) {
-      return new Response(JSON.stringify({ success: false, error: 'Unknown notification type' }), {
-        status: 400,
-        headers: jsonHeaders,
-      })
+    let subject: string
+    let body: string
+    let html: string | undefined
+
+    // Admin-editable types pull copy from message_templates; everything
+    // else uses the hardcoded templates. Missing row/table => fall back.
+    const dbKey = DB_TEMPLATE_KEY[type]
+    let dbTmpl: { subject: string; email_body: string; sms_body: string } | null = null
+    if (dbKey) {
+      const { data: tmplRow, error: tmplErr } = await supabase
+        .from('message_templates')
+        .select('subject, email_body, sms_body')
+        .eq('key', dbKey)
+        .maybeSingle()
+      if (!tmplErr && tmplRow) {
+        dbTmpl = tmplRow as { subject: string; email_body: string; sms_body: string }
+      }
     }
 
-    const { subject, body, html } = template(data)
+    if (dbTmpl) {
+      const vars = {
+        name: data.first_name || 'there',
+        event: data.event_title || 'Cafe Kadhem',
+        amount: data.amount || '',
+      }
+      const target = data.pay_url || data.event_url || ''
+      const linkSuffix = target ? `\n\n${target}` : ''
+      subject = renderTemplate(dbTmpl.subject, vars)
+      body = renderTemplate(dbTmpl.sms_body, vars) + linkSuffix
+      html = simpleCardHtml({
+        title: data.event_title || 'Cafe Kadhem',
+        eventType: data.event_type,
+        greeting: '',
+        body: renderTemplate(dbTmpl.email_body, vars),
+        buttonLabel: type === 'maybe_nudge' ? 'Grab your spot' : 'Pay & confirm',
+        url: target,
+      })
+    } else {
+      const template = messageTemplates[type]
+      if (!template) {
+        return new Response(JSON.stringify({ success: false, error: 'Unknown notification type' }), {
+          status: 400,
+          headers: jsonHeaders,
+        })
+      }
+      ;({ subject, body, html } = template(data))
+    }
     // merge_verification requires sending to the specific channel that
     // owns the matched row (per spec §3.4 Case B). Other types fall back
     // to the guest's general preference.

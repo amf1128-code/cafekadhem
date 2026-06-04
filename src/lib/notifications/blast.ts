@@ -11,6 +11,7 @@ export type BlastAudience =
   | 'all_invited'
   | 'unpaid_tickets'
   | 'maybes'
+  | 'payment_unconfirmed'
 
 // RSVP statuses each audience includes.
 export const AUDIENCE_STATUSES: Record<BlastAudience, string[]> = {
@@ -22,6 +23,9 @@ export const AUDIENCE_STATUSES: Record<BlastAudience, string[]> = {
   // below restricts to payment_status 'unpaid'.
   unpaid_tickets: ['pending_payment', 'yes'],
   maybes: ['maybe'],
+  // Self-attested payment ('yes'), still awaiting host confirmation —
+  // narrowed to payment_status 'pending' below.
+  payment_unconfirmed: ['yes'],
 }
 
 // Audiences that additionally filter on payment_status. Absent = no
@@ -31,6 +35,8 @@ export const AUDIENCE_PAYMENT_STATUSES: Partial<Record<BlastAudience, string[]>>
   // flow a 'pending' guest has self-attested payment and counts as going,
   // so a "you haven't paid" nudge would be wrong. 'paid'/'refunded' too.
   unpaid_tickets: ['unpaid'],
+  // They clicked "I've paid" but the host hasn't matched the Venmo yet.
+  payment_unconfirmed: ['pending'],
 }
 
 export interface CreateBlastInput {
@@ -75,4 +81,32 @@ export async function createAndSendBlast(input: CreateBlastInput): Promise<Blast
 
   const r = result as { sent?: number; failed?: number } | null
   return { sent: r?.sent ?? 0, failed: r?.failed ?? 0 }
+}
+
+// ---- Message templates (admin-editable copy) ---------------------------
+// Reminder / nudge copy lives in the message_templates table so the admin
+// can edit it from the dashboard. Placeholders: {name} {event} {amount}.
+
+export interface MessageVars {
+  name: string
+  event: string
+  amount: string
+}
+
+export function renderTemplate(text: string, vars: MessageVars): string {
+  return text
+    .replace(/\{name\}/g, vars.name)
+    .replace(/\{event\}/g, vars.event)
+    .replace(/\{amount\}/g, vars.amount)
+}
+
+export async function fetchMessageTemplate(
+  key: string,
+): Promise<{ subject: string; email_body: string; sms_body: string } | null> {
+  const { data } = await supabase
+    .from('message_templates')
+    .select('subject, email_body, sms_body')
+    .eq('key', key)
+    .maybeSingle()
+  return (data as { subject: string; email_body: string; sms_body: string } | null) ?? null
 }
