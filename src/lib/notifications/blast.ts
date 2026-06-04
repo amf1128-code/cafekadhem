@@ -17,19 +17,20 @@ export const AUDIENCE_STATUSES: Record<BlastAudience, string[]> = {
   yes_only: ['yes'],
   yes_and_maybe: ['yes', 'maybe'],
   all_invited: ['yes', 'maybe', 'no', 'waitlisted'],
-  // A "ticket holder" reserved a seat (status 'yes'); the payment
-  // narrowing below restricts to those who haven't paid.
-  unpaid_tickets: ['yes'],
+  // "Hasn't paid": the new flow's registered-but-unpaid (pending_payment)
+  // plus grandfathered going-but-unpaid 'yes' rows. The payment narrowing
+  // below restricts to payment_status 'unpaid'.
+  unpaid_tickets: ['pending_payment', 'yes'],
   maybes: ['maybe'],
 }
 
 // Audiences that additionally filter on payment_status. Absent = no
 // payment filter (any payment_status is fine).
 export const AUDIENCE_PAYMENT_STATUSES: Partial<Record<BlastAudience, string[]>> = {
-  // "Haven't paid yet" = no confirmed payment. 'pending' (guest clicked
-  // "I've paid" but the host hasn't verified) is included so a stalled
-  // payment still gets a nudge; 'paid'/'refunded' are excluded.
-  unpaid_tickets: ['unpaid', 'pending'],
+  // Only payment_status 'unpaid'. 'pending' is excluded — under the new
+  // flow a 'pending' guest has self-attested payment and counts as going,
+  // so a "you haven't paid" nudge would be wrong. 'paid'/'refunded' too.
+  unpaid_tickets: ['unpaid'],
 }
 
 export interface CreateBlastInput {

@@ -13,7 +13,18 @@ import { PageLoader } from '../../components/ui/LoadingSpinner'
 
 type TicketRow = RSVP & { guest: Guest }
 
-type FilterTab = 'pending' | 'unpaid' | 'paid' | 'all'
+// "Needs to pay" = the new flow's registered-but-unpaid (pending_payment),
+// or a grandfathered going-but-unpaid 'yes' row. Excludes 'pending' (the
+// guest self-attested, so they count as going) and 'paid'. Drives the
+// Remind action + count.
+function needsPayment(r: TicketRow): boolean {
+  return (
+    r.status === 'pending_payment' ||
+    (r.status === 'yes' && r.payment_status === 'unpaid')
+  )
+}
+
+type FilterTab = 'registered' | 'pending' | 'unpaid' | 'paid' | 'all'
 
 const paymentVariant: Record<string, 'warning' | 'info' | 'success' | 'default'> = {
   unpaid: 'default',
@@ -36,15 +47,7 @@ export function AdminEventTickets() {
   // 'yes') without confirmed payment — matching the unpaid_tickets blast
   // audience. Maybes are nudged regardless of payment (they never began
   // paying); nudging never changes anyone's RSVP.
-  const unpaidTicketCount = useMemo(
-    () =>
-      rows.filter(
-        r =>
-          r.status === 'yes' &&
-          (r.payment_status === 'unpaid' || r.payment_status === 'pending'),
-      ).length,
-    [rows],
-  )
+  const unpaidTicketCount = useMemo(() => rows.filter(needsPayment).length, [rows])
   const maybeCount = useMemo(
     () => rows.filter(r => r.status === 'maybe').length,
     [rows],
@@ -263,12 +266,19 @@ export function AdminEventTickets() {
 
   const filtered = useMemo(() => {
     if (filter === 'all') return rows
+    // New-flow signups who haven't paid (saved, not counted).
+    if (filter === 'registered') return rows.filter(r => r.status === 'pending_payment')
+    // 'unpaid' excludes those registrations (they have their own tab) —
+    // i.e. grandfathered going-but-unpaid rows only.
+    if (filter === 'unpaid')
+      return rows.filter(r => r.payment_status === 'unpaid' && r.status !== 'pending_payment')
     return rows.filter(r => r.payment_status === filter)
   }, [rows, filter])
 
   const counts = useMemo(() => {
     return {
-      unpaid: rows.filter(r => r.payment_status === 'unpaid').length,
+      registered: rows.filter(r => r.status === 'pending_payment').length,
+      unpaid: rows.filter(r => r.payment_status === 'unpaid' && r.status !== 'pending_payment').length,
       pending: rows.filter(r => r.payment_status === 'pending').length,
       paid: rows.filter(r => r.payment_status === 'paid').length,
       all: rows.length,
@@ -344,7 +354,11 @@ export function AdminEventTickets() {
 
       {/* Filter tabs */}
       <div className="flex gap-2 mb-4 flex-wrap">
-        {(['pending', 'unpaid', 'paid', 'all'] as FilterTab[]).map(tab => (
+        {(
+          event.use_new_rsvp_flow || counts.registered > 0
+            ? (['registered', 'pending', 'unpaid', 'paid', 'all'] as FilterTab[])
+            : (['pending', 'unpaid', 'paid', 'all'] as FilterTab[])
+        ).map(tab => (
           <button
             key={tab}
             onClick={() => setFilter(tab)}
@@ -395,7 +409,7 @@ export function AdminEventTickets() {
                         : 'default'
                       }
                     >
-                      {row.status}
+                      {row.status === 'pending_payment' ? 'registered' : row.status}
                     </Badge>
                   </td>
                   <td className="px-4 py-3">
@@ -438,7 +452,7 @@ export function AdminEventTickets() {
                         </>
                       ) : (
                         <>
-                          {row.status === 'yes' && (
+                          {needsPayment(row) && (
                             <Button
                               size="sm"
                               variant="outline"

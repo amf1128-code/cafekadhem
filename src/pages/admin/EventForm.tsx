@@ -39,6 +39,7 @@ export function AdminEventForm() {
   const [preorderEnabled, setPreorderEnabled] = useState(true)
   const [ticketingEnabled, setTicketingEnabled] = useState(false)
   const [ticketPrice, setTicketPrice] = useState('')
+  const [useNewRsvpFlow, setUseNewRsvpFlow] = useState(false)
   const [flyerFile, setFlyerFile] = useState<File | null>(null)
   const [flyerUrl, setFlyerUrl] = useState<string | null>(null)
   const [homeFlyerFile, setHomeFlyerFile] = useState<File | null>(null)
@@ -119,6 +120,7 @@ export function AdminEventForm() {
         setPreorderEnabled(event.preorder_enabled ?? true)
         setTicketingEnabled(!!event.ticketing_enabled)
         setTicketPrice(event.ticket_price != null ? String(event.ticket_price) : '')
+        setUseNewRsvpFlow(!!event.use_new_rsvp_flow)
         setFlyerUrl(event.flyer_url)
         setHomeFlyerUrl(event.home_flyer_url)
         if (event.theme === 'theme1' || event.theme === 'theme2' || event.theme === 'theme3') {
@@ -190,6 +192,7 @@ export function AdminEventForm() {
         preorder_enabled: preorderEnabled,
         ticketing_enabled: ticketingEnabled,
         ticket_price: ticketingEnabled && ticketPrice ? parseFloat(ticketPrice) : null,
+        use_new_rsvp_flow: ticketingEnabled ? useNewRsvpFlow : false,
         flyer_url: uploadedFlyerUrl,
         home_flyer_url: uploadedHomeFlyerUrl,
         theme,
@@ -514,7 +517,7 @@ export function AdminEventForm() {
             Guests RSVP, pay via Venmo, then you confirm payment in the tickets queue. Each confirmed guest gets a QR-code ticket sent via their notification preference.
           </p>
           {ticketingEnabled && (
-            <div className="mt-3 ml-6">
+            <div className="mt-3 ml-6 space-y-3">
               <Input
                 label="Ticket Price (USD)"
                 type="number"
@@ -524,6 +527,22 @@ export function AdminEventForm() {
                 onChange={e => setTicketPrice(e.target.value)}
                 placeholder="e.g. 25"
               />
+              <div>
+                <label className="flex items-center gap-2 text-sm font-medium">
+                  <input
+                    type="checkbox"
+                    checked={useNewRsvpFlow}
+                    onChange={e => setUseNewRsvpFlow(e.target.checked)}
+                    className="rounded border-warm text-forest focus:ring-forest"
+                  />
+                  Use new payment flow (beta)
+                </label>
+                <p className="text-xs text-ink-muted mt-1 ml-6">
+                  Guests must pay (or tap &ldquo;I&rsquo;ve paid&rdquo;) before they
+                  count as going. Unpaid sign-ups are saved but don&rsquo;t take a
+                  spot. Leave off to keep the current flow.
+                </p>
+              </div>
             </div>
           )}
         </div>
