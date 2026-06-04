@@ -43,6 +43,26 @@ function relativeTime(iso: string): string {
   return `${Math.floor(hrs / 24)}d ago`
 }
 
+// Safety fallback if message_templates isn't seeded yet (e.g. migration
+// 059 not applied). The DB rows are the source of truth; this just keeps
+// the bulk buttons working during the deploy window.
+const DEFAULT_TEMPLATES: Record<string, { subject: string; email_body: string; sms_body: string }> = {
+  payment_reminder: {
+    subject: "We're holding your spot for {event}, but get your ticket!",
+    email_body:
+      "Hi {name}! We're holding your spot for {event}, but we don't have your payment confirmed yet. Tickets are ${amount}. Tap below to pay and lock in your seat.",
+    sms_body:
+      "We're holding your spot for {event}, but we don't have your ${amount} payment yet. Tap below to pay and lock in your seat:",
+  },
+  maybe_nudge: {
+    subject: 'Still thinking about {event}?',
+    email_body:
+      "Hi {name}! You marked yourself as a maybe for {event}. Seats are limited — if you're in, tap below to grab your spot before it fills up.",
+    sms_body:
+      'Still thinking about {event}? Seats are limited — tap below to grab your spot before it fills up:',
+  },
+}
+
 type FilterTab = 'registered' | 'pending' | 'unpaid' | 'paid' | 'all'
 
 const paymentVariant: Record<string, 'warning' | 'info' | 'success' | 'default'> = {
@@ -188,8 +208,8 @@ export function AdminEventTickets() {
   // {name} is generic ("there") for bulk sends since the body is shared.
   async function sendTemplatedBlast(templateKey: string, audience: BlastAudience) {
     if (!event) throw new Error('No event')
-    const t = await fetchMessageTemplate(templateKey)
-    if (!t) throw new Error('Message template not found — apply migration 059')
+    const t = (await fetchMessageTemplate(templateKey)) ?? DEFAULT_TEMPLATES[templateKey]
+    if (!t) throw new Error('Message template not found')
     const vars = {
       name: 'there',
       event: event.title,
