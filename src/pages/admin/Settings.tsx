@@ -32,6 +32,8 @@ export function AdminSettings() {
   const [saving, setSaving] = useState(false)
 
   const [venmoHandle, setVenmoHandle] = useState('')
+  const [venmoQrUrl, setVenmoQrUrl] = useState<string | null>(null)
+  const [qrFile, setQrFile] = useState<File | null>(null)
   const [contactEmail, setContactEmail] = useState('')
   const [siteUrl, setSiteUrl] = useState('')
   const [theme, setTheme] = useState<SiteThemeChoice>('default')
@@ -47,6 +49,7 @@ export function AdminSettings() {
     if (data) {
       setSettings(data)
       setVenmoHandle(data.venmo_handle)
+      setVenmoQrUrl(data.venmo_qr_url || null)
       setContactEmail(data.contact_email || '')
       setSiteUrl(data.site_url || '')
       setTheme(isValidSiteTheme(data.theme) ? data.theme : 'default')
@@ -56,12 +59,40 @@ export function AdminSettings() {
     setLoading(false)
   }
 
+  const ALLOWED_QR_TYPES = ['image/jpeg', 'image/png', 'image/webp']
+
+  async function uploadQr(file: File): Promise<string> {
+    if (!ALLOWED_QR_TYPES.includes(file.type)) {
+      throw new Error('Only JPG, PNG, and WebP files are allowed')
+    }
+    const ext = file.name.split('.').pop()
+    const path = `venmo-qr-${Date.now()}.${ext}`
+    const { error } = await supabase.storage.from('flyers').upload(path, file)
+    if (error) throw new Error(`QR upload failed: ${error.message}`)
+    const { data } = supabase.storage.from('flyers').getPublicUrl(path)
+    return data.publicUrl
+  }
+
   async function handleSave(e: FormEvent) {
     e.preventDefault()
     setSaving(true)
 
+    let uploadedQrUrl = venmoQrUrl
+    if (qrFile) {
+      try {
+        uploadedQrUrl = await uploadQr(qrFile)
+        setVenmoQrUrl(uploadedQrUrl)
+        setQrFile(null)
+      } catch (err) {
+        addToast(err instanceof Error ? err.message : 'QR upload failed', 'error')
+        setSaving(false)
+        return
+      }
+    }
+
     const payload = {
       venmo_handle: venmoHandle.trim(),
+      venmo_qr_url: uploadedQrUrl,
       contact_email: contactEmail.trim() || null,
       site_url: siteUrl.trim().replace(/\/$/, '') || 'https://cafekadhem.com',
       theme,
@@ -117,6 +148,36 @@ export function AdminSettings() {
           onChange={e => setVenmoHandle(e.target.value)}
           required
         />
+        <div>
+          <label className="block text-sm font-medium text-ink mb-1">Venmo QR code</label>
+          {(qrFile || venmoQrUrl) && (
+            <img
+              src={qrFile ? URL.createObjectURL(qrFile) : venmoQrUrl!}
+              alt="Venmo QR preview"
+              className="w-32 h-32 object-contain rounded-lg border border-warm mb-2 bg-white"
+            />
+          )}
+          <input
+            type="file"
+            accept="image/jpeg,image/png,image/webp"
+            onChange={e => setQrFile(e.target.files?.[0] || null)}
+            className="block text-sm"
+          />
+          {venmoQrUrl && !qrFile && (
+            <button
+              type="button"
+              className="text-xs text-red-600 hover:underline mt-1"
+              onClick={() => setVenmoQrUrl(null)}
+            >
+              Remove QR
+            </button>
+          )}
+          <p className="text-xs text-ink-muted mt-1">
+            Shown at the door (Door → Venmo QR) so guests can pay on the spot. Save
+            your Venmo QR from the Venmo app. If empty, a QR is generated from your
+            handle as a fallback.
+          </p>
+        </div>
         <Input
           label="Contact Email"
           type="email"
