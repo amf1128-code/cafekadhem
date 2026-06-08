@@ -2,12 +2,13 @@
 // webhook-sms — Telnyx inbound webhook for STOP / HELP / START.
 //
 // 10DLC compliance requires us to honor STOP. Telnyx auto-blocks the
-// number on their side but we must also flip our side to
-// notification_preference='none' so we never try to re-send via that
-// channel (and so admin's audit trail reflects the unsubscribe).
+// number on their side but we must also record the per-channel opt-out
+// on our side so send-time gating sees it and the audit trail is
+// complete. STOP/START operate on the SMS channel only — they no
+// longer suppress email (migration 060).
 //
 // Also handles HELP (auto-reply with a help line) and START / UNSTOP
-// (re-subscribe, sets preference back to 'sms').
+// (re-subscribe to SMS).
 //
 // Signature verification uses Telnyx ed25519 webhook signing. The
 // public key is set as TELNYX_PUBLIC_KEY in the edge function env.
@@ -151,10 +152,13 @@ Deno.serve(async (req) => {
   }
 
   if (START_WORDS.includes(text)) {
-    await supabase
-      .from('guests')
-      .update({ notification_preference: 'sms', updated_at: new Date().toISOString() })
-      .eq('id', guest.id)
+    // Remove only the SMS opt-out. Any email opt-out the guest has on
+    // file is preserved; notification_preference is recomputed by the
+    // guests trigger from the resulting (email, phone, opt-outs).
+    await supabase.rpc('record_resubscribe', {
+      p_guest_id: guest.id,
+      p_channel: 'sms',
+    })
     await sendTelnyxReply(
       fromPhone,
       "Cafe Kadhem: you're back on the list. Reply STOP to opt out.",
