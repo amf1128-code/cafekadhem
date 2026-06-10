@@ -17,6 +17,10 @@ export interface AdminSettings {
   // flows only accept email. Defaults to false until the operator's
   // 10DLC campaign is approved.
   sms_enabled: boolean
+  // Uploaded image of the host's Venmo QR code, shown full-screen at the
+  // door so an unpaid guest can pay on the spot. Null = the door falls
+  // back to a generated QR of the Venmo profile.
+  venmo_qr_url: string | null
   // Italic blurb under "CURRENT MENU." on the cinema landing. Editable
   // from /admin/settings.
   current_menu_blurb: string | null
@@ -152,6 +156,12 @@ export interface RSVP {
   ticket_token: string | null
   paid_at: string | null
   checked_in_at: string | null
+  // Free-text door note for this guest at this event (e.g. "actually paid
+  // for two"). Surfaced on the check-in row and when their ticket scans.
+  notes: string | null
+  // True when this RSVP was created manually at the door via the walk-in
+  // flow rather than a public registration. Drives the "walk-in" badge.
+  walk_in: boolean
   // When set, this row represents a plus-one and points back to the
   // host's RSVP. The host RSVP has plus_one_of = null.
   plus_one_of: string | null
@@ -185,6 +195,8 @@ export interface CheckInResult {
   rsvp_id?: string
   guest_first_name?: string
   guest_last_name?: string | null
+  payment_status?: RSVP['payment_status']
+  notes?: string | null
   event_id?: string
   event_title?: string
   checked_in_at?: string
