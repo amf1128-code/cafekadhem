@@ -8,6 +8,7 @@ import { sendNotification } from '../../lib/notifications'
 import { createAndSendBlast, fetchMessageTemplate, renderTemplate, type BlastAudience } from '../../lib/notifications/blast'
 import { Button } from '../../components/ui/Button'
 import { Badge } from '../../components/ui/Badge'
+import { Textarea } from '../../components/ui/Input'
 import { useToast } from '../../components/ui/Toast'
 import { PageLoader } from '../../components/ui/LoadingSpinner'
 
@@ -82,6 +83,8 @@ export function AdminEventTickets() {
   const [busy, setBusy] = useState<string | null>(null)
   const [filter, setFilter] = useState<FilterTab>('pending')
   const [blasting, setBlasting] = useState<null | 'remind' | 'nudge' | 'chase'>(null)
+  const [editingNote, setEditingNote] = useState<string | null>(null)
+  const [noteDraft, setNoteDraft] = useState('')
 
   // One-click reminder/nudge audiences. "Unpaid" = a held seat (status
   // 'yes') without confirmed payment — matching the unpaid_tickets blast
@@ -357,6 +360,24 @@ export function AdminEventTickets() {
     }
   }
 
+  // Per-RSVP door note ("actually paid for two"). Shared with the check-in
+  // page — same rsvps.notes column, surfaced there when the ticket scans.
+  async function saveNote(row: TicketRow) {
+    const value = noteDraft.trim() || null
+    setBusy(row.id)
+    try {
+      const { error } = await supabase.from('rsvps').update({ notes: value }).eq('id', row.id)
+      if (error) throw error
+      setEditingNote(null)
+      setNoteDraft('')
+      await loadData()
+    } catch (err) {
+      addToast(err instanceof Error ? err.message : 'Failed to save note', 'error')
+    } finally {
+      setBusy(null)
+    }
+  }
+
   const filtered = useMemo(() => {
     if (filter === 'all') return rows
     // New-flow signups who haven't paid (saved, not counted).
@@ -496,9 +517,56 @@ export function AdminEventTickets() {
             <tbody>
               {filtered.map(row => (
                 <tr key={row.id} className="border-b border-warm/50 last:border-0">
-                  <td className="px-4 py-3">
+                  <td className="px-4 py-3 align-top">
                     <span className="font-medium">{row.guest.first_name}</span>
                     {row.guest.last_name && <span className="text-ink/70"> {row.guest.last_name}</span>}
+                    {editingNote === row.id ? (
+                      <div className="mt-1 w-56">
+                        <Textarea
+                          value={noteDraft}
+                          onChange={e => setNoteDraft(e.target.value)}
+                          rows={2}
+                          placeholder="e.g. actually paid for two"
+                          autoFocus
+                        />
+                        <div className="flex gap-2 mt-1">
+                          <Button size="sm" onClick={() => saveNote(row)} loading={busy === row.id}>
+                            Save
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => {
+                              setEditingNote(null)
+                              setNoteDraft('')
+                            }}
+                          >
+                            Cancel
+                          </Button>
+                        </div>
+                      </div>
+                    ) : row.notes ? (
+                      <button
+                        className="mt-1 block text-left bg-amber-50 border border-amber-200 text-amber-900 text-xs rounded px-2 py-1 max-w-[14rem]"
+                        onClick={() => {
+                          setEditingNote(row.id)
+                          setNoteDraft(row.notes || '')
+                        }}
+                      >
+                        📝 {row.notes}
+                        <span className="text-amber-700/70 ml-1">(edit)</span>
+                      </button>
+                    ) : (
+                      <button
+                        className="mt-1 block text-xs text-ink/40 hover:text-forest"
+                        onClick={() => {
+                          setEditingNote(row.id)
+                          setNoteDraft('')
+                        }}
+                      >
+                        + Add note
+                      </button>
+                    )}
                   </td>
                   <td className="px-4 py-3 text-ink/70">
                     {row.guest.email && <span className="block">{row.guest.email}</span>}
