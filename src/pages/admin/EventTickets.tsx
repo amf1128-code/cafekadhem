@@ -191,6 +191,31 @@ export function AdminEventTickets() {
     }
   }
 
+  // Move one unpaid registrant to the waitlist — "close the door" on this
+  // guest so a reminder/pay link can't let them buy in past a full event.
+  // They keep their place (appended to the waitlist) and the host can
+  // promote them back manually. Paid/self-attested guests aren't offered
+  // this; payment_status is preserved either way.
+  async function handleWaitlistOne(row: TicketRow) {
+    if (
+      !confirm(
+        `Move ${row.guest.first_name} to the waitlist? They won't be able to pay in on their own — promote them from the waitlist to bring them back.`,
+      )
+    )
+      return
+    setBusy(row.id)
+    try {
+      const { error } = await supabase.rpc('waitlist_rsvp', { p_rsvp_id: row.id })
+      if (error) throw error
+      addToast(`${row.guest.first_name} moved to the waitlist`)
+      await loadData()
+    } catch (err) {
+      addToast(err instanceof Error ? err.message : 'Failed to waitlist', 'error')
+    } finally {
+      setBusy(null)
+    }
+  }
+
   async function handleResend(row: TicketRow) {
     if (!row.ticket_token) return
     setBusy(row.id)
@@ -656,6 +681,16 @@ export function AdminEventTickets() {
                               loading={busy === row.id}
                             >
                               Nudge
+                            </Button>
+                          )}
+                          {needsPayment(row) && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleWaitlistOne(row)}
+                              loading={busy === row.id}
+                            >
+                              Waitlist
                             </Button>
                           )}
                           <Button

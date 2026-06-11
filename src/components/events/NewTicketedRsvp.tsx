@@ -22,7 +22,7 @@ import { useToast } from '../ui/Toast'
 //   maybe    -> marked maybe
 //   declined -> marked can't go
 
-type Step = 'form' | 'pay' | 'confirm' | 'going' | 'saved' | 'maybe' | 'declined'
+type Step = 'form' | 'pay' | 'confirm' | 'going' | 'saved' | 'maybe' | 'declined' | 'waitlisted'
 
 interface Props {
   eventId: string
@@ -38,6 +38,8 @@ function stepForStatus(status: RSVP['status'] | undefined): Step {
       return 'going'
     case 'pending_payment':
       return 'pay'
+    case 'waitlisted':
+      return 'waitlisted'
     case 'maybe':
       return 'maybe'
     case 'no':
@@ -155,8 +157,11 @@ export function NewTicketedRsvp({ eventId, event, settings, existingRsvp, onComp
         p_guest_id: guestId,
       })
       if (error) throw error
-      setRsvp(created as RSVP)
-      setStep('pay')
+      const row = created as RSVP
+      setRsvp(row)
+      // Event was full: register_pending_payment routed them to the
+      // waitlist instead of the pay flow. Skip payment, show the list.
+      setStep(row?.status === 'waitlisted' ? 'waitlisted' : 'pay')
       onComplete()
     } catch (err) {
       addToast(err instanceof Error ? err.message : 'Something went wrong', 'error')
@@ -195,9 +200,17 @@ export function NewTicketedRsvp({ eventId, event, settings, existingRsvp, onComp
     try {
       const { data, error } = await supabase.rpc('mark_payment_pending', { p_rsvp_id: rsvp.id })
       if (error) throw error
-      if (data) setRsvp(data as RSVP)
-      addToast("You're going! Your host will confirm your payment shortly.")
-      setStep('going')
+      const row = (data as RSVP) ?? rsvp
+      setRsvp(row)
+      // Capacity filled before they paid: they're on the waitlist now, not
+      // counted. Surface that honestly rather than "you're going."
+      if (row.status === 'waitlisted') {
+        addToast("This event filled up — you're on the waitlist. Your host will be in touch.")
+        setStep('waitlisted')
+      } else {
+        addToast("You're going! Your host will confirm your payment shortly.")
+        setStep('going')
+      }
       onComplete()
     } catch (err) {
       addToast(err instanceof Error ? err.message : 'Could not record that', 'error')
@@ -241,6 +254,26 @@ export function NewTicketedRsvp({ eventId, event, settings, existingRsvp, onComp
             </button>
           </div>
         )}
+      </div>
+    )
+  }
+
+  // ---- WAITLISTED (event full) --------------------------------------------
+  if (step === 'waitlisted') {
+    const pos = rsvp?.waitlist_position
+    return (
+      <div style={{ textAlign: 'center', padding: '8px 0' }}>
+        <div style={{ fontFamily: 'var(--ck-serif)', fontWeight: 900, fontSize: 30, color: 'var(--ck-cobalt)' }}>
+          YOU&apos;RE ON THE WAITLIST
+        </div>
+        <p className="ck-italic" style={{ fontSize: 18, marginTop: 8, lineHeight: 1.4 }}>
+          This event is full{pos ? ` — you&apos;re #${pos} in line` : ''}.
+        </p>
+        <p className="ck-mono" style={{ marginTop: 10, opacity: 0.7 }}>
+          No payment yet — your spot isn&apos;t reserved. If one opens up, your host will reach out
+          to bring you in.
+        </p>
+        {changeButton}
       </div>
     )
   }
