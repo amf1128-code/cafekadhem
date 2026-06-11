@@ -272,7 +272,7 @@ export function NewTicketedRsvp({ eventId, event, settings, existingRsvp, isFull
           YOU&apos;RE ON THE WAITLIST
         </div>
         <p className="ck-italic" style={{ fontSize: 18, marginTop: 8, lineHeight: 1.4 }}>
-          This event is full{pos ? ` — you&apos;re #${pos} in line` : ''}.
+          This event is full{pos ? ` — you're #${pos} in line` : ''}.
         </p>
         <p className="ck-mono" style={{ marginTop: 10, opacity: 0.7 }}>
           No payment yet — your spot isn&apos;t reserved. If one opens up, your host will reach out
