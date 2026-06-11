@@ -191,15 +191,15 @@ export function AdminEventTickets() {
     }
   }
 
-  // Move one unpaid registrant to the waitlist — "close the door" on this
-  // guest so a reminder/pay link can't let them buy in past a full event.
-  // They keep their place (appended to the waitlist) and the host can
-  // promote them back manually. Paid/self-attested guests aren't offered
-  // this; payment_status is preserved either way.
+  // Move one not-yet-paid guest to the waitlist — offered for anyone who
+  // isn't confirmed-paid (registered, going-but-unpaid, or "said they
+  // paid"). They keep their place (appended to the waitlist), can't pay
+  // their way back in (server-locked), and the host promotes them back
+  // manually. The guest is notified they're now on the waitlist.
   async function handleWaitlistOne(row: TicketRow) {
     if (
       !confirm(
-        `Move ${row.guest.first_name} to the waitlist? They won't be able to pay in on their own — promote them from the waitlist to bring them back.`,
+        `Move ${row.guest.first_name} to the waitlist? They'll be notified, they won't be able to pay in on their own, and you can promote them back from the waitlist.`,
       )
     )
       return
@@ -207,7 +207,19 @@ export function AdminEventTickets() {
     try {
       const { error } = await supabase.rpc('waitlist_rsvp', { p_rsvp_id: row.id })
       if (error) throw error
-      addToast(`${row.guest.first_name} moved to the waitlist`)
+
+      // Let them know — reuses the "you're on the waitlist" RSVP copy.
+      sendNotification({
+        guestId: row.guest_id,
+        eventId: id!,
+        type: 'rsvp_confirmation',
+        data: {
+          status: 'waitlisted',
+          is_ticketed: event?.ticketing_enabled ? 'true' : 'false',
+        },
+      })
+
+      addToast(`${row.guest.first_name} moved to the waitlist — notifying them`)
       await loadData()
     } catch (err) {
       addToast(err instanceof Error ? err.message : 'Failed to waitlist', 'error')
@@ -683,7 +695,7 @@ export function AdminEventTickets() {
                               Nudge
                             </Button>
                           )}
-                          {needsPayment(row) && (
+                          {row.status !== 'waitlisted' && (
                             <Button
                               size="sm"
                               variant="outline"
