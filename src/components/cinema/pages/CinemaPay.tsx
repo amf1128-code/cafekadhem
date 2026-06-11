@@ -14,6 +14,7 @@ export function CinemaPay() {
   const [event, setEvent] = useState<Event | null>(null)
   const [settings, setSettings] = useState<AdminSettings | null>(null)
   const [myRsvp, setMyRsvp] = useState<RSVP | null>(null)
+  const [isFull, setIsFull] = useState(false)
   const [loading, setLoading] = useState(true)
 
   async function load() {
@@ -34,6 +35,20 @@ export function CinemaPay() {
     ])
     setEvent((ev as Event) ?? null)
     setSettings((settingsRow as AdminSettings) ?? null)
+
+    // Mirror the detail page's capacity gate so a fresh visitor to /pay
+    // on a sold-out event leads with the waitlist instead of the pay ask.
+    const cap = (ev as Event | null)?.capacity || null
+    if (cap !== null) {
+      const { count } = await supabase
+        .from('rsvps')
+        .select('id', { count: 'exact', head: true })
+        .eq('event_id', id)
+        .eq('status', 'yes')
+      setIsFull((count ?? 0) >= cap)
+    } else {
+      setIsFull(false)
+    }
 
     const token = getGuestToken()
     if (token) {
@@ -85,6 +100,7 @@ export function CinemaPay() {
             event={event}
             settings={settings}
             existingRsvp={myRsvp}
+            isFull={isFull}
             onComplete={load}
           />
         </div>
