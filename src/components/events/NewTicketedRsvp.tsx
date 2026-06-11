@@ -29,6 +29,11 @@ interface Props {
   event: Event
   settings: AdminSettings | null
   existingRsvp: RSVP | null
+  // True when the event is at capacity. When set, the form leads with the
+  // waitlist path (no payment ask) instead of "Going — pay to reserve."
+  // The server (register_pending_payment) is authoritative and waitlists
+  // on a full event regardless; this just keeps the UI honest up front.
+  isFull?: boolean
   onComplete: () => void
 }
 
@@ -65,7 +70,7 @@ function Field({
   )
 }
 
-export function NewTicketedRsvp({ eventId, event, settings, existingRsvp, onComplete }: Props) {
+export function NewTicketedRsvp({ eventId, event, settings, existingRsvp, isFull = false, onComplete }: Props) {
   const { addToast } = useToast()
   const [rsvp, setRsvp] = useState<RSVP | null>(existingRsvp)
   const [step, setStep] = useState<Step>(() => {
@@ -408,8 +413,18 @@ export function NewTicketedRsvp({ eventId, event, settings, existingRsvp, onComp
   // ---- FORM (choose a response) -------------------------------------------
   return (
     <form onSubmit={e => e.preventDefault()} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+      {isFull && (
+        <div className="ck-mono" style={{
+          letterSpacing: '0.14em', textTransform: 'uppercase', fontSize: 11,
+          color: 'var(--ck-magenta)',
+        }}>
+          ✦ Sold out
+        </div>
+      )}
       <p className="ck-italic" style={{ fontSize: 18, lineHeight: 1.4 }}>
-        ${amount} per person. Going? Enter your info, then pay to lock in your spot.
+        {isFull
+          ? `This event is sold out. Add your name to the waitlist and we'll reach out if a spot opens — no payment needed yet.`
+          : `$${amount} per person. Going? Enter your info, then pay to lock in your spot.`}
       </p>
       <Field label="Name" value={firstName} onChange={e => setFirstName(e.target.value)} placeholder="Your first name" required />
       <Field label="Last name" optional value={lastName} onChange={e => setLastName(e.target.value)} />
@@ -426,7 +441,7 @@ export function NewTicketedRsvp({ eventId, event, settings, existingRsvp, onComp
           className="ck-btn ck-btn--primary"
           style={{ flex: '1 1 200px' }}
         >
-          {loading ? 'Saving…' : 'Going — reserve a seat →'}
+          {loading ? 'Saving…' : isFull ? 'Join the waitlist →' : 'Going — reserve a seat →'}
         </button>
         <button type="button" onClick={() => handleResponse('maybe')} disabled={loading} className="ck-btn">
           Maybe

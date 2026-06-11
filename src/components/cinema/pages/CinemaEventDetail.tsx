@@ -454,7 +454,11 @@ export function CinemaEventDetail() {
               </div>
               {rsvpOpen ? (
                 <a href="#rsvp" className="ck-btn ck-btn--primary">
-                  {event.ticketing_enabled ? 'Get a ticket' : 'RSVP'} →
+                  {seatsRemaining === 0
+                    ? 'Join the waitlist'
+                    : event.ticketing_enabled
+                      ? 'Get a ticket'
+                      : 'RSVP'} →
                 </a>
               ) : (
                 <a href="#coming-soon" className="ck-btn">
@@ -545,6 +549,7 @@ export function CinemaEventDetail() {
                 event={event}
                 settings={settings}
                 existingRsvp={myRsvp}
+                isFull={totalSeats !== null && seatsTaken >= totalSeats}
                 onComplete={() => loadEvent({ silent: true })}
               />
             ) : (
