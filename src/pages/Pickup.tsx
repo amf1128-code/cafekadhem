@@ -10,6 +10,8 @@ import type {
   PickupSlot,
 } from '../lib/types'
 import { getGuestToken, setGuestToken } from '../lib/utils/guest-token'
+import { cartTotal } from '../lib/utils/cart'
+import { formatUsd } from '../lib/utils/money'
 import {
   dispatchMergeVerification,
   type PendingMerge,
@@ -186,10 +188,7 @@ export function Pickup() {
     })
   }
 
-  const total = cart.reduce(
-    (sum, item) => sum + (item.menuItem.price || 0) * item.quantity,
-    0,
-  )
+  const total = cartTotal(cart)
 
   async function handleSubmit() {
     if (cart.length === 0) return
@@ -385,7 +384,7 @@ export function Pickup() {
               rel="noopener noreferrer"
               style={{ color: 'var(--ck-cobalt)', textDecoration: 'underline' }}
             >
-              Tap here to retry (${submitted.amount.toFixed(2)})
+              Tap here to retry ({formatUsd(submitted.amount)})
             </a>
             .
           </p>
@@ -752,7 +751,7 @@ export function Pickup() {
                       <span style={{ opacity: 0.55 }}>× {item.quantity}</span>
                     </span>
                     <span style={{ fontWeight: 800 }}>
-                      ${((item.menuItem.price || 0) * item.quantity).toFixed(2)}
+                      {formatUsd((item.menuItem.price || 0) * item.quantity)}
                     </span>
                   </div>
                 ))}
@@ -767,7 +766,7 @@ export function Pickup() {
                   }}
                 >
                   <span>Total</span>
-                  <span>${total.toFixed(2)}</span>
+                  <span>{formatUsd(total)}</span>
                 </div>
               </div>
             </>
@@ -839,7 +838,7 @@ export function Pickup() {
           >
             {submitting
               ? 'Sending you to Venmo…'
-              : `Pay $${total.toFixed(2)} with Venmo →`}
+              : `Pay ${formatUsd(total)} with Venmo →`}
           </button>
           <p
             style={{

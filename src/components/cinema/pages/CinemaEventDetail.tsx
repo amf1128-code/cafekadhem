@@ -11,6 +11,13 @@ import type {
   RSVP,
 } from '../../../lib/types'
 import { getGuestToken, setGuestToken } from '../../../lib/utils/guest-token'
+import { cartCount as sumCartCount, cartTotal as sumCartTotal } from '../../../lib/utils/cart'
+import { formatUsd } from '../../../lib/utils/money'
+import {
+  formatCinemaDay as formatDay,
+  formatCinemaTime as formatTime,
+  formatShortDate as formatDate,
+} from '../helpers'
 import {
   dispatchMergeVerification,
   type PendingMerge,
@@ -208,11 +215,8 @@ export function CinemaEventDetail() {
 
   // Cart total / count helpers + adjust handler. Caps a quantity to the
   // remaining stock when an event_menu_item_limit has been set.
-  const cartTotal = cart.reduce(
-    (sum, c) => sum + (c.menuItem.price ?? 0) * c.quantity,
-    0,
-  )
-  const cartCount = cart.reduce((sum, c) => sum + c.quantity, 0)
+  const cartTotal = sumCartTotal(cart)
+  const cartCount = sumCartCount(cart)
   function remainingFor(itemId: string): number | null {
     const a = availability[itemId]
     if (!a) return null
@@ -1452,7 +1456,7 @@ function StickyCartBar({
             lineHeight: 1,
           }}
         >
-          ${total.toFixed(2)}
+          {formatUsd(total)}
         </span>
       </div>
       <button
@@ -1904,7 +1908,7 @@ function CartCheckoutModal({
                           marginTop: 2,
                         }}
                       >
-                        ${(c.menuItem.price ?? 0).toFixed(2)} each
+                        {formatUsd(c.menuItem.price ?? 0)} each
                       </div>
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -1945,7 +1949,7 @@ function CartCheckoutModal({
                         minWidth: 60,
                       }}
                     >
-                      ${((c.menuItem.price ?? 0) * c.quantity).toFixed(2)}
+                      {formatUsd((c.menuItem.price ?? 0) * c.quantity)}
                     </div>
                   </div>
                 ))}
@@ -1960,7 +1964,7 @@ function CartCheckoutModal({
                   }}
                 >
                   <span>Total</span>
-                  <span>${total.toFixed(2)}</span>
+                  <span>{formatUsd(total)}</span>
                 </div>
               </div>
 
@@ -2105,7 +2109,7 @@ function CartCheckoutModal({
               }
               className="ck-btn ck-btn--primary ck-btn--block"
             >
-              {submitting ? 'Sending you to Venmo…' : `Pay $${total.toFixed(2)} with Venmo →`}
+              {submitting ? 'Sending you to Venmo…' : `Pay ${formatUsd(total)} with Venmo →`}
             </button>
             <p
               style={{
@@ -2147,23 +2151,3 @@ function InstagramGlyph() {
   )
 }
 
-function formatDate(dateStr: string): string {
-  const [, m, d] = dateStr.split('-')
-  return m && d ? `${m}.${d}` : dateStr
-}
-function formatDay(dateStr: string): string {
-  const date = new Date(dateStr + 'T12:00:00')
-  return date
-    .toLocaleDateString('en-US', { weekday: 'short', timeZone: 'America/New_York' })
-    .toUpperCase()
-}
-function formatTime(start: string, end: string | null): string {
-  const startHour = Number(start.split(':')[0])
-  const period = startHour >= 12 ? 'PM' : 'AM'
-  const display = startHour % 12 || 12
-  if (!end) return `${display}${period} TILL LATE`
-  const endHour = Number(end.split(':')[0])
-  const endPeriod = endHour >= 12 ? 'PM' : 'AM'
-  const endDisplay = endHour % 12 || 12
-  return `${display}${period} – ${endDisplay}${endPeriod}`
-}

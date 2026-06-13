@@ -10,6 +10,8 @@ import type {
   RSVP,
 } from '../lib/types'
 import { getGuestToken, setGuestToken } from '../lib/utils/guest-token'
+import { cartTotal } from '../lib/utils/cart'
+import { formatUsd } from '../lib/utils/money'
 import {
   dispatchMergeVerification,
   type PendingMerge,
@@ -150,10 +152,7 @@ export function Order() {
     })
   }
 
-  const total = cart.reduce(
-    (sum, item) => sum + (item.menuItem.price || 0) * item.quantity,
-    0,
-  )
+  const total = cartTotal(cart)
 
   async function handleSubmit() {
     if (cart.length === 0) return
@@ -415,7 +414,7 @@ export function Order() {
                 rel="noopener noreferrer"
                 style={{ color: 'var(--ck-cobalt)', textDecoration: 'underline' }}
               >
-                Tap here to retry (${paidAmount.toFixed(2)})
+                Tap here to retry ({formatUsd(paidAmount)})
               </a>
               .
             </p>
@@ -691,7 +690,7 @@ export function Order() {
                     <span style={{ opacity: 0.55 }}>× {item.quantity}</span>
                   </span>
                   <span style={{ fontWeight: 800 }}>
-                    ${((item.menuItem.price || 0) * item.quantity).toFixed(2)}
+                    {formatUsd((item.menuItem.price || 0) * item.quantity)}
                   </span>
                 </div>
               ))}
@@ -706,7 +705,7 @@ export function Order() {
                 }}
               >
                 <span>Total</span>
-                <span>${total.toFixed(2)}</span>
+                <span>{formatUsd(total)}</span>
               </div>
             </div>
           )}
@@ -846,7 +845,7 @@ export function Order() {
           >
             {submitting
               ? 'Sending you to Venmo…'
-              : `Pay $${total.toFixed(2)} with Venmo →`}
+              : `Pay ${formatUsd(total)} with Venmo →`}
           </button>
           <p
             style={{

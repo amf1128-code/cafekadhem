@@ -46,6 +46,28 @@ export function formatCinemaDate(dateStr: string): string {
   return `${m}.${d}.${y.slice(-2)}`
 }
 
+/**
+ * "2026-06-16" → "06.16" — short date stamp without the year. Used on
+ * event detail / ticket / calendar / my-tickets rows where the year is
+ * implied. Falls back to the raw string if it isn't an ISO date.
+ */
+export function formatShortDate(dateStr: string): string {
+  const [, m, d] = dateStr.split('-')
+  return m && d ? `${m}.${d}` : dateStr
+}
+
+/**
+ * "18:00" → "6PM" — single time, hour-only. Null/empty → "". Used for
+ * pickup slots and event start times where the end time isn't shown.
+ */
+export function formatHour(t: string | null | undefined): string {
+  if (!t) return ''
+  const hour = Number(t.split(':')[0])
+  const period = hour >= 12 ? 'PM' : 'AM'
+  const display = hour % 12 || 12
+  return `${display}${period}`
+}
+
 /** "2026-06-16" → "TUE" — three-letter weekday in ET. */
 export function formatCinemaDay(dateStr: string): string {
   const date = new Date(dateStr + 'T12:00:00')

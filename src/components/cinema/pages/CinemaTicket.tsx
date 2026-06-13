@@ -3,6 +3,11 @@ import { useParams } from 'react-router-dom'
 import QRCode from 'qrcode'
 import { supabase } from '../../../lib/supabase'
 import type { TicketView } from '../../../lib/types'
+import {
+  formatCinemaDay as formatDay,
+  formatCinemaTime as formatTime,
+  formatShortDate as formatDate,
+} from '../helpers'
 import { CinemaPageLoader } from '../primitives'
 
 /**
@@ -227,23 +232,3 @@ function Row({ label, value }: { label: string; value: string }) {
   )
 }
 
-function formatDate(dateStr: string): string {
-  const [, m, d] = dateStr.split('-')
-  return m && d ? `${m}.${d}` : dateStr
-}
-function formatDay(dateStr: string): string {
-  const date = new Date(dateStr + 'T12:00:00')
-  return date
-    .toLocaleDateString('en-US', { weekday: 'short', timeZone: 'America/New_York' })
-    .toUpperCase()
-}
-function formatTime(start: string, end: string | null): string {
-  const startHour = Number(start.split(':')[0])
-  const period = startHour >= 12 ? 'PM' : 'AM'
-  const display = startHour % 12 || 12
-  if (!end) return `${display}${period} TILL LATE`
-  const endHour = Number(end.split(':')[0])
-  const endPeriod = endHour >= 12 ? 'PM' : 'AM'
-  const endDisplay = endHour % 12 || 12
-  return `${display}${period} – ${endDisplay}${endPeriod}`
-}

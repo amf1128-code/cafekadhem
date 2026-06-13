@@ -1,6 +1,7 @@
 import { Modal } from '../ui/Modal'
 import { QRCode } from './QRCode'
 import { venmoProfileUrl } from '../../lib/utils/door'
+import { formatUsd } from '../../lib/utils/money'
 
 interface VenmoQrModalProps {
   open: boolean
@@ -36,7 +37,7 @@ export function VenmoQrModal({
           </p>
         )}
         {amount != null && amount > 0 && (
-          <p className="font-serif text-3xl text-forest-dark mb-3">${amount.toFixed(2)}</p>
+          <p className="font-serif text-3xl text-forest-dark mb-3">{formatUsd(amount)}</p>
         )}
 
         {!handle ? (

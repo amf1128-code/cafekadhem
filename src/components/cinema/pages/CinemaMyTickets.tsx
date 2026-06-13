@@ -6,6 +6,8 @@ import {
   getGuestToken,
   setGuestToken,
 } from '../../../lib/utils/guest-token'
+import { formatUsd } from '../../../lib/utils/money'
+import { formatHour as formatTime, formatShortDate as formatDate } from '../helpers'
 import { CinemaPageLoader } from '../primitives'
 
 interface RsvpRow {
@@ -311,7 +313,7 @@ export function CinemaMyTickets() {
                     fontSize: 22,
                   }}
                 >
-                  ${p.total.toFixed(2)}
+                  {formatUsd(p.total)}
                 </div>
               )}
             </div>
@@ -511,7 +513,7 @@ function PreorderBlock({ order }: { order: EventOrderRow }) {
             </span>
             {item.unit_price != null && (
               <span style={{ fontWeight: 700 }}>
-                ${(item.unit_price * item.quantity).toFixed(2)}
+                {formatUsd(item.unit_price * item.quantity)}
               </span>
             )}
           </li>
@@ -531,7 +533,7 @@ function PreorderBlock({ order }: { order: EventOrderRow }) {
           }}
         >
           <span>Total</span>
-          <span>${order.total.toFixed(2)}</span>
+          <span>{formatUsd(order.total)}</span>
         </div>
       )}
       {order.status === 'pending' && (
@@ -679,15 +681,3 @@ function today(): string {
   return new Date().toISOString().slice(0, 10)
 }
 
-function formatDate(dateStr: string): string {
-  const [, m, d] = dateStr.split('-')
-  return m && d ? `${m}.${d}` : dateStr
-}
-function formatTime(t: string | null | undefined): string {
-  if (!t) return ''
-  const [h] = t.split(':')
-  const hour = Number(h)
-  const period = hour >= 12 ? 'PM' : 'AM'
-  const display = hour % 12 || 12
-  return `${display}${period}`
-}

@@ -4,11 +4,36 @@ import {
   formatCinemaDate,
   formatCinemaDay,
   formatCinemaTime,
+  formatHour,
+  formatShortDate,
   interleaveAlternating,
   makeDisplayTitle,
   padNo,
   splitBullets,
 } from './helpers'
+
+describe('formatShortDate', () => {
+  it('renders month.day without the year', () => {
+    expect(formatShortDate('2026-06-16')).toBe('06.16')
+  })
+  it('falls back to the raw string when not an ISO date', () => {
+    expect(formatShortDate('soon')).toBe('soon')
+  })
+})
+
+describe('formatHour', () => {
+  it('formats a 24h time to an hour-only 12h stamp', () => {
+    expect(formatHour('18:00')).toBe('6PM')
+    expect(formatHour('09:30')).toBe('9AM')
+    expect(formatHour('00:00')).toBe('12AM')
+    expect(formatHour('12:00')).toBe('12PM')
+  })
+  it('returns empty string for null/undefined/empty', () => {
+    expect(formatHour(null)).toBe('')
+    expect(formatHour(undefined)).toBe('')
+    expect(formatHour('')).toBe('')
+  })
+})
 
 describe('interleaveAlternating', () => {
   it('strictly alternates equal-length arrays', () => {

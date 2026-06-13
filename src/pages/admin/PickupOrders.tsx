@@ -8,6 +8,7 @@ import { useToast } from '../../components/ui/Toast'
 import { PageLoader } from '../../components/ui/LoadingSpinner'
 import { formatDate, formatTime } from '../../lib/utils/date'
 import { downloadCSV } from '../../lib/utils/csv'
+import { formatAmount, formatUsd } from '../../lib/utils/money'
 
 type OrderWithDetails = PickupOrder & {
   guest: Guest
@@ -132,8 +133,8 @@ export function AdminPickupOrders() {
       pickup_time: o.pickup_time,
       items: o.items.map(i => `${i.menu_item?.name || 'Unknown'} x${i.quantity}`).join('; '),
       total: o.total || 0,
-      cost: orderCost(o).toFixed(2),
-      margin: ((o.total || 0) - orderCost(o)).toFixed(2),
+      cost: formatAmount(orderCost(o)),
+      margin: formatAmount((o.total || 0) - orderCost(o)),
       status: o.status,
       notes: o.notes || '',
       created: o.created_at,
@@ -179,19 +180,19 @@ export function AdminPickupOrders() {
           <p className="text-sm text-ink/60">Active Tickets</p>
         </div>
         <div className="bg-white border border-warm rounded-lg p-4 text-center">
-          <p className="text-2xl font-serif text-forest-dark">${totalRevenue.toFixed(2)}</p>
+          <p className="text-2xl font-serif text-forest-dark">{formatUsd(totalRevenue)}</p>
           <p className="text-sm text-ink/60">Revenue</p>
         </div>
         <div className="bg-white border border-warm rounded-lg p-4 text-center">
-          <p className="text-2xl font-serif text-forest-dark">${paidRevenue.toFixed(2)}</p>
+          <p className="text-2xl font-serif text-forest-dark">{formatUsd(paidRevenue)}</p>
           <p className="text-sm text-ink/60">Paid / Picked Up</p>
         </div>
         <div className="bg-white border border-warm rounded-lg p-4 text-center">
-          <p className="text-2xl font-serif text-forest-dark">${totalCost.toFixed(2)}</p>
+          <p className="text-2xl font-serif text-forest-dark">{formatUsd(totalCost)}</p>
           <p className="text-sm text-ink/60">Cost</p>
         </div>
         <div className="bg-white border border-warm rounded-lg p-4 text-center">
-          <p className="text-2xl font-serif text-forest-dark">${margin.toFixed(2)}</p>
+          <p className="text-2xl font-serif text-forest-dark">{formatUsd(margin)}</p>
           <p className="text-sm text-ink/60">Margin</p>
         </div>
       </div>
@@ -248,7 +249,7 @@ export function AdminPickupOrders() {
                       </span>
                     ))}
                   </td>
-                  <td className="px-4 py-3">${(order.total || 0).toFixed(2)}</td>
+                  <td className="px-4 py-3">{formatUsd(order.total || 0)}</td>
                   <td className="px-4 py-3">
                     <button onClick={() => toggleStatus(order.id, order.status)}>
                       <Badge variant={statusVariants[order.status]}>

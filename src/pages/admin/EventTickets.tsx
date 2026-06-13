@@ -4,6 +4,7 @@ import { supabase } from '../../lib/supabase'
 import type { Event, RSVP, Guest } from '../../lib/types'
 import { formatDate, formatTime } from '../../lib/utils/date'
 import { formatPhone } from '../../lib/utils/phone'
+import { formatUsd } from '../../lib/utils/money'
 import { sendNotification } from '../../lib/notifications'
 import { createAndSendBlast, fetchMessageTemplate, renderTemplate, type BlastAudience } from '../../lib/notifications/blast'
 import { Button } from '../../components/ui/Button'
@@ -459,7 +460,7 @@ export function AdminEventTickets() {
         <div>
           <h1 className="font-serif text-2xl text-forest-dark">{event.title} - Tickets</h1>
           <p className="text-sm text-ink/60">
-            {formatDate(event.date)} at {formatTime(event.start_time)} · ${event.ticket_price?.toFixed(2) || '0.00'} per ticket
+            {formatDate(event.date)} at {formatTime(event.start_time)} · {formatUsd(event.ticket_price ?? 0)} per ticket
           </p>
         </div>
         <div className="flex gap-2">

@@ -3,6 +3,7 @@ import { useParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import type { MenuItem, PickupOrder, PickupOrderItem } from '../lib/types'
 import { formatDate, formatTime } from '../lib/utils/date'
+import { formatUsd } from '../lib/utils/money'
 import { QRCode } from '../components/tickets/QRCode'
 import { CinemaPageLoader } from '../components/cinema/primitives'
 
@@ -141,7 +142,7 @@ export function PickupTicket() {
             <Row label="Pick-up" value={`${formatDate(order.pickup_date)} · ${formatTime(order.pickup_time)}`} />
             <Row label="Status" value={STATUS_LABELS[order.status] || order.status} />
             {order.total != null && (
-              <Row label="Total" value={`$${order.total.toFixed(2)}`} />
+              <Row label="Total" value={formatUsd(order.total)} />
             )}
 
             <div
@@ -172,7 +173,7 @@ export function PickupTicket() {
                     <span style={{ opacity: 0.55, marginLeft: 8 }}>× {i.quantity}</span>
                   </span>
                   {i.unit_price != null && (
-                    <span>${(i.unit_price * i.quantity).toFixed(2)}</span>
+                    <span>{formatUsd(i.unit_price * i.quantity)}</span>
                   )}
                 </div>
               ))}
