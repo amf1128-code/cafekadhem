@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useMemo, type FormEvent } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { Html5Qrcode } from 'html5-qrcode'
+import QRCode from 'qrcode'
 import { supabase } from '../../lib/supabase'
 import type { Event, CheckInResult } from '../../lib/types'
 import { formatDate, formatTime } from '../../lib/utils/date'
@@ -57,6 +58,11 @@ export function AdminEventCheckIn() {
   const [walkInOpen, setWalkInOpen] = useState(false)
   const [qrFor, setQrFor] = useState<{ name?: string } | null>(null)
 
+  // Door QR (capacity-bypass walk-in link) modal.
+  const [doorOpen, setDoorOpen] = useState(false)
+  const [doorQr, setDoorQr] = useState<{ url: string; image: string } | null>(null)
+  const [doorBusy, setDoorBusy] = useState(false)
+
   const scannerRef = useRef<Html5Qrcode | null>(null)
   const lastScanRef = useRef<{ token: string; at: number } | null>(null)
   const busyRef = useRef(false)
@@ -86,6 +92,54 @@ export function AdminEventCheckIn() {
     if (rsvpResult.data) setAttendees(rsvpResult.data as AttendeeRow[])
     if (settingsResult.data) setSettings(settingsResult.data as DoorSettings)
     setLoading(false)
+  }
+
+  // ---- Door QR (capacity-bypass walk-in link) ----------------------------
+  async function buildDoorQr(tok: string) {
+    const url = `${window.location.origin}/door/${tok}`
+    const image = await QRCode.toDataURL(url, {
+      margin: 1,
+      width: 480,
+      color: { dark: '#0d0d0f', light: '#f4ecd8' },
+    })
+    setDoorQr({ url, image })
+  }
+
+  async function openDoorQr() {
+    setDoorOpen(true)
+    if (doorQr) return
+    setDoorBusy(true)
+    try {
+      let tok = event?.door_token || null
+      if (!tok) {
+        const { data, error } = await supabase.rpc('mint_door_token', { p_event_id: id! })
+        if (error) throw error
+        tok = data as string
+        setEvent(e => (e ? { ...e, door_token: tok } : e))
+      }
+      await buildDoorQr(tok)
+    } catch (err) {
+      addToast(err instanceof Error ? err.message : 'Could not create door QR', 'error')
+    } finally {
+      setDoorBusy(false)
+    }
+  }
+
+  async function rotateDoorToken() {
+    if (!confirm('Generate a new door QR? The current one stops working immediately.')) return
+    setDoorBusy(true)
+    try {
+      const { data, error } = await supabase.rpc('mint_door_token', { p_event_id: id! })
+      if (error) throw error
+      const tok = data as string
+      setEvent(e => (e ? { ...e, door_token: tok } : e))
+      await buildDoorQr(tok)
+      addToast('New door QR generated')
+    } catch (err) {
+      addToast(err instanceof Error ? err.message : 'Could not rotate the code', 'error')
+    } finally {
+      setDoorBusy(false)
+    }
   }
 
   // Map a plus-one rsvp id -> its host's first name, for the "+1 of X" tag.
@@ -291,6 +345,9 @@ export function AdminEventCheckIn() {
           </p>
         </div>
         <div className="flex gap-2">
+          <Button variant="outline" size="sm" onClick={openDoorQr}>
+            Door QR
+          </Button>
           <Button variant="outline" size="sm" onClick={() => setQrFor({})}>
             Venmo QR
           </Button>
@@ -555,6 +612,44 @@ export function AdminEventCheckIn() {
           loadData()
         }}
       />
+
+      <Modal open={doorOpen} onClose={() => setDoorOpen(false)} title="Door QR — register & pay">
+        <div className="text-sm text-ink/70 space-y-3">
+          <p>
+            Show this at the door. Anyone who scans can register and pay{' '}
+            <strong>even when the event is full</strong> — it bypasses the waitlist. They’ll appear
+            here flagged “said paid” for you to reconcile against Venmo.
+          </p>
+          {doorBusy && !doorQr ? (
+            <p className="text-ink/50">Generating…</p>
+          ) : doorQr ? (
+            <>
+              <div className="flex justify-center">
+                <img
+                  src={doorQr.image}
+                  alt="Door QR code"
+                  width={240}
+                  height={240}
+                  className="border-2 border-warm rounded"
+                  style={{ imageRendering: 'pixelated' }}
+                />
+              </div>
+              <p className="break-all text-xs text-ink/40 text-center">{doorQr.url}</p>
+              <div className="flex justify-center gap-2">
+                <a href={doorQr.url} target="_blank" rel="noopener noreferrer">
+                  <Button variant="ghost" size="sm">Open link</Button>
+                </a>
+                <Button variant="outline" size="sm" onClick={rotateDoorToken} loading={doorBusy}>
+                  Rotate code
+                </Button>
+              </div>
+              <p className="text-xs text-ink/50">
+                Rotate if the code leaks — the old QR stops working at once.
+              </p>
+            </>
+          ) : null}
+        </div>
+      </Modal>
     </div>
   )
 }

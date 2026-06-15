@@ -60,6 +60,9 @@ export interface Event {
   // they pay or self-attest. Default false = the legacy flow. Per-event
   // so it can be rolled out one event at a time.
   use_new_rsvp_flow: boolean
+  // Unguessable per-event token embedded in the door QR (capacity-bypass
+  // walk-in flow). Null until the host first opens the door QR; rotatable.
+  door_token: string | null
   theme: 'theme1' | 'theme2' | 'theme3'
   // Cinema/poster landing fields. All optional; the cinema landing falls
   // back to defaults when null. Set per event from the admin form.
