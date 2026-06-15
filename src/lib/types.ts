@@ -152,6 +152,10 @@ export interface RSVP {
   status: 'yes' | 'maybe' | 'no' | 'waitlisted' | 'pending_payment'
   waitlist_position: number | null
   waitlisted_at: string | null
+  // Set when a host promotes a waitlisted guest into pending_payment on a
+  // ticketed event — marks a reserved seat whose payment bypasses the
+  // capacity gate. Cleared once they're seated ('yes').
+  promoted_at: string | null
   payment_status: 'unpaid' | 'pending' | 'paid' | 'refunded'
   ticket_token: string | null
   paid_at: string | null

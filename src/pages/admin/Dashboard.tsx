@@ -14,10 +14,6 @@ export function AdminDashboard() {
   const [recentRsvps, setRecentRsvps] = useState<(RSVP & { guest: PublicGuestProfile; event_title: string })[]>([])
   const [loading, setLoading] = useState(true)
 
-  useEffect(() => {
-    loadData()
-  }, [])
-
   async function loadData() {
     // Load events
     const { data: eventsData } = await supabase
@@ -74,6 +70,13 @@ export function AdminDashboard() {
 
     setLoading(false)
   }
+
+  useEffect(() => {
+    // loadData awaits before any setState, so the mount-load is async, not
+    // a synchronous cascade — the rule can't see through the async loader.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    loadData()
+  }, [])
 
   if (loading) return <PageLoader />
 
@@ -146,6 +149,49 @@ export function AdminDashboard() {
             </div>
           ))}
         </div>
+      )}
+
+      {/* Waitlists — who's waiting across upcoming events, with a jump to
+          each event's waitlist to promote them. */}
+      {events.some(e => e.rsvp_waitlisted > 0) && (
+        <>
+          <h2 className="font-serif text-lg text-forest-dark mb-3">Waitlists</h2>
+          <div className="bg-white border border-warm rounded-lg overflow-x-auto mb-8">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-warm bg-warm/30">
+                  <th className="text-left px-4 py-2 font-medium text-ink/70">Event</th>
+                  <th className="text-left px-4 py-2 font-medium text-ink/70">When</th>
+                  <th className="text-left px-4 py-2 font-medium text-ink/70">Going</th>
+                  <th className="text-left px-4 py-2 font-medium text-ink/70">Waiting</th>
+                  <th className="text-right px-4 py-2 font-medium text-ink/70">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {events
+                  .filter(e => e.rsvp_waitlisted > 0)
+                  .map(event => (
+                    <tr key={event.id} className="border-b border-warm/50 last:border-0">
+                      <td className="px-4 py-2 font-medium">{event.title}</td>
+                      <td className="px-4 py-2 text-ink/70">{formatDate(event.date)}</td>
+                      <td className="px-4 py-2 text-ink/70">
+                        {event.rsvp_yes}
+                        {event.capacity ? ` / ${event.capacity}` : ''}
+                      </td>
+                      <td className="px-4 py-2">
+                        <Badge variant="info">{event.rsvp_waitlisted} waiting</Badge>
+                      </td>
+                      <td className="px-4 py-2 text-right">
+                        <Link to={`/admin/events/${event.id}/waitlist`}>
+                          <Button variant="outline" size="sm">Manage waitlist</Button>
+                        </Link>
+                      </td>
+                    </tr>
+                  ))}
+              </tbody>
+            </table>
+          </div>
+        </>
       )}
 
       {/* Past Events */}
