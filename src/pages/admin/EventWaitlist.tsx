@@ -48,8 +48,18 @@ export function AdminEventWaitlist() {
     setLoading(false)
   }
 
-  async function handlePromote(rsvpId: string, guestId: string) {
-    setPromoting(rsvpId)
+  async function handlePromote(entry: WaitlistEntry) {
+    const name = entry.guest.first_name || 'this guest'
+    const newFlow = !!event?.use_new_rsvp_flow
+    const alreadyPaid = entry.payment_status === 'paid' || entry.payment_status === 'pending'
+    const msg = newFlow
+      ? alreadyPaid
+        ? `Promote ${name}? They've already paid, so this seats them as Going and lets them know.`
+        : `Promote ${name}? They'll be taken off the waitlist and sent a link to pay and lock in their spot — the seat is held for them until they pay.`
+      : `Promote ${name}? They'll be confirmed as Going and notified.${event?.capacity ? ' If the event is full, capacity bumps by 1.' : ''}`
+    if (!confirm(msg)) return
+
+    setPromoting(entry.id)
     try {
       // New (payment-gated) flow: promote into a *reserved* pending_payment
       // seat so the guest still has to pay to secure it — the /pay page
@@ -57,18 +67,18 @@ export function AdminEventWaitlist() {
       // already-paid/attested guest is seated outright. Legacy events keep
       // the old promote-straight-to-'yes' behavior.
       let needsToPay: boolean
-      if (event?.use_new_rsvp_flow) {
-        const { data, error } = await supabase.rpc('promote_to_payment', { p_rsvp_id: rsvpId })
+      if (newFlow) {
+        const { data, error } = await supabase.rpc('promote_to_payment', { p_rsvp_id: entry.id })
         if (error) throw error
         const row = data as RSVP | null
         needsToPay = row?.status !== 'yes'
         addToast(
           needsToPay
-            ? 'Promoted — they’ll get a link to pay and lock in their spot.'
-            : 'Promoted — already paid, so they’re in.',
+            ? `${name} promoted — sent a link to pay and lock in their spot.`
+            : `${name} promoted — already paid, so they're in.`,
         )
       } else {
-        const { data, error } = await supabase.rpc('promote_from_waitlist', { p_rsvp_id: rsvpId })
+        const { data, error } = await supabase.rpc('promote_from_waitlist', { p_rsvp_id: entry.id })
         if (error) throw error
         const result = data as { success: boolean; error?: string }
         if (!result.success) {
@@ -76,14 +86,14 @@ export function AdminEventWaitlist() {
           return
         }
         needsToPay = !!event?.ticketing_enabled
-        addToast('Guest promoted from waitlist')
+        addToast(`${name} promoted from the waitlist`)
       }
 
       // Notify the guest. is_ticketed='true' uses the "secure your spot —
       // pay now" copy with the /pay link; 'false' uses the plain "you're
       // confirmed" copy (already paid, or a free event).
       sendNotification({
-        guestId,
+        guestId: entry.guest_id,
         eventId: id!,
         type: 'waitlist_promoted',
         data: { is_ticketed: needsToPay ? 'true' : 'false' },
@@ -144,6 +154,16 @@ export function AdminEventWaitlist() {
         </div>
       </div>
 
+      {/* What "Promote" does — set expectations before the click. */}
+      {waitlist.length > 0 && (
+        <p className="text-sm text-ink/60 mb-3">
+          {event.use_new_rsvp_flow
+            ? 'Promote offers a guest the open spot: they’re taken off the waitlist and sent a link to pay and lock it in (the seat is held until they pay). Anyone who already paid is just seated. They’re notified either way.'
+            : 'Promote confirms a guest as going and notifies them.' +
+              (event.capacity ? ' If the event is full, capacity bumps by 1.' : '')}
+        </p>
+      )}
+
       {/* Waitlist Table */}
       {waitlist.length === 0 ? (
         <div className="bg-white border border-warm rounded-lg p-8 text-center">
@@ -202,10 +222,11 @@ export function AdminEventWaitlist() {
                   <td className="px-4 py-3 text-right">
                     <Button
                       size="sm"
-                      onClick={() => handlePromote(entry.id, entry.guest_id)}
+                      onClick={() => handlePromote(entry)}
                       loading={promoting === entry.id}
+                      title="Offer this guest the open spot"
                     >
-                      Promote
+                      Promote →
                     </Button>
                   </td>
                 </tr>

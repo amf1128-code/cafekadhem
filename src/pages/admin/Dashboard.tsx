@@ -137,9 +137,11 @@ export function AdminDashboard() {
                 <Link to={`/admin/events/${event.id}/blast`}>
                   <Button variant="ghost" size="sm">Blast</Button>
                 </Link>
-                {event.rsvp_waitlisted > 0 && (
+                {(event.capacity != null || event.rsvp_waitlisted > 0) && (
                   <Link to={`/admin/events/${event.id}/waitlist`}>
-                    <Button variant="ghost" size="sm">Waitlist</Button>
+                    <Button variant="ghost" size="sm">
+                      Waitlist{event.rsvp_waitlisted > 0 ? ` (${event.rsvp_waitlisted})` : ''}
+                    </Button>
                   </Link>
                 )}
                 <Link to={`/events/${event.id}`} target="_blank">

@@ -466,6 +466,9 @@ export function AdminEventTickets() {
           </p>
         </div>
         <div className="flex gap-2">
+          <Link to={`/admin/events/${id}/waitlist`}>
+            <Button variant="outline" size="sm">Waitlist</Button>
+          </Link>
           <Link to={`/admin/events/${id}/checkin`}>
             <Button variant="outline" size="sm">Door / Check-in</Button>
           </Link>
