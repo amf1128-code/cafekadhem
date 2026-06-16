@@ -11,6 +11,7 @@ import { Badge } from '../../components/ui/Badge'
 import { Textarea } from '../../components/ui/Input'
 import { useToast } from '../../components/ui/Toast'
 import { PageLoader } from '../../components/ui/LoadingSpinner'
+import { GuestActivityModal } from '../../components/admin/GuestActivityModal'
 
 type TicketRow = RSVP & { guest: Guest }
 
@@ -85,6 +86,8 @@ export function AdminEventTickets() {
   const [blasting, setBlasting] = useState<null | 'remind' | 'nudge' | 'chase'>(null)
   const [editingNote, setEditingNote] = useState<string | null>(null)
   const [noteDraft, setNoteDraft] = useState('')
+  // Per-guest activity history (click a guest name).
+  const [historyFor, setHistoryFor] = useState<{ guestId: string; name: string } | null>(null)
 
   // One-click reminder/nudge audiences. "Unpaid" = a held seat (status
   // 'yes') without confirmed payment — matching the unpaid_tickets blast
@@ -555,8 +558,20 @@ export function AdminEventTickets() {
               {filtered.map(row => (
                 <tr key={row.id} className="border-b border-warm/50 last:border-0">
                   <td className="px-4 py-3 align-top">
-                    <span className="font-medium">{row.guest.first_name}</span>
-                    {row.guest.last_name && <span className="text-ink/70"> {row.guest.last_name}</span>}
+                    <button
+                      type="button"
+                      className="font-medium text-left hover:text-forest hover:underline"
+                      onClick={() =>
+                        setHistoryFor({
+                          guestId: row.guest_id,
+                          name: `${row.guest.first_name}${row.guest.last_name ? ` ${row.guest.last_name}` : ''}`,
+                        })
+                      }
+                      title="View this guest's history"
+                    >
+                      {row.guest.first_name}
+                      {row.guest.last_name && <span className="text-ink/70"> {row.guest.last_name}</span>}
+                    </button>
                     {editingNote === row.id ? (
                       <div className="mt-1 w-56">
                         <Textarea
@@ -729,6 +744,15 @@ export function AdminEventTickets() {
             </tbody>
           </table>
         </div>
+      )}
+
+      {historyFor && (
+        <GuestActivityModal
+          eventId={id!}
+          guestId={historyFor.guestId}
+          guestName={historyFor.name}
+          onClose={() => setHistoryFor(null)}
+        />
       )}
     </div>
   )

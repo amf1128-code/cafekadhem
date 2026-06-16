@@ -51,30 +51,42 @@ export function AdminEventWaitlist() {
   async function handlePromote(rsvpId: string, guestId: string) {
     setPromoting(rsvpId)
     try {
-      const { data, error } = await supabase.rpc('promote_from_waitlist', {
-        p_rsvp_id: rsvpId,
-      })
-
-      if (error) throw error
-
-      const result = data as { success: boolean; error?: string }
-      if (!result.success) {
-        addToast(result.error || 'Failed to promote', 'error')
-        return
+      // New (payment-gated) flow: promote into a *reserved* pending_payment
+      // seat so the guest still has to pay to secure it — the /pay page
+      // unlocks for them and their payment skips the capacity gate. An
+      // already-paid/attested guest is seated outright. Legacy events keep
+      // the old promote-straight-to-'yes' behavior.
+      let needsToPay: boolean
+      if (event?.use_new_rsvp_flow) {
+        const { data, error } = await supabase.rpc('promote_to_payment', { p_rsvp_id: rsvpId })
+        if (error) throw error
+        const row = data as RSVP | null
+        needsToPay = row?.status !== 'yes'
+        addToast(
+          needsToPay
+            ? 'Promoted — they’ll get a link to pay and lock in their spot.'
+            : 'Promoted — already paid, so they’re in.',
+        )
+      } else {
+        const { data, error } = await supabase.rpc('promote_from_waitlist', { p_rsvp_id: rsvpId })
+        if (error) throw error
+        const result = data as { success: boolean; error?: string }
+        if (!result.success) {
+          addToast(result.error || 'Failed to promote', 'error')
+          return
+        }
+        needsToPay = !!event?.ticketing_enabled
+        addToast('Guest promoted from waitlist')
       }
 
-      addToast('Guest promoted from waitlist')
-
-      // Send notification to promoted guest. Pass ticketing context so the
-      // template can prompt for payment when this event requires a paid
-      // ticket. The edge function builds event_url from admin_settings.site_url.
+      // Notify the guest. is_ticketed='true' uses the "secure your spot —
+      // pay now" copy with the /pay link; 'false' uses the plain "you're
+      // confirmed" copy (already paid, or a free event).
       sendNotification({
         guestId,
         eventId: id!,
         type: 'waitlist_promoted',
-        data: {
-          is_ticketed: event?.ticketing_enabled ? 'true' : 'false',
-        },
+        data: { is_ticketed: needsToPay ? 'true' : 'false' },
       })
 
       await loadData()

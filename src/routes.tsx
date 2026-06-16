@@ -56,6 +56,9 @@ const CinemaPickupTicket = lazy(() =>
 const CinemaVerifyMerge = lazy(() =>
   import('./components/cinema/pages/CinemaVerifyMerge').then(m => ({ default: m.CinemaVerifyMerge }))
 )
+const CinemaDoor = lazy(() =>
+  import('./components/cinema/pages/CinemaDoor').then(m => ({ default: m.CinemaDoor }))
+)
 
 const AdminLogin = lazy(() =>
   import('./pages/admin/Login').then(m => ({ default: m.AdminLogin }))
@@ -133,6 +136,7 @@ export const router = createBrowserRouter([
       { path: 'pickup', element: <Lazy><CinemaPickup /></Lazy> },
       { path: 'pickup/:token', element: <Lazy><CinemaPickupTicket /></Lazy> },
       { path: 'verify-merge', element: <Lazy><CinemaVerifyMerge /></Lazy> },
+      { path: 'door/:token', element: <Lazy><CinemaDoor /></Lazy> },
     ],
   },
   {

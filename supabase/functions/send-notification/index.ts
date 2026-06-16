@@ -635,10 +635,13 @@ const messageTemplates: Record<string, (data: Record<string, string>) => { subje
   }),
   waitlist_promoted: (data) => {
     if (data.is_ticketed === 'true') {
-      const eventLink = data.event_url ? `\n\n${data.event_url}` : ''
+      // Point them at the focused pay page (promotion unlocks it). Their
+      // seat is held only until they pay, so the copy says exactly that.
+      const payLink = data.pay_url || data.event_url
+      const link = payLink ? `\n\n${payLink}` : ''
       return {
-        subject: `A spot opened up - ${data.event_title || 'Cafe Kadhem'}`,
-        body: `Good news — a spot opened up at ${data.event_title || 'our event'} and you're off the waitlist! To confirm your seat, please buy your ticket ASAP. We'll follow up with your ticket once payment is received.${eventLink}`,
+        subject: `You're off the waitlist - ${data.event_title || 'Cafe Kadhem'}`,
+        body: `Good news — a spot opened up at ${data.event_title || 'our event'} and you're off the waitlist! Your seat isn't secured until you pay, so grab it now before it's gone:${link}`,
       }
     }
     return {
@@ -920,8 +923,10 @@ Deno.serve(async (req: Request) => {
           : eventRow.location
         const siteUrl = await getSiteUrl()
         data.event_url = `${siteUrl}/events/${eventId}`
-        // Payment reminders point at the focused /pay page.
-        if (type === 'payment_reminder' || type === 'payment_unconfirmed')
+        // Payment reminders + waitlist promotions point at the focused
+        // /pay page (promotion moves the guest into pending_payment, which
+        // is the state that unlocks it).
+        if (type === 'payment_reminder' || type === 'payment_unconfirmed' || type === 'waitlist_promoted')
           data.pay_url = `${siteUrl}/pay/${eventId}`
       }
     }
